@@ -4,7 +4,9 @@
 pub mod utils;
 pub mod downloads;
 pub mod bootstrap;
+pub mod manifest;
 
+use bootstrap::{Version, VersionType};
 use downloads::Download;
 use std::env;
 
@@ -15,7 +17,19 @@ async fn main() {
 
   // TEST CODE!
   let load = Download::new();
-  load.await.download("1.19.4".to_string(), "E:\\programming\\code\\nomi".to_string()).await.unwrap();
+  load.await.download("1.19.4".to_string(), "E:\\programming\\code\\nomi\\minecraft".to_string()).await.unwrap();
+
+  let bootstrap = Version::new(
+    "1.19.4",
+    VersionType::Release,
+    "Umatriz",
+    "null",
+    "null",
+    "E:\\programming\\code\\nomi\\minecraft",
+    "E:\\programming\\apps\\java\\bin\\java.exe"
+  );
+
+  bootstrap.launch().unwrap();
 
   tauri::Builder::default()
     .run(tauri::generate_context!())
