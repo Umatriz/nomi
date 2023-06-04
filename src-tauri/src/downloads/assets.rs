@@ -1,5 +1,5 @@
 use std::{path::{Path, PathBuf}, collections::HashMap};
-use reqwest::{blocking, get, Client, Response};
+use reqwest::{blocking, Client};
 use serde::{Serialize, Deserialize};
 use tokio::task::spawn_blocking;
 

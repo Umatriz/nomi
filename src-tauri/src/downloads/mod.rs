@@ -2,7 +2,7 @@ use std::{
   path::{Path, PathBuf}
 };
 
-use reqwest::{Client, get, blocking};
+use reqwest::{Client, blocking};
 use thiserror::Error;
 use tokio::task::spawn_blocking;
 
@@ -12,7 +12,6 @@ pub mod assets;
 use crate::manifest::Manifest;
 use launcher_manifest::{LauncherManifest, LauncherManifestVersion};
 
-use self::assets::AssetsDownload;
 
 #[derive(Error, Debug)]
 pub enum DownloaderError {

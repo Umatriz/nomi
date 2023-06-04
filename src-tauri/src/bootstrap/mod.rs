@@ -25,17 +25,9 @@ pub enum BootstrapError {
 }
 
 #[derive(Debug)]
-pub enum VersionType {
-  Release,
-  Snapshot,
-  OldAlpha,
-  OldBeta,
-}
-
-#[derive(Debug)]
 pub struct Version {
   version: String,
-  version_type: VersionType,
+  version_type: String,
   // max_ram: i8,
   // min_ram: i8,
   username: String,
@@ -49,7 +41,7 @@ pub struct Version {
 impl Version {
   pub fn new(
     version: &str,
-    version_type: VersionType,
+    version_type: String,
     // max_ram: i8,
     // min_ram: i8,
     username: &str,
@@ -164,12 +156,7 @@ impl Version {
         format!("--version"),
         format!("{}", self.version),
         format!("--versionType"),
-        format!("{}", match &self.version_type {
-          VersionType::Release => "release".to_string(),
-          VersionType::Snapshot => "snapshot".to_string(),
-          VersionType::OldAlpha => "old_alpha".to_string(),
-          VersionType::OldBeta => "old_beta".to_string()
-        }),
+        format!("{}", self.version_type),
     ];
 
     return Ok(args);
