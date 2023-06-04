@@ -151,7 +151,7 @@ impl Version {
         format!("{}", self.access_token),
         format!("--assetsDir"),
         format!("{}", self.get_assets_dir()),
-        format!("--assetsIndex"),
+        format!("--assetIndex"),
         format!("{}", manifest.asset_index.id),
         format!("--gameDir"),
         format!("{}", self.dir),

@@ -1,5 +1,5 @@
 use std::{path::{Path, PathBuf}, collections::HashMap};
-use reqwest::{blocking, get, Client};
+use reqwest::{blocking, get, Client, Response};
 use serde::{Serialize, Deserialize};
 use tokio::task::spawn_blocking;
 
@@ -23,15 +23,19 @@ impl AssetInformation {
 
 #[derive(Debug)]
 pub struct AssetsDownload {
-  assets: Assets
+  assets: Assets,
+  id: String,
+  url: String
 }
 
 impl AssetsDownload {
-  pub async fn new(url: String) -> Self {
+  pub async fn new(url: String, id: String) -> Self {
     Self {
-      assets: Self::init(url)
+      assets: Self::init(url.clone())
         .await
         .unwrap(),
+      id,
+      url
     }
   }
 
@@ -58,6 +62,27 @@ impl AssetsDownload {
     println!("Dir {} created successfully", path.to_str().unwrap().to_string());
 
     return path;
+  }
+
+  pub async fn get_assets_json(&self, assets_dir: PathBuf) -> Result<(), reqwest::Error> {
+    let filen = format!("{}.json", self.id);
+    let path = assets_dir.join(filen);
+
+    let _ = std::fs::create_dir_all(&path.parent().unwrap());
+
+    let body = Client::new()
+      .get(&self.url)
+      .send()
+      .await?
+      .text()
+      .await?;
+
+    match std::fs::write(&path, body) {
+      Ok(_) => println!("Downloaded successfully {}", path.to_str().unwrap().to_string()),
+      Err(e) => println!("Error: {}", e)
+    }
+
+    Ok(())
   }
 
   pub async fn download_assets(&self, dir: &str) {

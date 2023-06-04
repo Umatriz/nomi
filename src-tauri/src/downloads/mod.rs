@@ -61,9 +61,6 @@ impl Download {
   }
 
   async fn dowload_file<P: AsRef<Path>>(&self, path: P, url: String) {
-    // let resp = get(url).await.expect("Request failed");
-    // let body = resp.text().await.expect("Body invalid");
-    // let mut out = File::create(path).expect("Failed to create file");
     let path = path.as_ref();
     let _ = std::fs::create_dir_all(path.parent().unwrap());
 
@@ -76,13 +73,19 @@ impl Download {
         .unwrap()
     }).await;
     println!("Downloaded {}", path.to_str().unwrap().to_string())
-
-    // match std::fs::write(path, body ) {
-    //   Ok(_) => println!("Downloaded successfully {}", path.to_str().unwrap().to_string()),
-    //   Err(e) => println!("Error: {}", e)
-    // }
   }
 
+  pub async fn create_version_json(&self, manifest: &Manifest, version_dir: PathBuf) -> Result<(), serde_json::Error> {
+    let filen = format!("{}.json", manifest.id);
+    let path = version_dir.join(filen);
+
+    let file = std::fs::File::create(&path).unwrap();
+
+    let _ = serde_json::to_writer_pretty(&file, &manifest);
+
+    Ok(())
+  }
+  
   async fn download_version(&self, manifest: Manifest, dir: String) -> Result<(), DownloaderError> {
     let main_dir = Path::new(&dir);
     let jar_name = format!("{}.jar", &manifest.id);
@@ -94,10 +97,10 @@ impl Download {
 
     self.dowload_file(&jar_file, manifest.downloads.client.url.clone()).await;
 
-    let asset = assets::AssetsDownload::new(manifest.asset_index.url.clone());
+    let asset = assets::AssetsDownload::new(manifest.asset_index.url.clone(), manifest.asset_index.id.clone());
     asset.await.download_assets(&dir).await;
 
-    self.create_json(&manifest, versions_path).await?;
+    self.create_version_json(&manifest, versions_path).await?;
 
     for lib in manifest.libraries {
       let artifact = lib.downloads.artifact;
@@ -118,16 +121,6 @@ impl Download {
     Ok(())
   }
 
-  pub async fn create_json(&self, manifest: &Manifest, version_dir: PathBuf) -> Result<(), reqwest::Error> {
-    let filen = format!("{}.json", manifest.id);
-    let path = version_dir.join(filen);
-
-    let file = std::fs::File::create(&path).unwrap();
-
-    let json = serde_json::to_writer_pretty(&file, &manifest);
-
-    Ok(())
-  }
 
   pub async fn download(&self, version_id: String, dir: String,) -> Result<(), DownloaderError> {
     let client = Client::new();
