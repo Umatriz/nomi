@@ -64,9 +64,9 @@ impl AssetsDownload {
     return path;
   }
 
-  pub async fn get_assets_json(&self, assets_dir: PathBuf) -> Result<(), reqwest::Error> {
+  pub async fn get_assets_json(&self, assets_dir: &String) -> Result<(), reqwest::Error> {
     let filen = format!("{}.json", self.id);
-    let path = assets_dir.join(filen);
+    let path = Path::new(&assets_dir).join("assets").join(filen);
 
     let _ = std::fs::create_dir_all(&path.parent().unwrap());
 

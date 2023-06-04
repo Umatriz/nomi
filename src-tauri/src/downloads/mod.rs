@@ -12,6 +12,8 @@ pub mod assets;
 use crate::manifest::Manifest;
 use launcher_manifest::{LauncherManifest, LauncherManifestVersion};
 
+use self::assets::AssetsDownload;
+
 #[derive(Error, Debug)]
 pub enum DownloaderError {
   #[error("An unexpected error has ocurred.")]
@@ -97,8 +99,9 @@ impl Download {
 
     self.dowload_file(&jar_file, manifest.downloads.client.url.clone()).await;
 
-    let asset = assets::AssetsDownload::new(manifest.asset_index.url.clone(), manifest.asset_index.id.clone());
-    asset.await.download_assets(&dir).await;
+    let asset = assets::AssetsDownload::new(manifest.asset_index.url.clone(), manifest.asset_index.id.clone()).await;
+    asset.download_assets(&dir).await;
+    asset.get_assets_json(&dir).await?;
 
     self.create_version_json(&manifest, versions_path).await?;
 
