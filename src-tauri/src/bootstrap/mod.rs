@@ -1,6 +1,6 @@
 mod classpath;
 
-use std::{path::{Path, PathBuf}, process::Command};
+use std::{path::{Path}, process::Command};
 
 use thiserror::Error;
 

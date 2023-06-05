@@ -30,11 +30,12 @@ pub fn launch (
     username,
     "null",
     "null",
-    current_dir()
-      .unwrap()
-      .join("minecraft")
-      .to_str()
-      .unwrap(),
+    // current_dir()
+    //   .unwrap()
+    //   .join("minecraft")
+    //   .to_str()
+    //   .unwrap(),
+    "E:\\programming\\code\\nomi\\minecraft",
     java_bin
   );
 

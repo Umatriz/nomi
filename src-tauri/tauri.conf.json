@@ -2,8 +2,8 @@
   "build": {
     "beforeBuildCommand": "yarn build",
     "beforeDevCommand": "yarn dev",
-    "devPath": "http://localhost:3000",
-    "distDir": "../out"
+    "devPath": "http://localhost:5173",
+    "distDir": "../build"
   },
   "package": {
     "productName": "nomi",
@@ -55,10 +55,10 @@
     "windows": [
       {
         "fullscreen": false,
-        "height": 600,
+        "height": 720,
         "resizable": true,
-        "title": "nomi",
-        "width": 800
+        "title": "Nomi",
+        "width": 1280
       }
     ]
   }
