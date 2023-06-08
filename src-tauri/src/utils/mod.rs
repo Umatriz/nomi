@@ -53,6 +53,16 @@ impl Config {
     }
   }
 
+  pub fn write_config(&self) {
+    let cdir = std::env::current_dir().unwrap();
+    if cdir.join("config.yaml").exists() {
+      todo!()
+    } else {
+      let file = std::fs::File::create(cdir.join("config.yaml")).unwrap();
+      let _ = serde_yaml::to_writer(&file, &self);
+    }
+  }
+
   pub fn add_profile(&mut self, profile: Profile) {
     self.profiles.push(profile)
   }
