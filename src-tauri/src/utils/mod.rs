@@ -55,7 +55,7 @@ impl Config {
     }
   }
 
-  pub fn does_exist(&self) -> (bool, Option<PathBuf>) {
+  fn does_exist(&self) -> (bool, Option<PathBuf>) {
     let config = std::env::current_dir().unwrap().join("config.yaml");
     if config.exists() {
       return (true, Some(config))
@@ -63,7 +63,7 @@ impl Config {
     return (false, None);
   }
 
-  pub fn write_config(&self) -> Result<(), serde_yaml::Error> {
+  fn write_config(&self) -> Result<(), serde_yaml::Error> {
     if self.does_exist().0 {
       print!("Config already exist");
       Ok(())
@@ -75,8 +75,17 @@ impl Config {
     }
   }
 
-  pub fn read_config(&self) {
-    todo!()
+  pub fn read_config(&self) -> Result<Config, ()> {
+    let conf = self.does_exist();
+    if conf.0 {
+      let f = std::fs::File::open(conf.1.unwrap()).expect("Could not open file");
+      let read: Config = serde_yaml::from_reader(f).expect("Could not read values");
+      return Ok(read);
+    } else {
+      let _ = self.write_config();
+      return Err(());
+    }
+        
   }
 
   pub fn add_profile(&mut self, profile: Profile) {
