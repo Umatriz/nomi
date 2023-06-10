@@ -21,24 +21,24 @@ impl Profile {
     version: String,
     version_type: String,
     path: String,
-    profiles: Vec<Profile>
+    profiles: &Vec<Profile>
   ) -> Self {
     Self {
-      id: Self::create_id(profiles),
+      id: Self::create_id(&profiles),
       version,
       version_type,
       path,
     }
   }
 
-  pub fn create_id(profiles: Vec<Profile>) -> i32 {
+  pub fn create_id(profiles: &Vec<Profile>) -> i32 {
     let mut max_id: Vec<i32> = vec![];
     for prof in profiles.iter() {
       max_id.push(prof.id)
     }
 
     match max_id.iter().max() {
-      Some(mx) => mx + 1,
+      Some(mx) => dbg!(mx + 1),
       None => {
         println!("Vec is empty");
         0
@@ -60,7 +60,7 @@ impl Config {
     if config.exists() {
       return (true, Some(config))
     }
-    return (false, None);
+    return (false, Some(config));
   }
 
   fn write_config(&self) -> Result<(), serde_yaml::Error> {
@@ -89,7 +89,8 @@ impl Config {
   }
 
   pub fn add_profile(&mut self, profile: Profile) {
-    self.profiles.push(profile)
+    self.profiles.push(profile);
+    todo!()
   }
 
   pub fn get_profile(&self, id: i32) -> Option<&Profile> {
