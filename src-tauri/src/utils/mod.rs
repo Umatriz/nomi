@@ -96,7 +96,7 @@ impl Config {
     return (false, config);
   }
 
-  pub fn write_config(&self) -> Result<(), Error> {
+  pub fn write(&self) -> Result<(), Error> {
     let conf = self.does_exist();
     let mut file: File = OpenOptions::new()
       .read(true)
@@ -125,7 +125,7 @@ impl Config {
         let _ = serde_yaml::to_writer(&mut file, &self);
       },
       false => {
-        self.write_config().unwrap()
+        self.write().unwrap()
       },
     }
   }
@@ -137,7 +137,7 @@ impl Config {
       let read: Config = serde_yaml::from_reader(f).expect("Could not read values");
       return Ok(read);
     } else {
-      let _ = self.write_config();
+      let _ = self.write();
       return Err(());
     }
         
@@ -154,5 +154,9 @@ impl Config {
       }
     }
     return None;
+  }
+
+  pub fn remove_profile(&mut self, id: usize) {
+    self.profiles.remove(id);
   }
 }
