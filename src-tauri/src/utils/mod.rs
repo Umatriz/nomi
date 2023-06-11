@@ -49,23 +49,46 @@ impl Profile {
 
 impl Config {
   pub fn new(username: String) -> Self {
-    let conf = Self::does_exist();
+    Self {
+      username,
+      profiles: vec![],
+    }
+  }
+  
+  pub fn from_file(username: Option<String>) -> Self {
+    let conf: (bool, PathBuf) = {
+      let config = std::env::current_dir().unwrap().join("config.yaml");
+      if config.exists() {
+        (true, config)
+      } else {
+        (false, config)
+      }
+    };
     match conf.0 {
       true => {
         let f = std::fs::File::open(conf.1).expect("Could not open file");
-        let read: Config = serde_yaml::from_reader(f).expect("Could not read values");
-        read
+        let mut read: Config = serde_yaml::from_reader(f).expect("Could not read values");
+        match username {
+          Some(u) => {
+            read.username = u;
+            read
+          },
+          None => read,
+        }
       },
       false => {
         Self {
-          username,
+          username: match username {
+            Some(u) => u,
+            None => panic!(),
+        },
           profiles: vec![],
         }
       },
     }
   }
 
-  fn does_exist() -> (bool, PathBuf) {
+  fn does_exist(&self) -> (bool, PathBuf) {
     let config = std::env::current_dir().unwrap().join("config.yaml");
     if config.exists() {
       return (true, config)
@@ -73,24 +96,42 @@ impl Config {
     return (false, config);
   }
 
-  fn write_config(&self) -> Result<(), Error> {
-    let conf = Self::does_exist();
+  pub fn write_config(&self) -> Result<(), Error> {
+    let conf = self.does_exist();
     let mut file: File = OpenOptions::new()
       .read(true)
       .write(true)
       .create(true)
       .append(false)
       .open(conf.1)?;
-    if !conf.0 { 
-      file = std::fs::File::create(Self::does_exist().1).unwrap();
+    if conf.0 { 
+      file = std::fs::File::create(self.does_exist().1).unwrap();
     }
     let _ = serde_yaml::to_writer(&mut file, &self);
     println!("created config");
     Ok(())
   }
 
+  pub fn overwrite(&self) {
+    let conf = self.does_exist();
+    match conf.0 {
+      true => {
+        let mut file = OpenOptions::new()
+          .write(true)
+          .truncate(true)
+          .open(conf.1)
+          .unwrap();
+
+        let _ = serde_yaml::to_writer(&mut file, &self);
+      },
+      false => {
+        self.write_config().unwrap()
+      },
+    }
+  }
+
   pub fn read_config(&self) -> Result<Config, ()> {
-    let conf = Self::does_exist();
+    let conf = self.does_exist();
     if conf.0 {
       let f = std::fs::File::open(conf.1).expect("Could not open file");
       let read: Config = serde_yaml::from_reader(f).expect("Could not read values");
@@ -104,7 +145,6 @@ impl Config {
 
   pub fn add_profile(&mut self, profile: Profile) {
     self.profiles.push(profile);
-    let _ = self.write_config();
   }
 
   pub fn get_profile(&self, id: i32) -> Option<&Profile> {
