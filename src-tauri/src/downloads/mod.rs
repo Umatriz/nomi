@@ -6,7 +6,7 @@ use reqwest::{Client, blocking};
 use thiserror::Error;
 use tokio::task::spawn_blocking;
 
-mod launcher_manifest;
+pub mod launcher_manifest;
 pub mod assets;
 
 use crate::manifest::Manifest;

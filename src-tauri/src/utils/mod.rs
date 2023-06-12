@@ -16,6 +16,19 @@ pub struct Profile {
   pub path: String,
 }
 
+struct ConfigFile(bool, PathBuf);
+
+impl ConfigFile {
+  pub fn new() -> Self {
+    let config = std::env::current_dir().unwrap().join("config.yaml");
+
+    match config.exists() {
+      true => Self(true, config),
+      false => Self(false, config),
+    }
+  }
+}
+
 impl Profile {
   pub fn new(
     version: String,
@@ -56,14 +69,7 @@ impl Config {
   }
   
   pub fn from_file(username: Option<String>) -> Self {
-    let conf: (bool, PathBuf) = {
-      let config = std::env::current_dir().unwrap().join("config.yaml");
-      if config.exists() {
-        (true, config)
-      } else {
-        (false, config)
-      }
-    };
+    let conf: ConfigFile = ConfigFile::new();
     match conf.0 {
       true => {
         let f = std::fs::File::open(conf.1).expect("Could not open file");
@@ -88,16 +94,8 @@ impl Config {
     }
   }
 
-  fn does_exist(&self) -> (bool, PathBuf) {
-    let config = std::env::current_dir().unwrap().join("config.yaml");
-    if config.exists() {
-      return (true, config)
-    }
-    return (false, config);
-  }
-
   pub fn write(&self) -> Result<(), Error> {
-    let conf = self.does_exist();
+    let conf: ConfigFile = ConfigFile::new();
     let mut file: File = OpenOptions::new()
       .read(true)
       .write(true)
@@ -105,7 +103,7 @@ impl Config {
       .append(false)
       .open(conf.1)?;
     if conf.0 { 
-      file = std::fs::File::create(self.does_exist().1).unwrap();
+      file = std::fs::File::create(ConfigFile::new().1).unwrap();
     }
     let _ = serde_yaml::to_writer(&mut file, &self);
     println!("created config");
@@ -113,7 +111,7 @@ impl Config {
   }
 
   pub fn overwrite(&self) {
-    let conf = self.does_exist();
+    let conf: ConfigFile = ConfigFile::new();
     match conf.0 {
       true => {
         let mut file = OpenOptions::new()
@@ -131,7 +129,7 @@ impl Config {
   }
 
   pub fn read_config(&self) -> Result<Config, ()> {
-    let conf = self.does_exist();
+    let conf: ConfigFile = ConfigFile::new();
     if conf.0 {
       let f = std::fs::File::open(conf.1).expect("Could not open file");
       let read: Config = serde_yaml::from_reader(f).expect("Could not read values");

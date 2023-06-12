@@ -1,6 +1,6 @@
 use std::env::current_dir;
 
-use crate::{downloads::Download, bootstrap::{Version}};
+use crate::{downloads::{Download, launcher_manifest::{LauncherManifest, LauncherManifestVersion}}, bootstrap::{Version}};
 
 #[tauri::command]
 pub async fn download_version(id: &str) -> Result<(), ()> {
@@ -40,4 +40,16 @@ pub fn launch (
   );
 
   bootstrap.launch().unwrap();
+}
+
+#[tauri::command]
+pub async fn get_manifest() -> Result<Vec<LauncherManifestVersion>, ()> {
+  let resp: LauncherManifest = reqwest::get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
+    .await
+    .unwrap()
+    .json()
+    .await
+    .unwrap();
+
+  return Ok(resp.versions);
 }
