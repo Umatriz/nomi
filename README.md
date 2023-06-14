@@ -1,8 +1,8 @@
 # Nomi
 Start project:
 ```shell
-cargo tauri dev
+cargo run
 ```
 
 ### TODO
-[] Rewrite UI to egui
+- [ ] Rewrite UI to egui
