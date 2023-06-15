@@ -157,4 +157,8 @@ impl Config {
   pub fn remove_profile(&mut self, id: usize) {
     self.profiles.remove(id);
   }
+
+  pub fn update_username(&mut self, username: String) {
+    self.username = username
+  }
 }

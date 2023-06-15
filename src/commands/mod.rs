@@ -1,6 +1,7 @@
 use std::{env::current_dir};
 
 use crate::{downloads::{Download, launcher_manifest::{LauncherManifest, LauncherManifestVersion}}, bootstrap::{Version}};
+
 pub async fn download_version(id: &str) -> Result<(), ()> {
   let load = Download::new().await;
   let minecraft_dir = current_dir().unwrap()
@@ -46,30 +47,6 @@ pub async fn get_manifest() -> Result<Vec<LauncherManifestVersion>, ()> {
     .json()
     .await
     .unwrap();
-
-  // let vec: Vec<LauncherManifestVersion> = vec![
-  //   LauncherManifestVersion {
-  //     id: "1".to_string(),
-  //     version_type: "release".to_string(),
-  //     url: "test".to_string(),
-  //     time: "12:00".to_string(),
-  //     release_time: "12:00".to_string()
-  //   },
-  //   LauncherManifestVersion {
-  //     id: "2".to_string(),
-  //     version_type: "release".to_string(),
-  //     url: "test".to_string(),
-  //     time: "12:00".to_string(),
-  //     release_time: "12:00".to_string()
-  //   },
-  //   LauncherManifestVersion {
-  //     id: "3".to_string(),
-  //     version_type: "release".to_string(),
-  //     url: "test".to_string(),
-  //     time: "12:00".to_string(),
-  //     release_time: "12:00".to_string()
-  //   }
-  // ];
 
   return Ok(resp.versions);
 }
