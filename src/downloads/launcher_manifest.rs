@@ -1,4 +1,4 @@
-use druid::Data;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -13,7 +13,7 @@ pub struct LauncherManifestLatest {
     pub snapshot: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Data)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct LauncherManifestVersion {
     pub id: String,
     #[serde(rename = "type")]

@@ -17,9 +17,7 @@ reqwest = { version = "0.11.18", features = ["json", "blocking"] }
 tokio = { version = "1.28.2", features = ["full"] }
 thiserror = "1.0.40"
 serde_yaml = "0.9.21"
-druid = { version="0.8", features=["im"] }
-im = "15.1.0"
+eframe = "0.22.0"
 
-druid-widget-nursery = { git = "https://github.com/linebender/druid-widget-nursery", rev="4427a99a99417420651ea45a334f499a14224cf8" }
 [features]
 

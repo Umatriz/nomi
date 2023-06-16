@@ -12,28 +12,63 @@ use commands::{
   launch,
   get_manifest
 };
-use ui::Launcher;
 
-use druid::{widget::{Label, Split, Container, Flex, List, LensWrap, TextBox, Button}, Color, Lens, Data, Env};
-use druid::{AppLauncher, Widget, WindowDesc};
-use druid::im::Vector;
-use im::vector;
+use downloads::launcher_manifest::{LauncherManifestVersion, LauncherManifest};
+use eframe::egui;
+use tokio::runtime::Builder;
 
-fn build_ui() -> impl Widget<Launcher> {
-  
+fn main() -> Result<(), eframe::Error> {
+  let options = eframe::NativeOptions {
+      initial_window_size: Some(egui::vec2(320.0, 240.0)),
+      ..Default::default()
+  };
+  eframe::run_native(
+      "My egui App",
+      options,
+      Box::new(|_cc| Box::<MyApp>::default()),
+  )
 }
 
-#[tokio::main]
-async fn main() {
-  let main_window = WindowDesc::new(build_ui())
-    .window_size((600.0, 400.0))
-    .title("My first Druid App");
-  let initial_data = Launcher {
-    versions: get_manifest().await.unwrap().into(),
-    username: String::new()
-  };
+struct MyApp {
+  name: String,
+  age: u32,
+  versions: Vec<LauncherManifestVersion>
+}
 
-  AppLauncher::with_window(main_window)
-    .launch(initial_data)
-    .expect("Failed to launch application");
+impl Default for MyApp {
+  fn default() -> Self {
+      let runtime = Builder::new_multi_thread()
+          .worker_threads(1)
+          .enable_all()
+          .build()
+          .unwrap();
+      Self {
+          name: "Arthur".to_owned(),
+          age: 42,
+          versions: runtime.block_on(get_manifest()).unwrap()
+      }
+  }
+}
+
+impl eframe::App for MyApp {
+  fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+      egui::CentralPanel::default().show(ctx, |ui| {
+          ui.heading("My egui Application");
+          ui.horizontal(|ui| {
+              let name_label = ui.label("Your name: ");
+              ui.text_edit_singleline(&mut self.name)
+                  .labelled_by(name_label.id);
+          });
+          ui.vertical(|ui| {
+              for v in self.versions.iter() {
+                  ui.label(format!("{:#?}", v));
+              }
+          });
+          ui.add(egui::Slider::new(&mut self.age, 0..=120).text("age"));
+          if ui.button("Click each year").clicked() {
+              self.age += 1;
+          }
+          ui.label(format!("Hello '{}', age {}", self.name, self.age));
+      });
+  }
 }
