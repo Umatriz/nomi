@@ -5,70 +5,46 @@ pub mod downloads;
 pub mod bootstrap;
 pub mod manifest;
 pub mod commands;
+pub mod configs;
 pub mod ui;
 
-use commands::{
-  download_version,
-  launch,
-  get_manifest
-};
+use eframe::egui::{self, CentralPanel, Frame};
+use egui_dock::{Style, DockArea};
+use ui::{Launcher, MyContext};
 
-use downloads::launcher_manifest::{LauncherManifestVersion, LauncherManifest};
-use eframe::egui;
-use tokio::runtime::Builder;
 
 fn main() -> Result<(), eframe::Error> {
   let options = eframe::NativeOptions {
-      initial_window_size: Some(egui::vec2(320.0, 240.0)),
+    initial_window_size: Some(egui::vec2(1280.0, 720.0)),
       ..Default::default()
   };
   eframe::run_native(
-      "My egui App",
-      options,
-      Box::new(|_cc| Box::<MyApp>::default()),
+    "My egui App",
+    options,
+    Box::new(|_cc| Box::<Launcher>::default()),
   )
 }
 
-struct MyApp {
-  name: String,
-  age: u32,
-  versions: Vec<LauncherManifestVersion>
-}
-
-impl Default for MyApp {
-  fn default() -> Self {
-      let runtime = Builder::new_multi_thread()
-          .worker_threads(1)
-          .enable_all()
-          .build()
-          .unwrap();
-      Self {
-          name: "Arthur".to_owned(),
-          age: 42,
-          versions: runtime.block_on(get_manifest()).unwrap()
-      }
-  }
-}
-
-impl eframe::App for MyApp {
+impl eframe::App for Launcher {
   fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-      egui::CentralPanel::default().show(ctx, |ui| {
-          ui.heading("My egui Application");
-          ui.horizontal(|ui| {
-              let name_label = ui.label("Your name: ");
-              ui.text_edit_singleline(&mut self.name)
-                  .labelled_by(name_label.id);
-          });
-          ui.vertical(|ui| {
-              for v in self.versions.iter() {
-                  ui.label(format!("{:#?}", v));
-              }
-          });
-          ui.add(egui::Slider::new(&mut self.age, 0..=120).text("age"));
-          if ui.button("Click each year").clicked() {
-              self.age += 1;
-          }
-          ui.label(format!("Hello '{}', age {}", self.name, self.age));
-      });
+    CentralPanel::default()
+    // When displaying a DockArea in another UI, it looks better
+    // to set inner margins to 0.
+      .frame(Frame::central_panel(&ctx.style()).inner_margin(0.))
+      .show(ctx, |ui| {
+        let style = self
+          .context
+          .style
+          .get_or_insert(Style::from_egui(ui.style()))
+          .clone();
+
+        DockArea::new(&mut self.tree)
+          .style(style)
+          .show_close_buttons(self.context.show_close_buttons)
+          .show_add_buttons(self.context.show_add_buttons)
+          .draggable_tabs(self.context.draggable_tabs)
+          .show_tab_name_on_hover(self.context.show_tab_name_on_hover)
+          .show_inside(ui, &mut self.context);
+    });
   }
 }

@@ -2,6 +2,12 @@ use std::{path::PathBuf, fs::{File, OpenOptions}, io::Error};
 
 use serde::{Deserialize, Serialize};
 
+/// TODO: Rewrite this all
+/// Config - trait
+/// Profiles - struct that implement it
+/// 
+/// FIXME: Dead code
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub struct Config {
   pub username: String,
@@ -86,7 +92,7 @@ impl Config {
         Self {
           username: match username {
             Some(u) => u,
-            None => panic!(),
+            None => "nomi".to_string(),
         },
           profiles: vec![],
         }

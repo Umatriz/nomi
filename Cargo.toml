@@ -18,6 +18,7 @@ tokio = { version = "1.28.2", features = ["full"] }
 thiserror = "1.0.40"
 serde_yaml = "0.9.21"
 eframe = "0.22.0"
+egui_dock = "0.6"
 
 [features]
 

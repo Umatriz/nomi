@@ -13,7 +13,7 @@ pub struct LauncherManifestLatest {
     pub snapshot: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct LauncherManifestVersion {
     pub id: String,
     #[serde(rename = "type")]
