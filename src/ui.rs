@@ -10,7 +10,7 @@ use crate::commands::{
   get_manifest
 };
 use crate::downloads::launcher_manifest::{LauncherManifestVersion, LauncherManifest};
-use crate::utils::{Profile, Config};
+use crate::configs::launcher::{ProfileConfig, LauncherConfig};
 
 pub struct Launcher {
   pub tree: Tree<String>,
@@ -38,7 +38,7 @@ impl Default for Launcher {
       }
     }
 
-    let conf = Config::from_file(None);
+    let conf = LauncherConfig::from_file(None);
 
     let context = MyContext {
       style: None,
@@ -103,7 +103,7 @@ impl MyContext {
 // TODO: Add substructs
 pub struct MyContext {
   pub username: String,
-  pub profiles: Vec<Profile>,
+  pub profiles: Vec<ProfileConfig>,
   pub selected_profile: usize,
 
   pub versions: Vec<LauncherManifestVersion>,

@@ -1,11 +1,23 @@
+use std::path::PathBuf;
+
 use serde::{Serialize, Deserialize};
 
-use crate::configs::Config;
+use crate::configs::{Config, ConfigFile};
+
+// is this a good way?
+struct ConfigDir;
+
+impl ConfigDir {
+  pub fn new() -> PathBuf {
+    // TODO: Remove this .join()
+    std::env::current_dir().unwrap().join("config.yaml")
+  }
+}
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
-struct LauncherConfig {
-  username: String,
-  profiles: ProfileConfig
+pub struct LauncherConfig {
+  pub username: String,
+  pub profiles: Vec<ProfileConfig>
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
@@ -50,5 +62,50 @@ impl ProfileConfig {
 impl Config for LauncherConfig {}
 
 impl LauncherConfig {
-  
+  pub fn from_file(username: Option<String>) -> Self {
+    let conf: ConfigFile = ConfigFile::new(ConfigDir::new());
+    match conf.0 {
+      true => {
+        let f = std::fs::File::open(conf.1).expect("Could not open file");
+        let mut read: Self = serde_yaml::from_reader(f).expect("Could not read values");
+        match username {
+          Some(u) => {
+            read.username = u;
+            read
+          },
+          None => read,
+        }
+      },
+      false => {
+        Self {
+          username: match username {
+            Some(u) => u,
+            None => "nomi".to_string(),
+        },
+          profiles: vec![],
+        }
+      },
+    }
+  }
+
+  pub fn add_profile(&mut self, profile: ProfileConfig) {
+    self.profiles.push(profile);
+  }
+
+  pub fn get_profile(&self, id: i32) -> Option<&ProfileConfig> {
+    for prof in self.profiles.iter() {
+      if prof.id == id {
+        return Some(prof);
+      }
+    }
+    return None;
+  }
+
+  pub fn remove_profile(&mut self, id: usize) {
+    self.profiles.remove(id);
+  }
+
+  pub fn update_username(&mut self, username: String) {
+    self.username = username
+  }
 }
