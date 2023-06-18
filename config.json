@@ -1,0 +1,19 @@
+{
+  "username": "nomi",
+  "profiles": [
+    {
+      "id": 0,
+      "version": "1.20.1",
+      "version_type": "release",
+      "path": "E:\\programming\\code\\nomi\\minecraft",
+      "name": "asd"
+    },
+    {
+      "id": 1,
+      "version": "1.20.1",
+      "version_type": "release",
+      "path": "E:\\programming\\code\\nomi\\minecraft",
+      "name": ""
+    }
+  ]
+}

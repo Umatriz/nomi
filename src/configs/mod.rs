@@ -1,6 +1,6 @@
 pub mod launcher;
 
-use std::{path::PathBuf, fs::{OpenOptions, File}};
+use std::{path::PathBuf, fs::{OpenOptions, File}, io::Write};
 
 use serde::Serialize;
 
@@ -8,10 +8,7 @@ struct ConfigFile(bool, PathBuf);
 
 impl ConfigFile {
   pub fn new(path: PathBuf) -> Self {
-    match path.exists() {
-      true => Self(true, path),
-      false => Self(false, path),
-    }
+    Self(path.exists(), path)
   }
 }
 
@@ -20,16 +17,10 @@ pub trait Config {
   where Self: Serialize
   {
     let conf: ConfigFile = ConfigFile::new(path);
-    let mut file: File = OpenOptions::new()
-      .read(true)
-      .write(true)
-      .create(true)
-      .append(false)
-      .open(conf.1.clone())?;
-    if conf.0 { 
-      file = std::fs::File::create(conf.1).unwrap();
-    }
-    let _ = serde_yaml::to_writer(&mut file, &self);
+    let mut file: File = std::fs::File::create(conf.1.clone()).unwrap();
+    
+    let _ = serde_json::to_writer_pretty(&mut file, &self);
+
     println!("created config");
     Ok(())
   }
@@ -46,7 +37,7 @@ pub trait Config {
           .open(conf.1)
           .unwrap();
     
-        let _ = serde_yaml::to_writer(&mut file, &self);
+        let _ = serde_json::to_writer_pretty(&mut file, &self);
       },
       false => {
         self.write(conf.1).unwrap()
@@ -60,7 +51,7 @@ pub trait Config {
     let conf: ConfigFile = ConfigFile::new(path);
     if conf.0 {
       let f = std::fs::File::open(conf.1).expect("Could not open file");
-      let read: Self = serde_yaml::from_reader(f).expect("Could not read values");
+      let read: Self = serde_json::from_reader(f).expect("Could not read values");
       return Ok(read);
     } else {
       let _ = self.overwrite(conf.1);

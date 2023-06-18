@@ -1,8 +1,6 @@
-use std::path::PathBuf;
-
 use serde::{Serialize, Deserialize};
 
-use crate::configs::{Config, ConfigFile};
+use crate::configs::ConfigFile;
 
 use crate::utils::GetPath;
 
@@ -70,7 +68,7 @@ impl Launcher {
     match conf.0 {
       true => {
         let f = std::fs::File::open(conf.1).expect("Could not open file");
-        let mut read: Self = serde_yaml::from_reader(f).expect("Could not read values");
+        let mut read: Self = serde_json::from_reader(f).expect("Could not read values");
         match username {
           Some(u) => {
             read.username = u;
