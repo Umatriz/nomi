@@ -10,7 +10,7 @@ pub mod ui;
 
 use eframe::egui::{self, CentralPanel, Frame};
 use egui_dock::{Style, DockArea};
-use ui::{Main, MyContext};
+use ui::{Main};
 
 
 fn main() -> Result<(), eframe::Error> {

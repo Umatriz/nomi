@@ -4,15 +4,8 @@ use serde::{Serialize, Deserialize};
 
 use crate::configs::{Config, ConfigFile};
 
-// is this a good way?
-struct ConfigDir;
+use super::ConfigDir;
 
-impl ConfigDir {
-  pub fn new() -> PathBuf {
-    // TODO: Remove this .join()
-    std::env::current_dir().unwrap().join("config.yaml")
-  }
-}
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
 pub struct Launcher {
@@ -26,20 +19,32 @@ pub struct Profile {
   pub version: String,
   pub version_type: String,
   pub path: String,
+  pub name: String
 }
 
 impl Profile {
+  pub fn empty() -> Self {
+    Self {
+      id: 0,
+      version: String::new(),
+      version_type: String::new(),
+      path: String::new(),
+      name: String::new(),
+    }
+  }
   pub fn new(
     version: String,
     version_type: String,
     path: String,
-    profiles: &Vec<Profile>
+    profiles: &Vec<Profile>,
+    name: String
   ) -> Self {
     Self {
       id: Self::create_id(&profiles),
       version,
       version_type,
       path,
+      name,
     }
   }
 
@@ -59,11 +64,9 @@ impl Profile {
   }
 }
 
-impl Config for Launcher {}
-
 impl Launcher {
   pub fn from_file(username: Option<String>) -> Self {
-    let conf: ConfigFile = ConfigFile::new(ConfigDir::new());
+    let conf: ConfigFile = ConfigFile::new(ConfigDir::config());
     match conf.0 {
       true => {
         let f = std::fs::File::open(conf.1).expect("Could not open file");

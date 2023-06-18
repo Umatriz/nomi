@@ -9,8 +9,11 @@ use crate::commands::{
   launch,
   get_manifest
 };
+use crate::configs::{ConfigDir, Config};
 use crate::downloads::launcher_manifest::{LauncherManifestVersion};
 use crate::configs::launcher::{Profile, Launcher};
+
+impl Config for Launcher {}
 
 pub struct Main {
   pub tree: Tree<String>,
@@ -21,8 +24,12 @@ pub struct Main {
 // TODO: Add substructs
 pub struct MyContext {
   pub username: String,
-  pub profiles: Vec<Profile>,
+
+  pub launcher_config: Launcher,
   pub selected_profile: usize,
+
+  // TODO: remove
+  pub profile_name: String,
 
   pub versions: Vec<LauncherManifestVersion>,
   pub selected_version: usize,
@@ -68,9 +75,10 @@ impl Default for Main {
       show_tab_name_on_hover: false,
       versions: runtime.block_on(get_manifest()).unwrap(),
       selected_version: 0,
-      username: conf.username,
-      profiles: conf.profiles,
+      username: conf.username.clone(),
+      launcher_config: conf,
       selected_profile: 0,
+      profile_name: String::new(),
     };
 
     // TODO: add Config support
@@ -83,27 +91,36 @@ impl Default for Main {
 
 impl MyContext {
   fn launcher(&mut self, ui: &mut egui::Ui) {
-    ui.horizontal(|ui| {
-      ui.label("Your name: ");
-      ui.text_edit_singleline(&mut self.username);
-    });
-    egui::ComboBox::from_label("Take your pick")
-      .selected_text(format!("{}", &self.profiles[self.selected_profile].version))
-      .show_ui(ui, |ui| { 
-        for i in 0..self.profiles.len() {
-          let value = ui.selectable_value(&mut &self.profiles[i], &self.profiles[self.selected_profile], &self.profiles[i].version);
-          if value.clicked() {
-            self.selected_profile = i;
-          }
-        }
+    if self.launcher_config.profiles.is_empty() {
+      ui.label("Create profile");
+    } else {
+      ui.horizontal(|ui| {
+        ui.label("Your name: ");
+        ui.text_edit_singleline(&mut self.username);
       });
-    ui.end_row();
+      egui::ComboBox::from_label("Take your pick")
+        .selected_text(format!("{}", &self.launcher_config.profiles[self.selected_profile].version))
+        .show_ui(ui, |ui| { 
+          for i in 0..self.launcher_config.profiles.len() {
+            let value = ui.selectable_value(&mut &self.launcher_config.profiles[i], &self.launcher_config.profiles[self.selected_profile], &self.launcher_config.profiles[i].version);
+            if value.clicked() {
+              self.selected_profile = i;
+            }
+          }
+        });
+      ui.end_row();
+    }
   }
 
   fn profiles(&mut self, ui: &mut egui::Ui) {
-    ui.heading("Select with Vectors");
+    ui.heading("Create new Profile");
 
-    egui::ComboBox::from_label("Take your pick")
+    ui.horizontal(|ui| {
+      ui.label("Profile name: ");
+      ui.text_edit_singleline(&mut self.profile_name);
+    });
+
+    egui::ComboBox::from_label("Select version (SUPPORTS RELEASE VERSIONS ONLY!)")
       .selected_text(format!("{}", &self.versions[self.selected_version].id))
       .show_ui(ui, |ui| { 
         for i in 0..self.versions.len() {
@@ -113,6 +130,21 @@ impl MyContext {
           }
         }
       });
+
+    if ui.add(egui::Button::new("Click me")).clicked() {
+      let profile = Profile::new(
+        self.versions[self.selected_version].id.clone(),
+        "release".to_string(),
+        ConfigDir::game().to_str().unwrap().to_string(),
+        &self.launcher_config.profiles,
+        self.profile_name.clone(),
+      );
+      
+      // self.launcher_config.profiles.push(profile);
+      self.launcher_config.add_profile(profile);
+      self.launcher_config.overwrite(ConfigDir::config())
+    }
+
     ui.end_row();
   }
 }
