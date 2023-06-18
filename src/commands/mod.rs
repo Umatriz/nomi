@@ -2,6 +2,7 @@ use std::{env::current_dir};
 
 use crate::{downloads::{Download, launcher_manifest::{LauncherManifest, LauncherManifestVersion}}, bootstrap::{Version}};
 
+// FIXME: all this
 pub async fn download_version(id: &str) -> Result<(), ()> {
   let load = Download::new().await;
   let minecraft_dir = current_dir().unwrap()
@@ -26,7 +27,6 @@ pub fn launch (
     id,
     version_type,
     username,
-    "null",
     "null",
     // current_dir()
     //   .unwrap()

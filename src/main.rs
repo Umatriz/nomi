@@ -10,7 +10,7 @@ pub mod ui;
 
 use eframe::egui::{self, CentralPanel, Frame};
 use egui_dock::{Style, DockArea};
-use ui::{Launcher, MyContext};
+use ui::{Main, MyContext};
 
 
 fn main() -> Result<(), eframe::Error> {
@@ -21,11 +21,11 @@ fn main() -> Result<(), eframe::Error> {
   eframe::run_native(
     "My egui App",
     options,
-    Box::new(|_cc| Box::<Launcher>::default()),
+    Box::new(|_cc| Box::<Main>::default()),
   )
 }
 
-impl eframe::App for Launcher {
+impl eframe::App for Main {
   fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
     CentralPanel::default()
     // When displaying a DockArea in another UI, it looks better

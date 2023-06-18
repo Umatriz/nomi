@@ -38,6 +38,8 @@ pub struct Version {
   java_bin: String,
 }
 
+
+// TODO: MAX/MIN ram
 impl Version {
   pub fn new(
     version: &str,
@@ -46,7 +48,6 @@ impl Version {
     // min_ram: i8,
     username: &str,
     // password: Option<String>,
-    uuid: &str,
     access_token: &str,
     dir: &str,
     java_bin: &str,
@@ -58,7 +59,7 @@ impl Version {
         // min_ram,
         username: username.to_string(),
         // password: password,
-        uuid: uuid.to_string(),
+        uuid: uuid::Uuid::new_v4().to_string(),
         access_token: access_token.to_string(),
         dir: dir.to_string(),
         java_bin: java_bin.to_string(),

@@ -15,25 +15,25 @@ impl ConfigDir {
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
-pub struct LauncherConfig {
+pub struct Launcher {
   pub username: String,
-  pub profiles: Vec<ProfileConfig>
+  pub profiles: Vec<Profile>
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
-pub struct ProfileConfig {
+pub struct Profile {
   id: i32,
   pub version: String,
   pub version_type: String,
   pub path: String,
 }
 
-impl ProfileConfig {
+impl Profile {
   pub fn new(
     version: String,
     version_type: String,
     path: String,
-    profiles: &Vec<ProfileConfig>
+    profiles: &Vec<Profile>
   ) -> Self {
     Self {
       id: Self::create_id(&profiles),
@@ -43,7 +43,7 @@ impl ProfileConfig {
     }
   }
 
-  pub fn create_id(profiles: &Vec<ProfileConfig>) -> i32 {
+  pub fn create_id(profiles: &Vec<Profile>) -> i32 {
     let mut max_id: Vec<i32> = vec![];
     for prof in profiles.iter() {
       max_id.push(prof.id)
@@ -59,9 +59,9 @@ impl ProfileConfig {
   }
 }
 
-impl Config for LauncherConfig {}
+impl Config for Launcher {}
 
-impl LauncherConfig {
+impl Launcher {
   pub fn from_file(username: Option<String>) -> Self {
     let conf: ConfigFile = ConfigFile::new(ConfigDir::new());
     match conf.0 {
@@ -88,11 +88,11 @@ impl LauncherConfig {
     }
   }
 
-  pub fn add_profile(&mut self, profile: ProfileConfig) {
+  pub fn add_profile(&mut self, profile: Profile) {
     self.profiles.push(profile);
   }
 
-  pub fn get_profile(&self, id: i32) -> Option<&ProfileConfig> {
+  pub fn get_profile(&self, id: i32) -> Option<&Profile> {
     for prof in self.profiles.iter() {
       if prof.id == id {
         return Some(prof);

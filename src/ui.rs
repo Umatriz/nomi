@@ -9,16 +9,34 @@ use crate::commands::{
   launch,
   get_manifest
 };
-use crate::downloads::launcher_manifest::{LauncherManifestVersion, LauncherManifest};
-use crate::configs::launcher::{ProfileConfig, LauncherConfig};
+use crate::downloads::launcher_manifest::{LauncherManifestVersion};
+use crate::configs::launcher::{Profile, Launcher};
 
-pub struct Launcher {
+pub struct Main {
   pub tree: Tree<String>,
-
+  
   pub context: MyContext,
 }
 
-impl Default for Launcher {
+// TODO: Add substructs
+pub struct MyContext {
+  pub username: String,
+  pub profiles: Vec<Profile>,
+  pub selected_profile: usize,
+
+  pub versions: Vec<LauncherManifestVersion>,
+  pub selected_version: usize,
+
+  pub style: Option<Style>,
+  pub open_tabs: HashSet<String>,
+
+  pub show_close_buttons: bool,
+  pub show_add_buttons: bool,
+  pub draggable_tabs: bool,
+  pub show_tab_name_on_hover: bool,
+}
+
+impl Default for Main {
   fn default() -> Self {
     let runtime = Builder::new_multi_thread()
       .worker_threads(1)
@@ -38,7 +56,7 @@ impl Default for Launcher {
       }
     }
 
-    let conf = LauncherConfig::from_file(None);
+    let conf = Launcher::from_file(None);
 
     let context = MyContext {
       style: None,
@@ -49,7 +67,7 @@ impl Default for Launcher {
       draggable_tabs: true,
       show_tab_name_on_hover: false,
       versions: runtime.block_on(get_manifest()).unwrap(),
-      selected: 0,
+      selected_version: 0,
       username: conf.username,
       profiles: conf.profiles,
       selected_profile: 0,
@@ -86,12 +104,12 @@ impl MyContext {
     ui.heading("Select with Vectors");
 
     egui::ComboBox::from_label("Take your pick")
-      .selected_text(format!("{}", &self.versions[self.selected].id))
+      .selected_text(format!("{}", &self.versions[self.selected_version].id))
       .show_ui(ui, |ui| { 
         for i in 0..self.versions.len() {
-          let value = ui.selectable_value(&mut &self.versions[i], &self.versions[self.selected], &self.versions[i].id);
+          let value = ui.selectable_value(&mut &self.versions[i], &self.versions[self.selected_version], &self.versions[i].id);
           if value.clicked() {
-            self.selected = i;
+            self.selected_version = i;
           }
         }
       });
@@ -100,23 +118,6 @@ impl MyContext {
 }
 
 
-// TODO: Add substructs
-pub struct MyContext {
-  pub username: String,
-  pub profiles: Vec<ProfileConfig>,
-  pub selected_profile: usize,
-
-  pub versions: Vec<LauncherManifestVersion>,
-  pub selected: usize,
-
-  pub style: Option<Style>,
-  pub open_tabs: HashSet<String>,
-
-  pub show_close_buttons: bool,
-  pub show_add_buttons: bool,
-  pub draggable_tabs: bool,
-  pub show_tab_name_on_hover: bool,
-}
 
 pub struct TabViewer {}
 
