@@ -9,7 +9,8 @@ use crate::commands::{
   launch,
   get_manifest
 };
-use crate::configs::{ConfigDir, Config};
+use crate::configs::Config;
+use crate::utils::GetPath;
 use crate::downloads::launcher_manifest::{LauncherManifestVersion};
 use crate::configs::launcher::{Profile, Launcher};
 
@@ -135,14 +136,14 @@ impl MyContext {
       let profile = Profile::new(
         self.versions[self.selected_version].id.clone(),
         "release".to_string(),
-        ConfigDir::game().to_str().unwrap().to_string(),
+        GetPath::game().to_str().unwrap().to_string(),
         &self.launcher_config.profiles,
         self.profile_name.clone(),
       );
       
       // self.launcher_config.profiles.push(profile);
       self.launcher_config.add_profile(profile);
-      self.launcher_config.overwrite(ConfigDir::config())
+      self.launcher_config.overwrite(GetPath::config())
     }
 
     ui.end_row();

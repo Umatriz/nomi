@@ -4,7 +4,7 @@ use serde::{Serialize, Deserialize};
 
 use crate::configs::{Config, ConfigFile};
 
-use super::ConfigDir;
+use crate::utils::GetPath;
 
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, PartialOrd)]
@@ -66,7 +66,7 @@ impl Profile {
 
 impl Launcher {
   pub fn from_file(username: Option<String>) -> Self {
-    let conf: ConfigFile = ConfigFile::new(ConfigDir::config());
+    let conf: ConfigFile = ConfigFile::new(GetPath::config());
     match conf.0 {
       true => {
         let f = std::fs::File::open(conf.1).expect("Could not open file");

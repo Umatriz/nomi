@@ -4,19 +4,6 @@ use std::{path::PathBuf, fs::{OpenOptions, File}};
 
 use serde::Serialize;
 
-pub struct ConfigDir;
-
-impl ConfigDir {
-  pub fn config() -> PathBuf {
-    // TODO: Remove this .join()
-    std::env::current_dir().unwrap().join("config.yaml")
-  }
-
-  pub fn game() -> PathBuf {
-    std::env::current_dir().unwrap().join("minecraft")
-  }
-}
-
 struct ConfigFile(bool, PathBuf);
 
 impl ConfigFile {
