@@ -4,11 +4,7 @@ use eframe::egui;
 use tokio::runtime::Builder;
 use egui_dock::{Tree, Style, Node};
 
-use crate::commands::{
-  download_version,
-  launch,
-  get_manifest
-};
+use crate::commands::{Commands};
 use crate::configs::Config;
 use crate::utils::GetPath;
 use crate::downloads::launcher_manifest::{LauncherManifestVersion};
@@ -74,7 +70,7 @@ impl Default for Main {
       // TODO: Set to false
       draggable_tabs: true,
       show_tab_name_on_hover: false,
-      versions: runtime.block_on(get_manifest()).unwrap(),
+      versions: runtime.block_on(Commands::get_manifest()).unwrap(),
       selected_version: 0,
       username: conf.username.clone(),
       launcher_config: conf,
@@ -95,9 +91,19 @@ impl MyContext {
     if self.launcher_config.profiles.is_empty() {
       ui.label("Create profile");
     } else {
+      let runtime = Builder::new_multi_thread()
+        .worker_threads(1)
+        .enable_all()
+        .build()
+        .unwrap();
+
       ui.horizontal(|ui| {
         ui.label("Your name: ");
         ui.text_edit_singleline(&mut self.username);
+        if ui.add(egui::Button::new("Update username")).clicked() {
+          self.launcher_config.update_username(self.username.clone());
+          self.launcher_config.overwrite(GetPath::config());
+        }
       });
       egui::ComboBox::from_label("Take your pick")
         .selected_text(format!("{}", &self.launcher_config.profiles[self.selected_profile].name))
@@ -109,6 +115,24 @@ impl MyContext {
             }
           }
         });
+
+      if self.launcher_config.profiles[self.selected_profile].is_downloaded {
+        if ui.add(egui::Button::new("Play")).clicked() {
+          let prof = &self.launcher_config.profiles[self.selected_profile];
+          Commands::launch(
+            &prof.version,
+            &prof.version_type,
+            self.username.as_str(),
+            "java"
+          )
+        }
+      } else {
+        if ui.add(egui::Button::new("Download")).clicked() {
+          runtime.block_on(Commands::download_version(&self.launcher_config.profiles[self.selected_profile].version));
+          let _ = self.launcher_config.profiles[self.selected_profile].is_downloaded == true;
+        }
+      }
+
       ui.end_row();
     }
   }
@@ -131,14 +155,6 @@ impl MyContext {
           }
         }
       });
-
-    // ui.label({
-    //   if self.profile_name.trim().is_empty() {
-    //     "the name cannot be empty"
-    //   } else {
-    //     "AWSUIEOFGH"
-    //   }
-    // });
 
     if self.profile_name.trim().is_empty() {
       ui.label("the name cannot be empty");

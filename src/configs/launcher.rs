@@ -17,7 +17,8 @@ pub struct Profile {
   pub version: String,
   pub version_type: String,
   pub path: String,
-  pub name: String
+  pub name: String,
+  pub is_downloaded: bool,
 }
 
 impl Profile {
@@ -28,6 +29,7 @@ impl Profile {
       version_type: String::new(),
       path: String::new(),
       name: String::new(),
+      is_downloaded: false
     }
   }
   pub fn new(
@@ -43,6 +45,7 @@ impl Profile {
       version_type,
       path,
       name,
+      is_downloaded: false
     }
   }
 

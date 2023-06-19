@@ -43,7 +43,7 @@ pub struct Version {
 impl Version {
   pub fn new(
     version: &str,
-    version_type: String,
+    version_type: &str,
     // max_ram: i8,
     // min_ram: i8,
     username: &str,
@@ -54,7 +54,7 @@ impl Version {
   ) -> Self {
       Self {
         version: version.to_string(),
-        version_type: version_type,
+        version_type: version_type.to_string(),
         // max_ram,
         // min_ram,
         username: username.to_string(),
@@ -166,7 +166,7 @@ impl Version {
   pub fn launch(&self) -> Result<i32, BootstrapError> {
     let args = self.build_args().unwrap();
 
-    let mut process = Command::new(&self.java_bin)
+    let mut process = Command::new("E:\\programming\\apps\\java\\bin")
       .args(args)
       .spawn()
       .expect("command failed to start");

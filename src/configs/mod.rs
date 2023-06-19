@@ -1,6 +1,6 @@
 pub mod launcher;
 
-use std::{path::PathBuf, fs::{OpenOptions, File}, io::Write};
+use std::{path::PathBuf, fs::{OpenOptions, File}};
 
 use serde::Serialize;
 
