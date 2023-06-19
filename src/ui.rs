@@ -100,10 +100,10 @@ impl MyContext {
         ui.text_edit_singleline(&mut self.username);
       });
       egui::ComboBox::from_label("Take your pick")
-        .selected_text(format!("{}", &self.launcher_config.profiles[self.selected_profile].version))
+        .selected_text(format!("{}", &self.launcher_config.profiles[self.selected_profile].name))
         .show_ui(ui, |ui| { 
           for i in 0..self.launcher_config.profiles.len() {
-            let value = ui.selectable_value(&mut &self.launcher_config.profiles[i], &self.launcher_config.profiles[self.selected_profile], &self.launcher_config.profiles[i].version);
+            let value = ui.selectable_value(&mut &self.launcher_config.profiles[i], &self.launcher_config.profiles[self.selected_profile], &self.launcher_config.profiles[i].name);
             if value.clicked() {
               self.selected_profile = i;
             }
@@ -132,18 +132,30 @@ impl MyContext {
         }
       });
 
-    if ui.add(egui::Button::new("Click me")).clicked() {
-      let profile = Profile::new(
-        self.versions[self.selected_version].id.clone(),
-        "release".to_string(),
-        GetPath::game().to_str().unwrap().to_string(),
-        &self.launcher_config.profiles,
-        self.profile_name.clone(),
-      );
-      
-      // self.launcher_config.profiles.push(profile);
-      self.launcher_config.add_profile(profile);
-      self.launcher_config.overwrite(GetPath::config())
+    // ui.label({
+    //   if self.profile_name.trim().is_empty() {
+    //     "the name cannot be empty"
+    //   } else {
+    //     "AWSUIEOFGH"
+    //   }
+    // });
+
+    if self.profile_name.trim().is_empty() {
+      ui.label("the name cannot be empty");
+    } else {
+      if ui.add(egui::Button::new("Create profile")).clicked() {
+        let profile = Profile::new(
+          self.versions[self.selected_version].id.clone(),
+          "release".to_string(),
+          GetPath::game().to_str().unwrap().to_string(),
+          &self.launcher_config.profiles,
+          self.profile_name.clone(),
+        );
+        
+        // self.launcher_config.profiles.push(profile);
+        self.launcher_config.add_profile(profile);
+        self.launcher_config.overwrite(GetPath::config())
+      }
     }
 
     ui.end_row();
