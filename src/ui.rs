@@ -1,12 +1,15 @@
 use std::collections::HashSet;
+use std::hash::Hash;
+use std::path::PathBuf;
 
 use eframe::egui;
 use tokio::runtime::Builder;
 use egui_dock::{Tree, Style, Node};
 
+use crate::bootstrap::{ClientBootstrap, ClientSettings, ClientAuth, ClientVersion};
 use crate::commands::{Commands};
 use crate::configs::Config;
-use crate::utils::GetPath;
+use crate::utils::{GetPath, get_java_bin};
 use crate::downloads::launcher_manifest::{LauncherManifestVersion};
 use crate::configs::launcher::{Profile, Launcher};
 
@@ -117,19 +120,49 @@ impl MyContext {
         });
 
       if self.launcher_config.profiles[self.selected_profile].is_downloaded {
-        if ui.add(egui::Button::new("Play")).clicked() {
-          let prof = &self.launcher_config.profiles[self.selected_profile];
-          Commands::launch(
-            &prof.version,
-            &prof.version_type,
-            self.username.as_str(),
-            "java"
-          )
+        let java = get_java_bin();
+        match java {
+          Some(java) => {
+            if ui.add(egui::Button::new("Play")).clicked() {
+              let prof: &Profile = &self.launcher_config.profiles[self.selected_profile];
+              let bootstrap = ClientBootstrap::new(ClientSettings {
+                assets: GetPath::game().join("assets"),
+                auth: ClientAuth {
+                  username: self.username.clone(),
+                  access_token: None,
+                  uuid: Some(uuid::Uuid::new_v4().to_string()),
+                },
+                game_dir: GetPath::game(),
+                java_bin: java,
+                libraries_dir: GetPath::game().join("libraries"),
+                manifest_file: GetPath::game()
+                  .join("versions")
+                  .join(&prof.version)
+                  .join(format!("{}.json", &prof.version)),
+                natives_dir: GetPath::game()
+                  .join("versions")
+                  .join(&prof.version)
+                  .join("natives"),
+                version: ClientVersion {
+                  version: prof.version.clone(),
+                  version_type: prof.version_type.clone(),
+                },
+                version_jar_file: GetPath::game()
+                  .join("versions")
+                  .join(&prof.version)
+                  .join(format!("{}.jar", &prof.version)),
+              });
+        
+              bootstrap.launch().unwrap();
+            }
+          }
+          None => todo!(),
         }
       } else {
         if ui.add(egui::Button::new("Download")).clicked() {
-          runtime.block_on(Commands::download_version(&self.launcher_config.profiles[self.selected_profile].version));
-          let _ = self.launcher_config.profiles[self.selected_profile].is_downloaded == true;
+          // runtime.block_on(Commands::download_version(&self.launcher_config.profiles[self.selected_profile].version));
+          // FIXME: not working
+          // let _ = self.launcher_config.profiles[self.selected_profile].is_downloaded == true;
         }
       }
 

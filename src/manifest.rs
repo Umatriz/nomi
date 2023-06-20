@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs};
+use std::{collections::HashMap, fs, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -7,6 +7,7 @@ use thiserror::Error;
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Manifest {
+  pub arguments: Arguments,
   pub asset_index: ManifestAssetIndex,
   pub assets: String,
   pub compliance_level: i8,
@@ -20,6 +21,44 @@ pub struct Manifest {
   pub time: String,
   #[serde(rename = "type")]
   pub version_type: String,
+}
+
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Arguments {
+  pub game: Vec<JvmArgument>,
+  pub jvm: Vec<JvmArgument>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum JvmArgument {
+  String(String),
+  Struct {
+    rules: Vec<Rules>,
+    value: serde_json::Value,
+  },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Rules {
+  pub action: String,
+  pub features: Option<Features>,
+  pub os: Option<Os>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Features {
+  pub is_demo_user: Option<bool>,
+  pub has_custom_resolution: Option<bool>,
+  pub is_quick_play_realms: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct Os {
+  pub arch: Option<String>,
+  pub name: Option<String>,
+  pub version: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -61,20 +100,13 @@ pub struct ManifestJavaVersion {
 pub struct ManifestLibrary {
   pub downloads: ManifestLibraryDownloads,
   pub name: String,
-  pub rules: Option<Vec<ManifestRule>>,
+  pub rules: Option<Vec<Rules>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ManifestLibraryDownloads {
   pub artifact: Option<ManifestFile>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-pub struct ManifestRule {
-  pub action: String,
-  pub os: Option<HashMap<String, String>>,
 }
 
 #[derive(Error, Debug)]
@@ -100,7 +132,7 @@ pub fn read_manifest_from_str(string: &str) -> Result<Manifest, ManifestError> {
   return Ok(manifest);
 }
 
-pub fn read_manifest_from_file(file: &str) -> Result<Manifest, ManifestError> {
+pub fn read_manifest_from_file(file: PathBuf) -> Result<Manifest, ManifestError> {
   let raw = fs::read_to_string(file)?;
   let manifest: Manifest = read_manifest_from_str(&raw)?;
   return Ok(manifest);

@@ -1,4 +1,4 @@
-use crate::{downloads::{Download, launcher_manifest::{LauncherManifest, LauncherManifestVersion}}, bootstrap::{Version}, utils::GetPath};
+use crate::{downloads::{Download, launcher_manifest::{LauncherManifest, LauncherManifestVersion}}, utils::GetPath};
 
 pub struct Commands;
 
@@ -9,24 +9,6 @@ impl Commands {
     load.download(id.to_string(), GetPath::game().to_str().unwrap().to_string())
       .await
       .unwrap();
-  }
-  
-  pub fn launch (
-    id: &str,
-    version_type: &String,
-    username: &str,
-    java_bin: &str
-  ) {
-    let bootstrap = Version::new(
-      id,
-      version_type,
-      username,
-      "null",
-      GetPath::game().to_str().unwrap(),
-      java_bin
-    );
-  
-    bootstrap.launch().unwrap();
   }
   
   pub async fn get_manifest() -> Result<Vec<LauncherManifestVersion>, ()> {
