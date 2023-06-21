@@ -3,7 +3,7 @@ use std::hash::Hash;
 use std::path::PathBuf;
 
 use eframe::egui;
-use tokio::runtime::Builder;
+use tokio::runtime::{Builder, Runtime};
 use egui_dock::{Tree, Style, Node};
 
 use crate::bootstrap::{ClientBootstrap, ClientSettings, ClientAuth, ClientVersion};
@@ -94,11 +94,7 @@ impl MyContext {
     if self.launcher_config.profiles.is_empty() {
       ui.label("Create profile");
     } else {
-      let runtime = Builder::new_multi_thread()
-        .worker_threads(1)
-        .enable_all()
-        .build()
-        .unwrap();
+      let rt = Runtime::new().unwrap();
 
       ui.horizontal(|ui| {
         ui.label("Your name: ");
@@ -156,13 +152,23 @@ impl MyContext {
               bootstrap.launch().unwrap();
             }
           }
-          None => todo!(),
+          None => {
+            ui.label("Java not found");
+          },
         }
       } else {
         if ui.add(egui::Button::new("Download")).clicked() {
-          // runtime.block_on(Commands::download_version(&self.launcher_config.profiles[self.selected_profile].version));
-          // FIXME: not working
-          // let _ = self.launcher_config.profiles[self.selected_profile].is_downloaded == true;
+
+          // TODO: not working
+          rt.block_on(async {
+            let runtime = Runtime::new().unwrap();
+            runtime.spawn(async {
+              Commands::download_version("1.18.2").await
+            }).await.unwrap();
+          });
+
+          // self.launcher_config.profiles[self.selected_profile].is_downloaded = true; 
+          // self.launcher_config.overwrite(GetPath::config());
         }
       }
 
