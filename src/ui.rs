@@ -1,6 +1,7 @@
 use std::collections::HashSet;
-use std::hash::Hash;
-use std::path::PathBuf;
+use std::sync::mpsc::{Receiver, Sender};
+use std::thread;
+use std::time::Duration;
 
 use eframe::egui;
 use tokio::runtime::{Builder, Runtime};
@@ -23,6 +24,9 @@ pub struct Main {
 
 // TODO: Add substructs
 pub struct MyContext {
+  pub tx: Sender<u32>,
+  pub rx: Receiver<u32>,
+
   pub username: String,
 
   pub launcher_config: Launcher,
@@ -65,7 +69,12 @@ impl Default for Main {
 
     let conf = Launcher::from_file(None);
 
+    let (tx, rx) = std::sync::mpsc::channel();
+
     let context = MyContext {
+      tx,
+      rx,
+
       style: None,
       open_tabs,
       show_close_buttons: false,
@@ -158,14 +167,17 @@ impl MyContext {
         }
       } else {
         if ui.add(egui::Button::new("Download")).clicked() {
-
-          // TODO: not working
-          rt.block_on(async {
-            let runtime = Runtime::new().unwrap();
-            runtime.spawn(async {
-              Commands::download_version("1.18.2").await
-            }).await.unwrap();
-          });
+          rt.enter();
+          std::thread::spawn(move || {
+            println!("downloading");
+            // self.tx.send(1).unwrap();
+            // rt.block_on(
+            //   // TODO: set duynamic vesion
+            //   Commands::download_version("1.18.2")
+            // );
+            thread::sleep(Duration::from_millis(750));
+            println!("downloaded");
+          }).join().unwrap();
 
           // self.launcher_config.profiles[self.selected_profile].is_downloaded = true; 
           // self.launcher_config.overwrite(GetPath::config());
