@@ -1,10 +1,8 @@
 use std::collections::HashSet;
-use std::sync::mpsc::{Receiver, Sender};
-use std::thread;
-use std::time::Duration;
 
 use eframe::egui;
 use tokio::runtime::{Builder, Runtime};
+use tokio::sync::mpsc;
 use egui_dock::{Tree, Style, Node};
 
 use crate::bootstrap::{ClientBootstrap, ClientSettings, ClientAuth, ClientVersion};
@@ -24,8 +22,9 @@ pub struct Main {
 
 // TODO: Add substructs
 pub struct MyContext {
-  pub tx: Sender<u32>,
-  pub rx: Receiver<u32>,
+  pub runtime: Runtime,
+
+  pub state: bool,
 
   pub username: String,
 
@@ -69,11 +68,13 @@ impl Default for Main {
 
     let conf = Launcher::from_file(None);
 
-    let (tx, rx) = std::sync::mpsc::channel();
-
     let context = MyContext {
-      tx,
-      rx,
+      runtime: Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap(),
+
+      state: false,
 
       style: None,
       open_tabs,
@@ -103,8 +104,6 @@ impl MyContext {
     if self.launcher_config.profiles.is_empty() {
       ui.label("Create profile");
     } else {
-      let rt = Runtime::new().unwrap();
-
       ui.horizontal(|ui| {
         ui.label("Your name: ");
         ui.text_edit_singleline(&mut self.username);
@@ -167,23 +166,20 @@ impl MyContext {
         }
       } else {
         if ui.add(egui::Button::new("Download")).clicked() {
-          rt.enter();
-          std::thread::spawn(move || {
-            println!("downloading");
-            // self.tx.send(1).unwrap();
-            // rt.block_on(
-            //   // TODO: set duynamic vesion
-            //   Commands::download_version("1.18.2")
-            // );
-            thread::sleep(Duration::from_millis(750));
-            println!("downloaded");
-          }).join().unwrap();
+          let version = self.launcher_config.profiles[self.selected_profile].version.clone();
+          self.runtime.spawn(async move {
+            dbg!("1");
+            tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await;
+            dbg!("2");
+          });
 
           // self.launcher_config.profiles[self.selected_profile].is_downloaded = true; 
           // self.launcher_config.overwrite(GetPath::config());
         }
+        // if rx.recv().unwrap() {
+        //   ui.spinner();
+        // }
       }
-
       ui.end_row();
     }
   }
@@ -229,14 +225,19 @@ impl MyContext {
   }
 }
 
-
-
 pub struct TabViewer {}
 
 impl egui_dock::TabViewer for MyContext {
   type Tab = String;
 
   fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
+    let runtime = Builder::new_multi_thread()
+      .worker_threads(1)
+      .enable_all()
+      .build()
+      .unwrap();
+
+    let _guard = runtime.enter();
     match tab.as_str() {
       "Launcher" => self.launcher(ui),
       "Profiles" => self.profiles(ui),

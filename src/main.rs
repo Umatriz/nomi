@@ -18,6 +18,7 @@ fn main() -> Result<(), eframe::Error> {
     initial_window_size: Some(egui::vec2(1280.0, 720.0)),
       ..Default::default()
   };
+
   eframe::run_native(
     "My egui App",
     options,

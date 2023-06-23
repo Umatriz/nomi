@@ -4,9 +4,9 @@ pub struct Commands;
 
 // FIXME: Change all `String` in paths to `PathBuf`
 impl Commands {
-  pub async fn download_version(id: &str) {
+  pub async fn download_version(id: String) {
     let load: Download = Download::new().await;
-    load.download(id.to_string(), GetPath::game().to_str().unwrap().to_string())
+    load.download(id, GetPath::game().to_str().unwrap().to_string())
       .await
       .unwrap();
   }
