@@ -12,7 +12,6 @@ use eframe::egui::{self, CentralPanel, Frame};
 use egui_dock::{Style, DockArea};
 use ui::{Main};
 
-
 fn main() -> Result<(), eframe::Error> {
   let options = eframe::NativeOptions {
     initial_window_size: Some(egui::vec2(1280.0, 720.0)),
@@ -20,7 +19,7 @@ fn main() -> Result<(), eframe::Error> {
   };
 
   eframe::run_native(
-    "My egui App",
+    "Nomi",
     options,
     Box::new(|_cc| Box::<Main>::default()),
   )

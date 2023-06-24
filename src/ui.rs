@@ -1,8 +1,9 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use eframe::egui;
 use tokio::runtime::{Builder, Runtime};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 use egui_dock::{Tree, Style, Node};
 
 use crate::bootstrap::{ClientBootstrap, ClientSettings, ClientAuth, ClientVersion};
@@ -167,15 +168,50 @@ impl MyContext {
       } else {
         if ui.add(egui::Button::new("Download")).clicked() {
           let version = self.launcher_config.profiles[self.selected_profile].version.clone();
-          self.runtime.spawn(async move {
-            dbg!("1");
-            tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await;
-            dbg!("2");
+          
+          // let (tx, mut rx) = mpsc::channel::<bool>(1);
+
+          let (tx, rx) = std::sync::mpsc::channel::<bool>();
+
+          self.state = true;
+
+          // self.runtime.spawn(async move {
+          //   dbg!("1");
+          //   tokio::time::sleep(tokio::time::Duration::from_millis(7000)).await;
+          //   dbg!("2");
+          //   tx.send(true).await.unwrap();
+          // });
+
+          std::thread::spawn(move || {
+            let rt = Runtime::new().unwrap();
+
+            rt.block_on(async {
+              dbg!("1");
+              tokio::time::sleep(tokio::time::Duration::from_millis(7000)).await;
+              dbg!("2");
+            });
+            tx.send(true).unwrap();
           });
 
+          if self.state {
+            ui.add(egui::Spinner::new());
+            if let Ok(_) = rx.try_recv() {
+              ui.label("text");
+            }
+          }
+
+          // let resp = res.join().unwrap();
+          
+          // dbg!(resp);
+
+          // if self.state {
+          //   ui.label("text");
+          // }
+          
           // self.launcher_config.profiles[self.selected_profile].is_downloaded = true; 
           // self.launcher_config.overwrite(GetPath::config());
         }
+
         // if rx.recv().unwrap() {
         //   ui.spinner();
         // }
