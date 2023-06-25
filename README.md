@@ -1,11 +1,11 @@
 # Nomi
+
 Start project:
 ```shell
-cargo run
+cargo tauri dev
 ```
 
 ### TODO
-- ~~[ ] Rewrite UI to egui~~
 - [x] UUID generation
 - [ ] Mod loaders support
 - [ ] Profiles features
