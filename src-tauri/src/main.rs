@@ -7,9 +7,6 @@ pub mod manifest;
 pub mod commands;
 pub mod configs;
 
-use eframe::egui::{self, CentralPanel, Frame};
-use egui_dock::{Style, DockArea};
-
 #[tokio::main]
 async fn main() {
   tauri::Builder::default()
