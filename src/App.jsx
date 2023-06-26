@@ -1,33 +1,29 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { invoke } from '@tauri-apps/api'
+import { useEffect, useState } from 'react'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [manifest, setManifest] = useState([])
+
+  useEffect(() => {
+    invoke("get_manifest").then((res) => {
+      setManifest(res)
+      console.log(manifest)
+      console.log(res)
+    })
+  }, [])
+
+  const buttonTest = () => {
+    invoke("get_manifest").then((resp) => {
+      setManifest(resp)
+      console.log(manifest)
+    })
+  }
 
   return (
     <>
       <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+        <button onClick={buttonTest}>R</button>
       </div>
-      <h1>1</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
     </>
   )
 }

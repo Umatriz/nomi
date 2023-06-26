@@ -7,10 +7,14 @@ pub mod manifest;
 pub mod commands;
 pub mod configs;
 
+use commands::{download_version, get_manifest};
+
 #[tokio::main]
 async fn main() {
   tauri::Builder::default()
     .invoke_handler(tauri::generate_handler![
+      download_version,
+      get_manifest
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
