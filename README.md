@@ -10,3 +10,5 @@ cargo tauri dev
 - [ ] Mod loaders support
 - [ ] Profiles features
 - [ ] Mods download features
+- [ ] DB for profiles
+- [ ] Update `config` mod

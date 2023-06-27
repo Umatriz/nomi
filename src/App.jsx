@@ -1,29 +1,24 @@
 import { invoke } from '@tauri-apps/api'
 import { useEffect, useState } from 'react'
 
+import Main from "./components/Main/Main"
+
 function App() {
-  const [manifest, setManifest] = useState([])
+  // const [manifest, setManifest] = useState([])
 
-  useEffect(() => {
-    invoke("get_manifest").then((res) => {
-      setManifest(res)
-      console.log(manifest)
-      console.log(res)
-    })
-  }, [])
+  // useEffect(() => {
+  //   invoke("get_manifest").then((res) => {
+  //     setManifest(res)
+  //   })
+  // }, [])
 
-  const buttonTest = () => {
-    invoke("get_manifest").then((resp) => {
-      setManifest(resp)
-      console.log(manifest)
-    })
-  }
+  // useEffect(() => {
+  //   console.log(manifest)
+  // }, [manifest])
 
   return (
     <>
-      <div>
-        <button onClick={buttonTest}>R</button>
-      </div>
+      <Main />
     </>
   )
 }
