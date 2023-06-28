@@ -1,24 +1,24 @@
 import { invoke } from '@tauri-apps/api'
 import { useEffect, useState } from 'react'
 
-import Main from "./components/Main/Main"
+import { Route, Routes, Link } from 'react-router-dom'
+
+import Main from "./components/app/pages/Main/Main"
+import Profile from './components/app/pages/Profile/Profile'
+
+import "./index.css"
 
 function App() {
-  // const [manifest, setManifest] = useState([])
-
-  // useEffect(() => {
-  //   invoke("get_manifest").then((res) => {
-  //     setManifest(res)
-  //   })
-  // }, [])
-
-  // useEffect(() => {
-  //   console.log(manifest)
-  // }, [manifest])
-
   return (
     <>
-      <Main />
+      <ul>
+        <li><a href="/">Home</a></li>
+        <li><a href="/profile">Profile</a></li>
+      </ul>
+      <Routes>
+        <Route path='/' element={<Main />} />
+        <Route path='/profile' element={<Profile />} />
+      </Routes>
     </>
   )
 }

@@ -1,4 +1,4 @@
-use crate::{downloads::{Download, launcher_manifest::{LauncherManifest, LauncherManifestVersion}}, utils::GetPath};
+use crate::{downloads::{Download, launcher_manifest::{LauncherManifest, LauncherManifestVersion}}, utils::GetPath, configs::launcher::Launcher};
 
 // FIXME: Change all `String` in paths to `PathBuf`
 #[tauri::command]
@@ -21,5 +21,12 @@ pub async fn get_manifest() -> Result<Vec<LauncherManifestVersion>, ()> {
     .unwrap();
 
   return Ok(resp.versions);
+}
+
+#[tauri::command]
+pub async fn get_profiles() -> Result<Vec<crate::configs::launcher::Profile>, ()> {
+  let launcher_config = Launcher::from_file(None);
+
+  Ok(launcher_config.profiles)
 }
 
