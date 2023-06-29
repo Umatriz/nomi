@@ -22,22 +22,27 @@ const Main = () => {
 
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
+    <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
       <input type="text" {...register("username", {
         required: true,
         minLength: 3,
         maxLength: 16,
         pattern: /^[a-zA-Z0-9_]{3,16}$/mg
-      })}/>
-      <select {...register("profile")}>
-        {
-          profiles.map((option) => (
-            <option value={option.id} key={option.id}>
-              {option.name}
-            </option>
-          ))
-        }
-      </select>
+      })}
+      className={styles.input}
+      />
+      <div className={styles.select}>
+        {/* TODO: Add a customizable select */}
+        <select {...register("profile")}>
+          {
+            profiles.map((option) => (
+              <option value={option.id} key={option.id}>
+                {option.name}
+              </option>
+            ))
+          }
+        </select>
+      </div>
 
       {errors?.username && <div>
         <span>Requirements:</span>
@@ -64,7 +69,7 @@ const Main = () => {
           </ul>
         </div>}
 
-      <input type="submit" />
+      <input type="submit" className={styles.button} value="Launch" />
     </form>
   )
 }

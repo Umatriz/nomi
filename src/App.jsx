@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react'
 
 import { Route, Routes, Link } from 'react-router-dom'
 
-import Main from "./components/app/pages/Main/Main"
-import Profile from './components/app/pages/Profile/Profile'
+import Main from "./pages/Main/Main"
+import Profile from './pages/Profile/Profile'
 
 import "./index.css"
 

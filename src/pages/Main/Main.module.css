@@ -1,0 +1,52 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.input {
+  border: none;
+  color: #020A11;
+  background-color: #E3E730;
+  padding: 0.5rem 1rem;
+}
+
+.input:focus {
+  outline: none;
+}
+
+.button {
+  outline: none;
+  border: none;
+  background-color: #E3E730;
+  color: #020A11;
+  padding: 0.5rem 1rem;
+}
+
+.button:hover {
+  cursor: pointer;
+}
+
+.select {
+  position: relative;
+  display: flex;
+  height: 1.9rem;
+  overflow: hidden;
+}
+
+.select select {
+  appearance: none;
+  outline: 0;
+  border: 0;
+  box-shadow: none;
+  background-color: #E3E730;
+  color: #020A11;
+  flex: 1;
+  padding: 0 1em;
+  cursor: pointer;
+}
+
+.select select option {
+  padding: 0.5rem 0.2rem;
+}
