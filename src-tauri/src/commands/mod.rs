@@ -24,9 +24,9 @@ pub async fn get_manifest() -> Result<Vec<LauncherManifestVersion>, ()> {
 }
 
 #[tauri::command]
-pub async fn get_profiles() -> Result<Vec<crate::configs::launcher::Profile>, ()> {
+pub async fn get_config() -> Result<Launcher, ()> {
   let launcher_config = Launcher::from_file(None);
 
-  Ok(launcher_config.profiles)
+  Ok(launcher_config)
 }
 

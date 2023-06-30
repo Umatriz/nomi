@@ -33,20 +33,21 @@
   display: flex;
   height: 1.9rem;
   overflow: hidden;
-}
-
-.select select {
-  appearance: none;
-  outline: 0;
-  border: 0;
-  box-shadow: none;
   background-color: #E3E730;
-  color: #020A11;
-  flex: 1;
-  padding: 0 1em;
-  cursor: pointer;
+  width: 100%;
+  padding: 0;
 }
 
-.select select option {
-  padding: 0.5rem 0.2rem;
+.select label {
+  cursor: pointer;
+  color: #020A11;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.select label input {
+  display: flex;
+  cursor: pointer;
 }
