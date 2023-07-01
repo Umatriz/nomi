@@ -7,8 +7,13 @@ cargo tauri dev
 
 ### TODO
 - [x] UUID generation
-- [ ] Mod loaders support
 - [ ] Profiles features
+- [ ] Mod loaders support
+  * [ ] Downloads
+  * [ ] Launch
 - [ ] Mods download features
-- [ ] DB for profiles
-- [ ] Update `config` mod
+  * [ ] Mods config
+    + [ ] Short code to share modpacks
+- [ ] Update UI
+- [x] `config` mod update
+- [ ] `downloads` mod update
