@@ -1,5 +1,7 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito+Sans&display=swap');
+
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: 'Nunito Sans', sans-serif;
   line-height: 1.5;
   font-weight: 400;
 
@@ -27,4 +29,35 @@ body {
   margin: 0 auto;
   padding: 2rem;
   text-align: center;
+}
+
+.navbar {
+  text-decoration: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.navbar li {
+}
+
+.navbar li a {
+  text-decoration: none;
+  background-color: #E3E730;
+  color: #020A11;
+  padding: 0.5rem 2rem;
+  display: flex;
+  transition: 0.2s ease-in;
+  border: #020A11 1px solid;
+}
+
+.navbar li a:hover {
+  color: #E3E730;
+  background-color: #020A11;
+  border: #E3E730 1px solid;
 }

@@ -39,7 +39,7 @@ const Main = () => {
       className={styles.input}
       />
 
-      {errors?.username && <div>
+      {errors.username && <div>
         <span>Requirements:</span>
           <ul>
             <li>
@@ -66,6 +66,7 @@ const Main = () => {
 
       <div className={styles.select}>
         {/* TODO: Add a customizable select */}
+        <span>Select profile</span>
         {
           profiles.map((option) => (
             <label key={option.id}>
@@ -77,7 +78,7 @@ const Main = () => {
           ))
         }
       </div>
-      {errors?.profile && <p>You must select a profile to launch</p>}
+      {errors.profile && <p>You must select a profile to launch</p>}
 
       <input type="submit" className={styles.button} value="Launch" />
     </form>

@@ -11,7 +11,7 @@ import "./index.css"
 function App() {
   return (
     <>
-      <ul>
+      <ul className='navbar'>
         <li><a href="/">Home</a></li>
         <li><a href="/profile">Profile</a></li>
       </ul>
