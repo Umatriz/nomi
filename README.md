@@ -4,9 +4,9 @@ Next gen Minecraft launcher powered by Rust.
 
 ## Requirements
 
-- (Rust)[https://www.rust-lang.org/] >= 1.60
-- (Node Js)[https://nodejs.org/en] >= v16.18.0 (lower versions may work, but not tested)
-  * (yarn)[https://yarnpkg.com/getting-started/install] >= 1.22.19
+- [Rust](https://www.rust-lang.org/) >= 1.60
+- [Node Js](https://nodejs.org/en) >= v16.18.0 (lower versions may work, but not tested)
+  * [yarn](https://yarnpkg.com/getting-started/install) >= 1.22.19
 
 Start project:
 ```shell
