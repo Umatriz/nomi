@@ -1,11 +1,14 @@
 # Nomi
 
+Next gen Minecraft launcher powered by Rust. 
+
 Start project:
 ```shell
 cargo tauri dev
 ```
 
 ### TODO
+
 - [x] UUID generation
 - [ ] Profiles features
 - [ ] Mod loaders support

@@ -5,8 +5,30 @@ import { invoke } from "@tauri-apps/api"
 import { useEffect, useState } from "react"
 
 const Main = () => {
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: {
+      errors
+    },
+  } = useForm()
+
   const [username, setUsername] = useState("")
   const [profiles, setProfiles] = useState([])
+
+  const [currentProfile, setCurrentProfile] = useState({})
+
+  const profileId = watch("profile")
+
+  useEffect(() => {
+    for (let index = 0; index < profiles.length; index++) {
+      const element = profiles[index];
+      if (element.id == profileId) {
+        setCurrentProfile(element)
+      }
+    }
+  },[profileId])
   
   useEffect(() => {
     invoke("get_config").then((resp) => {
@@ -15,17 +37,16 @@ const Main = () => {
     })
   }, [])
 
-  const {
-    register,
-    handleSubmit,
-    formState: {
-      errors
-    },
-  } = useForm()
 
   const onSubmit = (data) => {
-    console.log(data)
-    console.log(username)
+    if (currentProfile.is_downloaded) {
+      invoke("launch", {
+        username: data.username,
+        version: currentProfile.version
+      })
+    } else {
+      invoke("download_version", {id: currentProfile.version})
+    }
   }
 
   return (
@@ -80,7 +101,7 @@ const Main = () => {
       </div>
       {errors.profile && <p>You must select a profile to launch</p>}
 
-      <input type="submit" className={styles.button} value="Launch" />
+      <input type="submit" className={styles.button} value={currentProfile.is_downloaded ? "Launch" : "Download"} />
     </form>
   )
 }

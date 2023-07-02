@@ -28,7 +28,12 @@ const Profile = () => {
   return (
     <>
       <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
-        <input type="text" placeholder="Profile name" {...register("name")} className={styles.input} />
+        <input type="text" placeholder="Profile name" {...register("name", {
+          required: true,
+          // FIXME
+          pattern: /^[^\s].*[^\s]$/
+        })} className={styles.input} />
+        {errors.name && <p>{errors.name.message}</p>}
         <div className={styles.select}>
           <span>Select profile</span>
           {

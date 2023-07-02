@@ -1,7 +1,7 @@
 mod classpath;
 pub mod rules;
 
-use std::{path::{Path, PathBuf}, process::Command};
+use std::{path::PathBuf, process::Command};
 
 use thiserror::Error;
 

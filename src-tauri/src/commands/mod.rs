@@ -1,4 +1,6 @@
-use crate::{downloads::{Download, launcher_manifest::{LauncherManifest, LauncherManifestVersion}}, utils::GetPath, configs::launcher::Launcher};
+use std::path::PathBuf;
+
+use crate::{downloads::{Download, launcher_manifest::{LauncherManifest, LauncherManifestVersion}}, utils::GetPath, configs::launcher::Launcher, bootstrap::{ClientSettings, ClientBootstrap, ClientAuth, ClientVersion}};
 
 // FIXME: Change all `String` in paths to `PathBuf`
 #[tauri::command]
@@ -30,3 +32,34 @@ pub async fn get_config() -> Result<Launcher, ()> {
   Ok(launcher_config)
 }
 
+#[tauri::command]
+pub async fn launch(username: String, version: String) -> Result<(), ()> {
+  let bootstrap = ClientBootstrap::new(ClientSettings {
+    assets: GetPath::game().join("assets"),
+    auth: ClientAuth {
+      username: username,
+      access_token: None,
+      uuid: Some(uuid::Uuid::new_v4().to_string()),
+    },
+    game_dir: GetPath::game(),
+    java_bin: GetPath::java_bin().unwrap(),
+    libraries_dir: GetPath::game().join("libraries"),
+    manifest_file: GetPath::game()
+      .join("versions")
+      .join(&version)
+      .join(format!("{}.json", version)),
+    natives_dir: GetPath::game().join("versions").join(&version).join("natives"),
+    version: ClientVersion {
+      version: version.clone(),
+      version_type: "release".to_string(),
+    },
+    version_jar_file: GetPath::game()
+      .join("versions")
+      .join(&version)
+      .join(format!("{}.jar", version)),
+  });
+  
+  bootstrap.launch().unwrap();
+  
+  Ok(())
+}
