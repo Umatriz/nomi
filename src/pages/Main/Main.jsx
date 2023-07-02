@@ -2,6 +2,7 @@ import { useForm } from "react-hook-form"
 
 import styles from "./Main.module.css"
 import { invoke } from "@tauri-apps/api"
+import { listen } from "@tauri-apps/api/event"
 import { useEffect, useState } from "react"
 
 const Main = () => {
@@ -12,10 +13,16 @@ const Main = () => {
     formState: {
       errors
     },
-  } = useForm()
+    reset
+  } = useForm({
+    defaultValues: {
+      username: ""
+    }
+  })
 
   const [username, setUsername] = useState("")
   const [profiles, setProfiles] = useState([])
+  const [isDownloading, setIsDownloading] = useState(false)
 
   const [currentProfile, setCurrentProfile] = useState({})
 
@@ -34,24 +41,28 @@ const Main = () => {
     invoke("get_config").then((resp) => {
       setProfiles(resp.profiles)
       setUsername(resp.username)
+      reset({ username: username })
     })
   }, [])
 
 
-  const onSubmit = (data) => {
+  const onSubmit = async (data) => {
     if (currentProfile.is_downloaded) {
       invoke("launch", {
         username: data.username,
         version: currentProfile.version
       })
     } else {
+      const unlisten = await listen('downloading', (event) => {
+        console.log(event.payload);
+      });
       invoke("download_version", {id: currentProfile.version})
     }
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
-      <input defaultValue={username} type="text" {...register("username", {
+      <input type="text" {...register("username", {
         required: true,
         minLength: 3,
         maxLength: 16,
@@ -101,7 +112,7 @@ const Main = () => {
       </div>
       {errors.profile && <p>You must select a profile to launch</p>}
 
-      <input type="submit" className={styles.button} value={currentProfile.is_downloaded ? "Launch" : "Download"} />
+      <button type="submit" className={styles.button}>{currentProfile.is_downloaded ? "Launch" : "Download"}</button>
     </form>
   )
 }

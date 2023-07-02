@@ -1,14 +1,22 @@
-use std::path::PathBuf;
-
 use crate::{downloads::{Download, launcher_manifest::{LauncherManifest, LauncherManifestVersion}}, utils::GetPath, configs::launcher::Launcher, bootstrap::{ClientSettings, ClientBootstrap, ClientAuth, ClientVersion}};
 
-// FIXME: Change all `String` in paths to `PathBuf`
+use serde::Serialize;
+use tokio::sync::Mutex;
+use tauri::State;
+
+pub struct Downloading(pub Mutex<bool>);
+
 #[tauri::command]
-pub async fn download_version(id: String) -> Result<(), ()> {
+pub async fn download_version(downloading: State<'_, Downloading>, id: String) -> Result<(), ()> {
+  let mut state = downloading.0.lock().await;
+  *state = true;
   let load: Download = Download::new().await;
+  dbg!(*state);
   load.download(id, GetPath::game().to_str().unwrap().to_string())
     .await
     .unwrap();
+
+  *state = false;
 
   Ok(())
 }
@@ -31,6 +39,7 @@ pub async fn get_config() -> Result<Launcher, ()> {
 
   Ok(launcher_config)
 }
+
 
 #[tauri::command]
 pub async fn launch(username: String, version: String) -> Result<(), ()> {
