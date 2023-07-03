@@ -6,6 +6,7 @@ pub mod bootstrap;
 pub mod manifest;
 pub mod commands;
 pub mod configs;
+pub mod loaders;
 
 use commands::{download_version, get_manifest, get_config, launch};
 
