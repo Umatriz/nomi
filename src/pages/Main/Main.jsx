@@ -2,7 +2,7 @@ import { useForm } from "react-hook-form"
 
 import styles from "./Main.module.css"
 import { invoke } from "@tauri-apps/api"
-import { listen } from "@tauri-apps/api/event"
+import { appWindow } from '@tauri-apps/api/window';
 import { useEffect, useState } from "react"
 
 const Main = () => {
@@ -41,7 +41,7 @@ const Main = () => {
     invoke("get_config").then((resp) => {
       setProfiles(resp.profiles)
       setUsername(resp.username)
-      reset({ username: username })
+      reset({ username: resp.username })
     })
   }, [])
 
@@ -53,15 +53,17 @@ const Main = () => {
         version: currentProfile.version
       })
     } else {
-      const unlisten = await listen('downloading', (event) => {
-        console.log(event.payload);
-      });
-      invoke("download_version", {id: currentProfile.version})
+      const unlisten = await appWindow.listen(
+        'downloading',
+        ({event, payload}) => setIsDownloading(payload.state)
+      );
+      invoke("download_version", {id: currentProfile.version, window: appWindow})
     }
   }
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className={styles.form}>
+      {isDownloading ? <span>Downloading</span> : <span>Downloaded</span>}
       <input type="text" {...register("username", {
         required: true,
         minLength: 3,

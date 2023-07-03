@@ -1,22 +1,30 @@
 use crate::{downloads::{Download, launcher_manifest::{LauncherManifest, LauncherManifestVersion}}, utils::GetPath, configs::launcher::Launcher, bootstrap::{ClientSettings, ClientBootstrap, ClientAuth, ClientVersion}};
 
 use serde::Serialize;
-use tokio::sync::Mutex;
-use tauri::State;
+use tauri::Window;
 
-pub struct Downloading(pub Mutex<bool>);
+#[derive(Serialize, Clone)]
+struct Downloading {
+  state: bool,
+}
 
 #[tauri::command]
-pub async fn download_version(downloading: State<'_, Downloading>, id: String) -> Result<(), ()> {
-  let mut state = downloading.0.lock().await;
-  *state = true;
+pub async fn download_version(id: String, window: Window) -> Result<(), ()> {
   let load: Download = Download::new().await;
-  dbg!(*state);
-  load.download(id, GetPath::game().to_str().unwrap().to_string())
-    .await
-    .unwrap();
 
-  *state = false;
+  window.emit("downloading", Downloading {
+    state: true
+  }).unwrap();
+
+  // load.download(id, GetPath::game().to_str().unwrap().to_string())
+  //   .await
+  //   .unwrap();
+
+  tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
+
+  window.emit("downloading", Downloading {
+    state: false
+  }).unwrap();
 
   Ok(())
 }
@@ -72,3 +80,4 @@ pub async fn launch(username: String, version: String) -> Result<(), ()> {
   
   Ok(())
 }
+
