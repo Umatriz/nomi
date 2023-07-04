@@ -8,6 +8,7 @@ use tokio::task::spawn_blocking;
 
 pub mod launcher_manifest;
 pub mod assets;
+pub mod java_installer;
 
 use crate::manifest::Manifest;
 use launcher_manifest::{LauncherManifest, LauncherManifestVersion};
