@@ -1,20 +1,14 @@
 use crate::{downloads::{Download, launcher_manifest::{LauncherManifest, LauncherManifestVersion}}, utils::GetPath, configs::launcher::Launcher, bootstrap::{ClientSettings, ClientBootstrap, ClientAuth, ClientVersion}};
 
 use serde::Serialize;
-use tauri::Window;
 
 #[derive(Serialize, Clone)]
 struct Downloading {
   state: bool,
 }
 
-#[tauri::command]
-pub async fn download_version(id: String, window: Window) -> Result<(), ()> {
+pub async fn download_version(id: String) -> Result<(), ()> {
   let load: Download = Download::new().await;
-
-  window.emit("downloading", Downloading {
-    state: true
-  }).unwrap();
 
   // load.download(id, GetPath::game().to_str().unwrap().to_string())
   //   .await
@@ -22,14 +16,9 @@ pub async fn download_version(id: String, window: Window) -> Result<(), ()> {
 
   tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
 
-  window.emit("downloading", Downloading {
-    state: false
-  }).unwrap();
-
   Ok(())
 }
 
-#[tauri::command]
 pub async fn get_manifest() -> Result<Vec<LauncherManifestVersion>, ()> {
   let resp: LauncherManifest = reqwest::get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
     .await
@@ -41,15 +30,12 @@ pub async fn get_manifest() -> Result<Vec<LauncherManifestVersion>, ()> {
   return Ok(resp.versions);
 }
 
-#[tauri::command]
 pub async fn get_config() -> Result<Launcher, ()> {
   let launcher_config = Launcher::from_file(None);
 
   Ok(launcher_config)
 }
 
-
-#[tauri::command]
 pub async fn launch(username: String, version: String) -> Result<(), ()> {
   let bootstrap = ClientBootstrap::new(ClientSettings {
     assets: GetPath::game().join("assets"),
