@@ -34,8 +34,8 @@ cargo tauri dev
 
 #### Contact us
 
-Discord server: https://discord.gg/MjxGtugM
-Discord DMs: @umatriz
+- Discord server: https://discord.gg/MjxGtugM
+- Discord DMs: @umatriz
 
 ---
 
