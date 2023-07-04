@@ -1,5 +1,3 @@
-#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
 pub mod utils;
 pub mod downloads;
 pub mod bootstrap;
@@ -10,7 +8,11 @@ pub mod loaders;
 
 use commands::{download_version, get_manifest, get_config, launch};
 
-#[tokio::main]
-async fn main() {
-  
+slint::include_modules!();
+fn main() {
+  let ui = MainWindow::new().unwrap();
+  ui.global::<State>().on_launch(|id| {
+    println!("id: {}", id);
+  });
+  ui.run().unwrap();
 }
