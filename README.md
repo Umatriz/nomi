@@ -29,3 +29,14 @@ cargo tauri dev
 - [ ] Update UI
 - [x] `config` mod update
 - [ ] `downloads` mod update
+
+### FAQ
+
+#### Contact us
+
+Discord server: https://discord.gg/MjxGtugM
+Discord DMs: @umatriz
+
+---
+
+Copyright (C) 2023  umatriz
