@@ -1,7 +1,9 @@
 config.json
 
-/target/
+target/
 
-/minecraft/
+minecraft/
 
-/logs/
+logs/
+
+debug/
