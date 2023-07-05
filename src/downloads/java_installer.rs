@@ -24,7 +24,7 @@ impl JavaInstaller {
         file_name: &str,
     ) -> Result<(), JavaInstallerError>{
         let mut file = File::create(temporary_dir_path.join(file_name))?;
-        spawn_blocking(move || -> Result<(), reqwest::Error> { // TODO: remove expects
+        spawn_blocking(move || -> Result<(), reqwest::Error> {
             blocking::get(INSTALLER_URL)
                 ?
                 .copy_to(&mut file)
