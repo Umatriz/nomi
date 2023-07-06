@@ -24,7 +24,7 @@ impl JavaInstaller {
         file_name: &str,
     ) -> Result<(), JavaInstallerError>{
         let mut file = File::create(temporary_dir_path.join(file_name))?;
-        spawn_blocking(move || -> Result<(), reqwest::Error> { // TODO: remove expects
+        spawn_blocking(move || -> Result<(), reqwest::Error> {
             blocking::get(INSTALLER_URL)
                 ?
                 .copy_to(&mut file)
@@ -39,9 +39,7 @@ impl JavaInstaller {
         path: &PathBuf,
         hash: &str,
     ) -> Result<(), JavaInstallerError> {
-        // Umatriz: idk how to implement thsi for `JavaInstallerError`
-        // FIXME
-        if sha256::try_digest(path.as_path()).map_err(|x| JavaInstallerError::Sha256Error(x))? != hash {
+        if sha256::try_digest(path.as_path())? != hash {
             return Err(JavaInstallerError::HashDoesNotMatch);
         };
         return Ok(());
@@ -92,13 +90,9 @@ impl JavaInstaller {
 
 #[derive(Error, Debug)]
 enum JavaInstallerError<'a> {
-    #[error("Path convertation error")]
-    PathToStrConvertationError,
     #[error("Hash does not match")]
     HashDoesNotMatch,
     #[error("Hashing error")]
-    HashingError,
-    #[error("{0}")]
     Sha256Error(<&'a std::path::Path as sha256::TrySha256Digest>::Error),
     #[error("data store disconnected")]
     ZipExtractionError(#[from] zip_extract::ZipExtractError),
