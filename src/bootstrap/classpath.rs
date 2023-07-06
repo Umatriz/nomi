@@ -10,7 +10,7 @@ pub fn should_use_library(lib: &ManifestLibrary) -> bool {
     }
 
     let rules = rules_opt.as_ref().unwrap();
-    return is_all_rules_satisfied(rules);
+    is_all_rules_satisfied(rules)
 }
 
 pub fn create_classpath(
@@ -25,10 +25,10 @@ pub fn create_classpath(
         if should_use {
             let artifact = &lib.downloads.artifact;
             let lib_path = artifact.as_ref().unwrap().path.clone();
-            let fixed_lib_path = Path::new(&libraries_path).join(lib_path.unwrap().replace("/", "\\"));
+            let fixed_lib_path = Path::new(&libraries_path).join(lib_path.unwrap().replace('/', "\\"));
             classpath = format!("{};{}", classpath, fixed_lib_path.to_str().unwrap());
         }
     }
 
-    return classpath;
+    classpath
 }

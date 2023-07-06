@@ -62,27 +62,27 @@ impl ClientBootstrap {
     }
 
     pub fn get_assets_dir(&self) -> PathBuf {
-        return self.settings.assets.clone();
+        self.settings.assets.clone()
     }
 
     pub fn get_game_dir(&self) -> PathBuf {
-        return self.settings.game_dir.clone();
+        self.settings.game_dir.clone()
     }
 
     pub fn get_json_file(&self) -> PathBuf {
-        return self.settings.manifest_file.clone();
+        self.settings.manifest_file.clone()
     }
 
     pub fn get_jar_file(&self) -> PathBuf {
-        return self.settings.version_jar_file.clone();
+        self.settings.version_jar_file.clone()
     }
 
     pub fn get_libs_dir(&self) -> PathBuf {
-        return self.settings.libraries_dir.clone();
+        self.settings.libraries_dir.clone()
     }
 
     pub fn get_natives_dir(&self) -> PathBuf {
-        return self.settings.natives_dir.clone();
+        self.settings.natives_dir.clone()
     }
 
     pub fn build_args(&self) -> Result<Vec<String>, BootstrapError> {
@@ -156,9 +156,9 @@ impl ClientBootstrap {
         args = args
             .iter()
             .map(|x| {
-                x.replace("${assets_root}", &assets_dir.to_str().unwrap())
-                    .replace("${game_directory}", &game_dir.to_str().unwrap())
-                    .replace("${natives_directory}", &natives_dir.to_str().unwrap())
+                x.replace("${assets_root}", assets_dir.to_str().unwrap())
+                    .replace("${game_directory}", game_dir.to_str().unwrap())
+                    .replace("${natives_directory}", natives_dir.to_str().unwrap())
                     .replace("${launcher_name}", "nomi")
                     .replace("${launcher_version}", "0.0.1")
                     .replace(
@@ -175,13 +175,13 @@ impl ClientBootstrap {
                     )
                     .replace("${version_type}", &version.version_type)
                     .replace("${version_name}", &version.version)
-                    .replace("${assets_index_name}", &assets_index)
+                    .replace("${assets_index_name}", assets_index)
                     .replace("${user_properties}", "{}")
                     .replace("${classpath}", &classpath)
             })
             .collect();
 
-        return Ok(args);
+        Ok(args)
     }
 
     pub fn launch(&self) -> Result<i32, BootstrapError> {
@@ -193,6 +193,6 @@ impl ClientBootstrap {
             .expect("command failed to start");
 
         let status = process.wait().unwrap().code().unwrap();
-        return Ok(status);
+        Ok(status)
     }
 }

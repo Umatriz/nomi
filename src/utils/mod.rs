@@ -14,7 +14,7 @@ impl GetPath {
   
   pub fn java_bin() -> Option<PathBuf> {
     let _path = std::env::var("Path").unwrap();
-    let path_vec = _path.split(";").collect::<Vec<&str>>();
+    let path_vec = _path.split(';').collect::<Vec<&str>>();
     let mut java_bin: Option<PathBuf> = None;
     for i in path_vec.iter() {
       if i.contains("java") {

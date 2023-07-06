@@ -15,8 +15,8 @@ struct Downloading {
     state: bool,
 }
 
-pub async fn download_version(id: String) -> Result<(), ()> {
-    let load: Download = Download::new().await;
+pub async fn download_version(_id: String) -> Result<(), ()> {
+    let _load: Download = Download::new().await;
 
     // load.download(id, GetPath::game().to_str().unwrap().to_string())
     //   .await
@@ -38,7 +38,7 @@ pub async fn get_manifest() -> Result<Vec<LauncherManifestVersion>, ()> {
             .await
             .unwrap();
 
-    return Ok(resp.versions);
+    Ok(resp.versions)
 }
 
 pub async fn get_config() -> Result<Launcher, ()> {
@@ -51,7 +51,7 @@ pub async fn launch(username: String, version: String) -> Result<(), ()> {
     let bootstrap = ClientBootstrap::new(ClientSettings {
         assets: GetPath::game().join("assets"),
         auth: ClientAuth {
-            username: username,
+            username,
             access_token: None,
             uuid: Some(uuid::Uuid::new_v4().to_string()),
         },

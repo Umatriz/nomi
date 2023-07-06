@@ -40,7 +40,7 @@ impl Profile {
     name: String
   ) -> Self {
     Self {
-      id: Self::create_id(&profiles),
+      id: Self::create_id(profiles),
       version,
       version_type,
       path,
@@ -97,12 +97,7 @@ impl Launcher {
   }
 
   pub fn get_profile(&self, id: i32) -> Option<&Profile> {
-    for prof in self.profiles.iter() {
-      if prof.id == id {
-        return Some(prof);
-      }
-    }
-    return None;
+    self.profiles.iter().find(|&prof| prof.id == id)
   }
 
   pub fn remove_profile(&mut self, id: usize) {

@@ -17,7 +17,7 @@ pub trait Config {
   where Self: Serialize
   {
     let conf: ConfigFile = ConfigFile::new(path);
-    let mut file: File = std::fs::File::create(conf.1.clone()).unwrap();
+    let mut file: File = std::fs::File::create(conf.1).unwrap();
     
     let _ = serde_json::to_writer_pretty(&mut file, &self);
 
@@ -52,10 +52,10 @@ pub trait Config {
     if conf.0 {
       let f = std::fs::File::open(conf.1).expect("Could not open file");
       let read: Self = serde_json::from_reader(f).expect("Could not read values");
-      return Ok(read);
+      Ok(read)
     } else {
-      let _ = self.overwrite(conf.1);
-      return Err(());
+      self.overwrite(conf.1);
+      Err(())
     }
   }
 }
