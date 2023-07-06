@@ -22,7 +22,7 @@ impl JavaInstaller {
         &self,
         temporary_dir_path: &PathBuf, 
         file_name: &str,
-    ) -> Result<(), JavaInstallerError>{
+    ) -> anyhow::Result<()>{
         let mut file = File::create(temporary_dir_path.join(file_name))?;
         spawn_blocking(move || -> Result<(), reqwest::Error> {
             blocking::get(INSTALLER_URL)
@@ -38,9 +38,9 @@ impl JavaInstaller {
         &self,
         path: &PathBuf,
         hash: &str,
-    ) -> Result<(), JavaInstallerError> {
+    ) -> anyhow::Result<()> {
         if sha256::try_digest(path.as_path())? != hash {
-            return Err(JavaInstallerError::HashDoesNotMatch);
+            return Err(JavaInstallerError::HashDoesNotMatch.into());
         };
         return Ok(());
     }
@@ -48,7 +48,7 @@ impl JavaInstaller {
     async fn install_java(
         &self,
         temporary_dir_path: &PathBuf,
-    ) -> Result<(), JavaInstallerError> {
+    ) -> anyhow::Result<()> {
         let installer_file_name = "java_installer.exe";
 
         self.download(&temporary_dir_path, &installer_file_name).await?;
@@ -69,7 +69,7 @@ impl JavaInstaller {
         &self,
         temporary_dir_path: &PathBuf,
         java_dir_path: &Path,
-    ) -> Result<(), JavaInstallerError> {
+    ) -> anyhow::Result<()> {
         let archive_filename = "java_portable.zip";
         self.download(&temporary_dir_path, archive_filename).await?;
 
@@ -89,17 +89,7 @@ impl JavaInstaller {
 }
 
 #[derive(Error, Debug)]
-enum JavaInstallerError<'a> {
+enum JavaInstallerError {
     #[error("Hash does not match")]
-    HashDoesNotMatch,
-    #[error("Hashing error")]
-    Sha256Error(<&'a std::path::Path as sha256::TrySha256Digest>::Error),
-    #[error("data store disconnected")]
-    ZipExtractionError(#[from] zip_extract::ZipExtractError),
-    #[error("data store disconnected")]
-    IoError(#[from] std::io::Error),
-    #[error("Reqwest error")]
-    ReqwestError(#[from] reqwest::Error),
-    #[error("Join error")]
-    JoinError(#[from] tokio::task::JoinError)
+    HashDoesNotMatch
 }
