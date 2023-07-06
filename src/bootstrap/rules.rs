@@ -3,19 +3,19 @@ use std::env;
 use crate::manifest::Rules;
 
 pub fn is_rule_satisfied(rule: &Rules) -> bool {
-  if rule.os.is_some() {
-    let os = rule.os.as_ref().unwrap();
-    let target_os = &os.name;
+    if rule.os.is_some() {
+        let os = rule.os.as_ref().unwrap();
+        let target_os = &os.name;
 
-    if target_os.is_some() {
-      let target_os = target_os.as_ref().unwrap();
-      let current_os = env::consts::OS;
+        if target_os.is_some() {
+            let target_os = target_os.as_ref().unwrap();
+            let current_os = env::consts::OS;
 
-      if current_os != target_os {
-        return false;
-      }
+            if current_os != target_os {
+                return false;
+            }
+        }
     }
-  }
 
     if rule.features.is_some() {
         let features = rule.features.as_ref().unwrap();
@@ -28,20 +28,18 @@ pub fn is_rule_satisfied(rule: &Rules) -> bool {
         }
     }
 
-    return true;
+    true
 }
 
-pub fn is_all_rules_satisfied(rules: &Vec<Rules>) -> bool {
+pub fn is_all_rules_satisfied(rules: &[Rules]) -> bool {
     for rule in rules.iter() {
         let satisfied = is_rule_satisfied(rule);
         let use_lib = rule.action == "allow";
 
-        if satisfied && !use_lib {
-            return false;
-        } else if !satisfied && use_lib {
+        if satisfied && !use_lib || !satisfied && use_lib {
             return false;
         }
     }
 
-    return true;
+    true
 }
