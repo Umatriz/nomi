@@ -5,12 +5,10 @@ use super::rules::is_all_rules_satisfied;
 
 pub fn should_use_library(lib: &ManifestLibrary) -> bool {
     let rules_opt = &lib.rules;
-    if !rules_opt.is_some() {
-        return true;
+    return match rules_opt {
+        None => true,
+        Some(rules) => is_all_rules_satisfied(rules),
     }
-
-    let rules = rules_opt.as_ref().unwrap();
-    is_all_rules_satisfied(rules)
 }
 
 pub fn create_classpath(
