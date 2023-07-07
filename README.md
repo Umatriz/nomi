@@ -25,6 +25,7 @@ cargo run
 - [ ] Update UI
 - [x] `config` mod update
 - [ ] `downloads` mod update
+- [ ] Change all `Result` to `anyhow::Result`
 
 ### FAQ
 

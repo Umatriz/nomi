@@ -8,7 +8,7 @@ use thiserror::Error;
 use tokio::task::spawn_blocking;
 use zip_extract;
 
-struct JavaInstaller;
+pub struct JavaInstaller;
 
 const INSTALLER_URL: &str =
     "https://download.oracle.com/java/17/archive/jdk-17.0.7_windows-x64_bin.exe";
@@ -22,10 +22,15 @@ const JDK_17_0_7_PORTABLE_SHA256: &str =
     "c08fe96bc1af1b500ccbe7225475896d6859f66aa45e7c86e69906161b8cbaca";
 
 impl JavaInstaller {
-    async fn download(&self, temporary_dir_path: &Path, file_name: &str) -> anyhow::Result<()> {
+    async fn download(
+        &self,
+        temporary_dir_path: &Path,
+        file_name: &str,
+        url: &'static str,
+    ) -> anyhow::Result<()> {
         let mut file = File::create(temporary_dir_path.join(file_name))?;
         spawn_blocking(move || -> Result<(), reqwest::Error> {
-            blocking::get(INSTALLER_URL)?.copy_to(&mut file)?;
+            blocking::get(url)?.copy_to(&mut file)?;
             Ok(())
         })
         .await??;
@@ -39,10 +44,10 @@ impl JavaInstaller {
         Ok(())
     }
 
-    async fn install_java(&self, temporary_dir_path: &Path) -> anyhow::Result<()> {
+    pub async fn install_java(&self, temporary_dir_path: &Path) -> anyhow::Result<()> {
         let installer_file_name = "java_installer.exe";
 
-        self.download(temporary_dir_path, installer_file_name)
+        self.download(temporary_dir_path, installer_file_name, INSTALLER_URL)
             .await?;
         self.check_hash(
             &temporary_dir_path.join(installer_file_name),
@@ -59,13 +64,14 @@ impl JavaInstaller {
         Ok(())
     }
 
-    async fn prepare_portable_java(
+    pub async fn prepare_portable_java(
         &self,
         temporary_dir_path: &Path,
         java_dir_path: &Path,
     ) -> anyhow::Result<()> {
         let archive_filename = "java_portable.zip";
-        self.download(temporary_dir_path, archive_filename).await?;
+        self.download(temporary_dir_path, archive_filename, PORTABLE_URL)
+            .await?;
 
         self.check_hash(
             &temporary_dir_path.join(archive_filename),
