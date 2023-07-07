@@ -8,7 +8,7 @@ pub fn should_use_library(lib: &ManifestLibrary) -> bool {
     return match rules_opt {
         None => true,
         Some(rules) => is_all_rules_satisfied(rules),
-    }
+    };
 }
 
 pub fn create_classpath(
