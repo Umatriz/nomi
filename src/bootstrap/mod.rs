@@ -3,6 +3,7 @@ pub mod rules;
 
 use std::{path::PathBuf, process::Command};
 
+use anyhow::Result;
 use thiserror::Error;
 
 use crate::manifest::{read_manifest_from_file, JvmArgument};
