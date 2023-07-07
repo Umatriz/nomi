@@ -10,6 +10,7 @@ use crate::{
 
 use serde::Serialize;
 use thiserror::Error;
+use anyhow::Result;
 
 
 #[derive(Serialize, Clone)]
@@ -31,7 +32,7 @@ pub async fn download_version(_id: String) -> Result<(), ()> {
     Ok(())
 }
 
-pub async fn get_manifest() -> Result<Vec<LauncherManifestVersion>, CommandsError> {
+pub async fn get_manifest() -> Result<Vec<LauncherManifestVersion>> {
     let resp: LauncherManifest =
         reqwest::get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
             .await
@@ -49,7 +50,7 @@ pub async fn get_config() -> Result<Launcher, ()> {
     Ok(launcher_config)
 }
 
-pub async fn launch(username: String, version: String) -> Result<(), CommandsError> {
+pub async fn launch(username: String, version: String) -> Result<()> {
     let bootstrap = ClientBootstrap::new(ClientSettings {
         assets: GetPath::game().join("assets"),
         auth: ClientAuth {
@@ -78,7 +79,7 @@ pub async fn launch(username: String, version: String) -> Result<(), CommandsErr
             .join(format!("{}.jar", version)),
     });
 
-    bootstrap.launch().unwrap();
+    bootstrap.launch()?;
 
     Ok(())
 }
