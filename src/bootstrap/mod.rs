@@ -193,6 +193,7 @@ impl ClientBootstrap {
             .expect("command failed to start");
 
         let status = process.wait().unwrap().code().unwrap();
+        // TODO!: return result instead of 🤮🤮 exit code
         Ok(status)
     }
 }
