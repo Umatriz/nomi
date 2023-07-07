@@ -9,6 +9,8 @@ use crate::{
 };
 
 use serde::Serialize;
+use thiserror::Error;
+
 
 #[derive(Serialize, Clone)]
 struct Downloading {
@@ -29,14 +31,14 @@ pub async fn download_version(_id: String) -> Result<(), ()> {
     Ok(())
 }
 
-pub async fn get_manifest() -> Result<Vec<LauncherManifestVersion>, ()> {
+pub async fn get_manifest() -> Result<Vec<LauncherManifestVersion>, CommandsError> {
     let resp: LauncherManifest =
         reqwest::get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
             .await
-            .unwrap()
+            .map_err(|error| CommandsError::FailedToDownloadManifest(error))?
             .json()
             .await
-            .unwrap();
+            .map_err(|error| CommandsError::CantParseManifestToJson(error))?;
 
     Ok(resp.versions)
 }
@@ -47,7 +49,7 @@ pub async fn get_config() -> Result<Launcher, ()> {
     Ok(launcher_config)
 }
 
-pub async fn launch(username: String, version: String) -> Result<(), ()> {
+pub async fn launch(username: String, version: String) -> Result<(), CommandsError> {
     let bootstrap = ClientBootstrap::new(ClientSettings {
         assets: GetPath::game().join("assets"),
         auth: ClientAuth {
@@ -56,7 +58,7 @@ pub async fn launch(username: String, version: String) -> Result<(), ()> {
             uuid: Some(uuid::Uuid::new_v4().to_string()),
         },
         game_dir: GetPath::game(),
-        java_bin: GetPath::java_bin().unwrap(),
+        java_bin: GetPath::java_bin().ok_or_else(|| {CommandsError::CantFindJavaBin})?,
         libraries_dir: GetPath::game().join("libraries"),
         manifest_file: GetPath::game()
             .join("versions")
@@ -79,4 +81,16 @@ pub async fn launch(username: String, version: String) -> Result<(), ()> {
     bootstrap.launch().unwrap();
 
     Ok(())
+}
+
+#[derive(Error, Debug)]
+pub enum CommandsError {
+  #[error("Can't find java executables")]
+  CantFindJavaBin,
+
+  #[error("Failed to download minecraft manifest file")]
+  FailedToDownloadManifest(reqwest::Error),
+
+  #[error("Can't parse minecraft manifest file to json")]
+  CantParseManifestToJson(reqwest::Error),
 }
