@@ -3,7 +3,7 @@ pub mod rules;
 
 use std::{path::PathBuf, process::Command};
 
-use anyhow::Result;
+use anyhow::{Result, Context};
 use thiserror::Error;
 
 use crate::manifest::{read_manifest_from_file, JvmArgument};
@@ -86,7 +86,7 @@ impl ClientBootstrap {
         self.settings.natives_dir.clone()
     }
 
-    pub fn build_args(&self) -> Result<Vec<String>, BootstrapError> {
+    pub fn build_args(&self) -> Result<Vec<String>> {
         let auth = &self.settings.auth;
         let assets_dir = self.get_assets_dir();
         let game_dir = self.get_game_dir();
@@ -96,25 +96,25 @@ impl ClientBootstrap {
         let version = &self.settings.version;
 
         if !game_dir.is_dir() {
-            return Err(BootstrapError::GameDirNotExist);
+            return Err(BootstrapError::GameDirNotExist.into());
         }
 
         if !java_bin.is_file() {
-            return Err(BootstrapError::JavaBinNotExist);
+            return Err(BootstrapError::JavaBinNotExist.into());
         }
 
         if !json_file.is_file() {
-            return Err(BootstrapError::VersionFileNotFound);
+            return Err(BootstrapError::VersionFileNotFound.into());
         }
 
-        let manifest = read_manifest_from_file(json_file).unwrap();
+        let manifest = read_manifest_from_file(json_file)?;
 
         let assets_index = &manifest.asset_index.id;
         let classpath = classpath::create_classpath(
             self.get_jar_file(),
             self.get_libs_dir(),
             manifest.libraries,
-        );
+        )?;
 
         let mut args: Vec<String> = vec![];
 
@@ -157,6 +157,7 @@ impl ClientBootstrap {
         args = args
             .iter()
             .map(|x| {
+                // TODO: remove unwraps here
                 x.replace("${assets_root}", assets_dir.to_str().unwrap())
                     .replace("${game_directory}", game_dir.to_str().unwrap())
                     .replace("${natives_directory}", natives_dir.to_str().unwrap())
@@ -185,15 +186,15 @@ impl ClientBootstrap {
         Ok(args)
     }
 
-    pub fn launch(&self) -> Result<i32, BootstrapError> {
-        let args = self.build_args().unwrap();
+    pub fn launch(&self) -> Result<i32> {
+        let args = self.build_args()?;
 
         let mut process = Command::new(&self.settings.java_bin)
             .args(args)
             .spawn()
             .expect("command failed to start");
 
-        let status = process.wait().unwrap().code().unwrap();
+        let status = process.wait()?.code().context("can't get minecraft exit code")?;
         // TODO!: return result instead of 🤮🤮 exit code
         Ok(status)
     }
