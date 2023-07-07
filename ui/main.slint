@@ -1,0 +1,85 @@
+import { VerticalBox , HorizontalBox, Button, TextEdit} from "std-widgets.slint";
+
+struct Profile {
+    id: string,
+    version: string,
+    name: string,
+    loader: string
+}
+export global State {
+    in property <[Profile]> profiles: [{id: "aaaaaaaa", version: "1.20.1", name: "AAA", loader: "Vanilla"}];
+    in-out property <string> query;
+    callback launch(string);
+}
+
+export component MainWindow inherits Window {
+    default-font-size: 16px;
+    
+    VerticalBox {
+        HorizontalBox {
+            Text {
+                vertical-alignment: center;
+                text: "Search";
+            }
+            Rectangle {
+                border-color: #eeeeee;
+                border-width: 1px;
+                border-radius: 8px;
+                width: input.width;
+                height: 30px;
+
+                input := TextInput {
+                    text <=> State.query;                      
+                    x: 8px;
+                    vertical-alignment: center;
+                    height: 30px;
+                    width: 300px;
+                    single-line: true;
+                }
+            }
+            Button {
+                clicked => {
+
+                }
+                text: "Create";
+            }
+        }
+        Rectangle {
+            border-color: #eeeeee;
+            border-width: 1px;
+            border-radius: 8px;
+            vertical-stretch: 2;
+            VerticalBox {
+                for profile in State.profiles: elem :=  Rectangle {
+                    HorizontalBox {
+
+                        Text {
+                            vertical-alignment: center;
+                            text: profile.name;
+                        }
+                        Text {
+                            vertical-alignment: center;
+                            text: profile.version;
+                        }
+                        Text {
+                            vertical-alignment: center;
+                            text: profile.loader;
+                        }
+                        //TODO: Replace with custom play button
+                        Button {
+                            clicked =>{
+                                State.launch(profile.id)
+                            }
+                            width: 40px;
+                            height: 40px;
+                            text: "etst";
+                        }
+                    }
+                }
+                Rectangle {
+                    background: #eeeeee;
+                }
+            }
+        }
+    }
+}
