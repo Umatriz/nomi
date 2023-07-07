@@ -1,115 +1,107 @@
-use std::path::{Path, PathBuf};
+use reqwest::blocking;
+use sha256;
 use std::fs::File;
-use std::process::Command;
 use std::io::Cursor;
+use std::path::Path;
+use std::process::Command;
 use thiserror::Error;
 use tokio::task::spawn_blocking;
-use reqwest::blocking;
 use zip_extract;
-use sha256;
 
-struct JavaInstaller;
+pub struct JavaInstaller;
 
-const INSTALLER_URL: &str = "https://download.oracle.com/java/17/archive/jdk-17.0.7_windows-x64_bin.exe";
-const PORTABLE_URL: &str = "https://download.oracle.com/java/17/archive/jdk-17.0.7_windows-x64_bin.zip";
+const INSTALLER_URL: &str =
+    "https://download.oracle.com/java/17/archive/jdk-17.0.7_windows-x64_bin.exe";
+const PORTABLE_URL: &str =
+    "https://download.oracle.com/java/17/archive/jdk-17.0.7_windows-x64_bin.zip";
 // i hope they will not redesign site
 
-const JDK_17_0_7_INSTALLER_SHA256: &str = "f41cfb7fd675f9f74b76217a2c0940b76f4676f053fddb62a464eacffa4a773b";
-const JDK_17_0_7_PORTABLE_SHA256: &str = "c08fe96bc1af1b500ccbe7225475896d6859f66aa45e7c86e69906161b8cbaca";
+const JDK_17_0_7_INSTALLER_SHA256: &str =
+    "f41cfb7fd675f9f74b76217a2c0940b76f4676f053fddb62a464eacffa4a773b";
+const JDK_17_0_7_PORTABLE_SHA256: &str =
+    "c08fe96bc1af1b500ccbe7225475896d6859f66aa45e7c86e69906161b8cbaca";
 
 impl JavaInstaller {
     async fn download(
         &self,
-        temporary_dir_path: &PathBuf, 
+        temporary_dir_path: &Path,
         file_name: &str,
-    ) -> Result<(), JavaInstallerError>{
+        url: &'static str,
+    ) -> anyhow::Result<()> {
         let mut file = File::create(temporary_dir_path.join(file_name))?;
         spawn_blocking(move || -> Result<(), reqwest::Error> {
-            blocking::get(INSTALLER_URL)
-                ?
-                .copy_to(&mut file)
-                ?;
+            blocking::get(url)?.copy_to(&mut file)?;
             Ok(())
-            }).await??;
-        return Ok(());
+        })
+        .await??;
+        Ok(())
     }
 
-    fn check_hash(
-        &self,
-        path: &PathBuf,
-        hash: &str,
-    ) -> Result<(), JavaInstallerError> {
-        // Umatriz: idk how to implement thsi for `JavaInstallerError`
-        // FIXME
-        if sha256::try_digest(path.as_path()).map_err(|x| JavaInstallerError::Sha256Error(x))? != hash {
-            return Err(JavaInstallerError::HashDoesNotMatch);
+    fn check_hash(&self, path: &Path, hash: &str) -> anyhow::Result<()> {
+        if sha256::try_digest(path)? != hash {
+            return Err(JavaInstallerError::HashDoesNotMatch.into());
         };
-        return Ok(());
+        Ok(())
     }
 
-    async fn install_java(
-        &self,
-        temporary_dir_path: &PathBuf,
-    ) -> Result<(), JavaInstallerError> {
+    pub async fn install_java(&self, temporary_dir_path: &Path) -> anyhow::Result<()> {
         let installer_file_name = "java_installer.exe";
 
-        self.download(&temporary_dir_path, &installer_file_name).await?;
-        self.check_hash(&temporary_dir_path.join(&installer_file_name), JDK_17_0_7_INSTALLER_SHA256)?;
-        
+        self.download(temporary_dir_path, installer_file_name, INSTALLER_URL)
+            .await?;
+        self.check_hash(
+            &temporary_dir_path.join(installer_file_name),
+            JDK_17_0_7_INSTALLER_SHA256,
+        )?;
+
         let path = {
-            let joined_path = temporary_dir_path.join(&installer_file_name);
+            let joined_path = temporary_dir_path.join(installer_file_name);
             joined_path.to_string_lossy().to_string()
         };
-        
+
         Command::new(path)
             .arg("/s") // silent, does not show gui
             .spawn()
-            .map_err(|err| JavaInstallerError::FailedToSpawnJavaInstaller(err))?;
-            // TODO: check error code
+            .map_err(JavaInstallerError::FailedToSpawnJavaInstaller)?;
+        // TODO: check error code
 
-        return Ok(());
+        Ok(())
     }
 
-    async fn prepare_portable_java(
+    pub async fn prepare_portable_java(
         &self,
-        temporary_dir_path: &PathBuf,
+        temporary_dir_path: &Path,
         java_dir_path: &Path,
-    ) -> Result<(), JavaInstallerError> {
+    ) -> anyhow::Result<()> {
         let archive_filename = "java_portable.zip";
-        self.download(&temporary_dir_path, archive_filename).await?;
+        self.download(temporary_dir_path, archive_filename, PORTABLE_URL)
+            .await?;
 
-        self.check_hash(&temporary_dir_path.join(archive_filename), JDK_17_0_7_PORTABLE_SHA256)?;
+        self.check_hash(
+            &temporary_dir_path.join(archive_filename),
+            JDK_17_0_7_PORTABLE_SHA256,
+        )?;
 
         zip_extract::extract(
-            Cursor::new(
-                std::fs::read(
-                    temporary_dir_path.join(archive_filename)
-                )?
-            ), 
-            java_dir_path, 
+            Cursor::new(std::fs::read(temporary_dir_path.join(archive_filename))?),
+            java_dir_path,
             true,
         )?;
-        return Ok(());
+        Ok(())
     }
 }
 
 #[derive(Error, Debug)]
-enum JavaInstallerError<'a> {
-    #[error("Path convertation error")]
-    PathToStrConvertationError,
-
+pub enum JavaInstallerError<'a> {
     #[error("Hash does not match")]
     HashDoesNotMatch,
-    
-    #[error("Hashing error")]
-    HashingError,
 
     #[error("{0}")]
     Sha256Error(<&'a std::path::Path as sha256::TrySha256Digest>::Error),
 
     #[error("data store disconnected")]
     ZipExtractionError(#[from] zip_extract::ZipExtractError),
-    
+
     #[error("data store disconnected")]
     IoError(#[from] std::io::Error),
 
