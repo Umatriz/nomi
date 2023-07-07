@@ -1,3 +1,4 @@
+use anyhow::Result;
 use reqwest::blocking;
 use sha256;
 use std::fs::File;
