@@ -192,7 +192,7 @@ impl ClientBootstrap {
         let mut process = Command::new(&self.settings.java_bin)
             .args(args)
             .spawn()
-            .expect("command failed to start");
+            .context("command failed to start")?;
 
         let status = process.wait()?.code().context("can't get minecraft exit code")?;
         // TODO!: return result instead of 🤮🤮 exit code
