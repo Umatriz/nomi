@@ -5,7 +5,7 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::Result;
+use anyhow::{Result, Context};
 use serde::Serialize;
 use thiserror::Error;
 
@@ -24,12 +24,12 @@ pub enum ConfigError {
 }
 
 pub trait Config {
-    fn write(&self, path: PathBuf) -> Result<(), std::io::Error>
+    fn write(&self, path: PathBuf) -> Result<()>
     where
         Self: Serialize,
     {
         let conf: ConfigFile = ConfigFile::new(path);
-        let mut file: File = std::fs::File::create(conf.1).unwrap();
+        let mut file: File = std::fs::File::create(conf.1).context("failed to open config file")?;
 
         let _ = serde_json::to_writer_pretty(&mut file, &self);
 
@@ -48,7 +48,7 @@ pub trait Config {
                     .write(true)
                     .truncate(true)
                     .open(conf.1)
-                    .unwrap();
+                    .context("failed to open config file");
 
                 let _ = serde_json::to_writer_pretty(&mut file, &self);
             }
@@ -56,18 +56,18 @@ pub trait Config {
         }
     }
 
-    fn read_config(&self, path: PathBuf) -> Result<Self, ConfigError>
+    fn read_config(&self, path: PathBuf) -> Result<Self>
     where
         Self: Sized + for<'de> serde::Deserialize<'de> + Serialize,
     {
         let conf: ConfigFile = ConfigFile::new(path);
         if conf.0 {
-            let f = std::fs::File::open(conf.1).expect("Could not open file");
-            let read: Self = serde_json::from_reader(f).expect("Could not read values");
+            let f = std::fs::File::open(conf.1).context("Could not open file")?;
+            let read: Self = serde_json::from_reader(f).context("Could not read values")?;
             Ok(read)
         } else {
             self.overwrite(conf.1);
-            Err(ConfigError::ConfigFileDoesNotExist)
+            Err(ConfigError::ConfigFileDoesNotExist.into())
         }
     }
 }
