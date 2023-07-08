@@ -124,7 +124,7 @@ impl ClientBootstrap {
                     args.push(value);
                 }
                 JvmArgument::Struct { value, rules, .. } => {
-                    if !is_all_rules_satisfied(&rules) {
+                    if !is_all_rules_satisfied(&rules)? {
                         continue;
                     }
 
