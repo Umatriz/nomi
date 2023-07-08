@@ -37,7 +37,7 @@ pub trait Config {
         Ok(())
     }
 
-    fn overwrite(&self, path: PathBuf)
+    fn overwrite(&self, path: PathBuf) -> Result<()>
     where
         Self: Serialize,
     {
@@ -48,12 +48,13 @@ pub trait Config {
                     .write(true)
                     .truncate(true)
                     .open(conf.1)
-                    .context("failed to open config file");
+                    .context("failed to open config file")?;
 
                 let _ = serde_json::to_writer_pretty(&mut file, &self);
             }
             false => self.write(conf.1).unwrap(),
-        }
+        };
+        return Ok(());
     }
 
     fn read_config(&self, path: PathBuf) -> Result<Self>
