@@ -1,19 +1,25 @@
+use anyhow::Result;
 use std::path::PathBuf;
 
 pub struct GetPath;
 
 impl GetPath {
-  pub fn config() -> PathBuf {
+  pub fn config() -> Result<PathBuf> {
     // TODO: Remove this .join()
-    std::env::current_dir().unwrap().join("config.json")
+    return Ok(
+      std::env::current_dir()?.join("config.json")
+    );
   }
 
-  pub fn game() -> PathBuf {
-    std::env::current_dir().unwrap().join("minecraft")
+  pub fn game() -> Result<PathBuf> {
+    return Ok(
+      std::env::current_dir()?.join("minecraft")
+    )
   }
   
-  pub fn java_bin() -> Option<PathBuf> {
-    let _path = std::env::var("Path").unwrap();
+  // TODO: retern Err if cant find
+  pub fn java_bin() -> Result<Option<PathBuf>> {
+    let _path = std::env::var("Path")?;
     let path_vec = _path.split(';').collect::<Vec<&str>>();
     let mut java_bin: Option<PathBuf> = None;
     for i in path_vec.iter() {
@@ -29,6 +35,6 @@ impl GetPath {
         }
       }
     }
-    java_bin
+    return Ok(java_bin);
   }
 }

@@ -18,8 +18,8 @@ struct Downloading {
     state: bool,
 }
 
-pub async fn download_version(_id: String) -> Result<(), ()> {
-    let _load: Download = Download::new().await;
+pub async fn download_version(_id: String) -> Result<()> {
+    let _load: Download = Download::new().await?;
 
     // load.download(id, GetPath::game().to_str().unwrap().to_string())
     //   .await
@@ -44,28 +44,28 @@ pub async fn get_manifest() -> Result<Vec<LauncherManifestVersion>> {
     Ok(resp.versions)
 }
 
-pub async fn get_config() -> Result<Launcher, ()> {
-    let launcher_config = Launcher::from_file(None);
-
-    Ok(launcher_config)
+pub async fn get_config() -> Result<Launcher> {
+    let launcher_config = Launcher::from_file(None)?;
+    
+    return Ok(launcher_config);
 }
 
 pub async fn launch(username: String, version: String) -> Result<()> {
     let bootstrap = ClientBootstrap::new(ClientSettings {
-        assets: GetPath::game().join("assets"),
+        assets: GetPath::game()?.join("assets"),
         auth: ClientAuth {
             username,
             access_token: None,
             uuid: Some(uuid::Uuid::new_v4().to_string()),
         },
-        game_dir: GetPath::game(),
-        java_bin: GetPath::java_bin().ok_or_else(|| {CommandsError::CantFindJavaBin})?,
-        libraries_dir: GetPath::game().join("libraries"),
-        manifest_file: GetPath::game()
+        game_dir: GetPath::game()?,
+        java_bin: GetPath::java_bin()?.ok_or_else(|| {CommandsError::CantFindJavaBin})?,
+        libraries_dir: GetPath::game()?.join("libraries"),
+        manifest_file: GetPath::game()?
             .join("versions")
             .join(&version)
             .join(format!("{}.json", version)),
-        natives_dir: GetPath::game()
+        natives_dir: GetPath::game()?
             .join("versions")
             .join(&version)
             .join("natives"),
@@ -73,7 +73,7 @@ pub async fn launch(username: String, version: String) -> Result<()> {
             version: version.clone(),
             version_type: "release".to_string(),
         },
-        version_jar_file: GetPath::game()
+        version_jar_file: GetPath::game()?
             .join("versions")
             .join(&version)
             .join(format!("{}.jar", version)),

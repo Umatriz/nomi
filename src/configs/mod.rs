@@ -52,7 +52,7 @@ pub trait Config {
 
                 let _ = serde_json::to_writer_pretty(&mut file, &self);
             }
-            false => self.write(conf.1).unwrap(),
+            false => self.write(conf.1).context("failed to write data into config file")?,
         };
         return Ok(());
     }
@@ -67,7 +67,7 @@ pub trait Config {
             let read: Self = serde_json::from_reader(f).context("Could not read values")?;
             Ok(read)
         } else {
-            self.overwrite(conf.1);
+            self.overwrite(conf.1)?;
             Err(ConfigError::ConfigFileDoesNotExist.into())
         }
     }
