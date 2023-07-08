@@ -46,7 +46,7 @@ pub async fn get_manifest() -> Result<Vec<LauncherManifestVersion>> {
 
 pub async fn get_config() -> Result<Launcher> {
     let launcher_config = Launcher::from_file(None)?;
-    
+
     return Ok(launcher_config);
 }
 
@@ -59,7 +59,7 @@ pub async fn launch(username: String, version: String) -> Result<()> {
             uuid: Some(uuid::Uuid::new_v4().to_string()),
         },
         game_dir: GetPath::game()?,
-        java_bin: GetPath::java_bin()?.ok_or_else(|| {CommandsError::CantFindJavaBin})?,
+        java_bin: GetPath::get_java_bin()?,
         libraries_dir: GetPath::game()?.join("libraries"),
         manifest_file: GetPath::game()?
             .join("versions")
@@ -86,9 +86,6 @@ pub async fn launch(username: String, version: String) -> Result<()> {
 
 #[derive(Error, Debug)]
 pub enum CommandsError {
-  #[error("Can't find java executables")]
-  CantFindJavaBin,
-
   #[error("Failed to download minecraft manifest file")]
   FailedToDownloadManifest(reqwest::Error),
 
