@@ -1,5 +1,6 @@
-use anyhow::Result;
+use anyhow::{Result, Context};
 use std::path::PathBuf;
+use thiserror::Error;
 
 pub struct GetPath;
 
@@ -17,9 +18,9 @@ impl GetPath {
     )
   }
   
-  // TODO: retern Err if cant find
-  pub fn java_bin() -> Result<Option<PathBuf>> {
-    let _path = std::env::var("Path")?;
+  pub fn get_java_bin() -> Result<PathBuf> {
+    // TODO: looks like it \/ will not work on linux
+    let _path = std::env::var("Path").context("failed to get `path` env var")?;
     let path_vec = _path.split(';').collect::<Vec<&str>>();
     let mut java_bin: Option<PathBuf> = None;
     for i in path_vec.iter() {
@@ -35,6 +36,13 @@ impl GetPath {
         }
       }
     }
-    return Ok(java_bin);
+    return java_bin.ok_or(GetPathError::CantFindJavaBin.into());
   }
+}
+
+
+#[derive(Error, Debug)]
+pub enum GetPathError {
+    #[error("can't find java executables")]
+    CantFindJavaBin,
 }
