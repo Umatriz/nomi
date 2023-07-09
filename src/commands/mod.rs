@@ -36,10 +36,10 @@ pub async fn get_manifest() -> Result<Vec<LauncherManifestVersion>> {
     let resp: LauncherManifest =
         reqwest::get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
             .await
-            .map_err(|error| CommandsError::FailedToDownloadManifest(error))?
+            .map_err(CommandsError::FailedToDownloadManifest)?
             .json()
             .await
-            .map_err(|error| CommandsError::CantParseManifestToJson(error))?;
+            .map_err(CommandsError::CantParseManifestToJson)?;
 
     Ok(resp.versions)
 }
