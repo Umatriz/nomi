@@ -11,13 +11,13 @@ pub const QUILT_MAVEN: &str = "https://maven.quiltmc.org/";
 pub const FABRIC_META: &str = "https://meta.fabricmc.net/v2";
 pub const FABRIC_MAVEN: &str = "https://maven.fabricmc.net/";
 
-#[async_trait]
+#[async_trait(?Send)]
 pub trait Loader {
     async fn download(&self) -> anyhow::Result<()>;
 
-    fn create_json();
+    fn create_json() -> anyhow::Result<()>;
 
-    async fn dowload_file<P: AsRef<std::path::Path> + std::marker::Send>(
+    async fn dowload_file<P: AsRef<std::path::Path>>(
         &self,
         path: P,
         url: String,
