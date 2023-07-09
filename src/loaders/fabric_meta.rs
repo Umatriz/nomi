@@ -1,9 +1,9 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Meta(Vec<VersionLoader>);
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+pub struct Meta(pub Vec<VersionLoader>);
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct VersionLoader {
     pub loader: Loader,
@@ -11,7 +11,7 @@ pub struct VersionLoader {
     pub launcher_meta: LauncherMeta,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Loader {
     pub separator: String,
@@ -21,7 +21,7 @@ pub struct Loader {
     pub stable: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Intermediary {
     pub maven: String,
@@ -29,13 +29,15 @@ pub struct Intermediary {
     pub stable: bool,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct LauncherMeta {
     pub version: i32,
+    pub libraries: Libraries,
+    pub main_class: MainClass,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Libraries {
     pub client: Vec<Library>,
@@ -43,9 +45,16 @@ pub struct Libraries {
     pub server: Vec<Library>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Library {
     pub name: String,
     pub url: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct MainClass {
+    pub client: String,
+    pub server: String,
 }
