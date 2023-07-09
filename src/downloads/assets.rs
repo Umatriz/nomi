@@ -84,7 +84,7 @@ impl AssetsDownload {
 
         match std::fs::write(&path, body) {
             Ok(_) => println!("Downloaded successfully {}", path.to_str().context("")?),
-            Err(e) => println!("Error: {}", e),
+            Err(e) => println!("Error: {}", e), // FIXME
         }
 
         Ok(())
@@ -104,11 +104,16 @@ impl AssetsDownload {
                 &v.hash[0..2],
                 v.hash
             );
-            // TODO: remove unwraps here
-            let _response =
-                spawn_blocking(move || blocking::get(url).unwrap().copy_to(&mut file).unwrap())
-                    .await;
-            }
+            spawn_blocking(
+                move || -> Result<()> {
+                    blocking::get(url)
+                    .context("failed to download asset")?
+                    .copy_to(&mut file)
+                    .context("failed to copy asset into file")?;
+                    Ok(())
+                }
+            ).await??;
+        }
         return Ok(());
     }
 }

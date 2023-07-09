@@ -64,9 +64,15 @@ impl Download {
 
         let mut file = std::fs::File::create(path).context("failed to create file")?;
 
-        // TODO: remove unwraps here
-        let _response =
-            spawn_blocking(move || blocking::get(url).unwrap().copy_to(&mut file).unwrap()).await;
+        spawn_blocking(
+            move || -> Result<()> {
+                blocking::get(url)
+                .context("failed to download file")?
+                .copy_to(&mut file)
+                .context("failed to copy data into file")?;
+                Ok(())
+            }
+        ).await??;
         println!("Downloaded {}", path.to_str().context("")?);
         return Ok(());
     }
