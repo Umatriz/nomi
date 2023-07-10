@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use anyhow::{Result, Context};
 use reqwest::{blocking, Client};
 use thiserror::Error;
 use tokio::task::spawn_blocking;
@@ -31,10 +32,12 @@ pub struct Download {
 }
 
 impl Download {
-    pub async fn new() -> Self {
-        Self {
-            global_manifest: Self::init().await.unwrap(),
-        }
+    pub async fn new() -> Result<Self> {
+        Ok(
+            Self {
+                global_manifest: Self::init().await?,
+            }
+        )
     }
 
     async fn init() -> Result<LauncherManifest, DownloaderError> {
@@ -55,26 +58,34 @@ impl Download {
             .find(|&version| version.id == id)
     }
 
-    async fn dowload_file<P: AsRef<Path>>(&self, path: P, url: String) {
+    async fn dowload_file<P: AsRef<Path>>(&self, path: P, url: String) -> Result<()>{
         let path = path.as_ref();
-        let _ = std::fs::create_dir_all(path.parent().unwrap());
+        let _ = std::fs::create_dir_all(path.parent().context("failed to get parent dir")?);
 
-        let mut file = std::fs::File::create(path).unwrap();
+        let mut file = std::fs::File::create(path).context("failed to create file")?;
 
-        let _response =
-            spawn_blocking(move || blocking::get(url).unwrap().copy_to(&mut file).unwrap()).await;
-        println!("Downloaded {}", path.to_str().unwrap())
+        spawn_blocking(
+            move || -> Result<()> {
+                blocking::get(url)
+                .context("failed to download file")?
+                .copy_to(&mut file)
+                .context("failed to copy data into file")?;
+                Ok(())
+            }
+        ).await??;
+        println!("Downloaded {}", path.to_str().context("")?);
+        return Ok(());
     }
 
     pub async fn create_version_json(
         &self,
         manifest: &Manifest,
         version_dir: PathBuf,
-    ) -> Result<(), serde_json::Error> {
+    ) -> Result<()> {
         let filen = format!("{}.json", manifest.id);
         let path = version_dir.join(filen);
 
-        let file = std::fs::File::create(path).unwrap();
+        let file = std::fs::File::create(path)?;
 
         let _ = serde_json::to_writer_pretty(&file, &manifest);
 
@@ -85,21 +96,21 @@ impl Download {
         &self,
         manifest: Manifest,
         dir: String,
-    ) -> Result<(), DownloaderError> {
+    ) -> Result<()> {
         let main_dir = Path::new(&dir);
         let jar_name = format!("{}.jar", &manifest.id);
         let versions_path = main_dir.join("versions").join(&manifest.id);
         let jar_file = versions_path.join(jar_name);
 
         self.dowload_file(&jar_file, manifest.downloads.client.url.clone())
-            .await;
+            .await?;
 
         let asset = assets::AssetsDownload::new(
             manifest.asset_index.url.clone(),
             manifest.asset_index.id.clone(),
         )
-        .await;
-        asset.download_assets(&dir).await;
+        .await?;
+        asset.download_assets(&dir).await?;
         asset.get_assets_json(&dir).await?;
 
         self.create_version_json(&manifest, versions_path).await?;
@@ -107,31 +118,30 @@ impl Download {
         for lib in manifest.libraries {
             let artifact = lib.downloads.artifact;
             if artifact.is_some() {
-                let download = artifact.unwrap();
-                let path = download.path.unwrap();
+                let download = artifact.context("`artifact` must be Some")?;
+                let path = download.path.context("`download.path` must be Some")?;
                 let final_path = main_dir
                     .join("libraries")
                     .join(path)
-                    .to_str()
-                    .unwrap()
+                    .to_str().context("")?
                     .to_string()
                     .replace('/', "\\");
-                self.dowload_file(&final_path, download.url).await;
+                self.dowload_file(&final_path, download.url).await?;
             }
         }
 
         Ok(())
     }
 
-    pub async fn download(&self, version_id: String, dir: String) -> Result<(), DownloaderError> {
+    pub async fn download(&self, version_id: String, dir: String) -> Result<()> {
         let client = Client::new();
         let version_option = self.get_version(version_id);
 
         if version_option.is_none() {
-            return Err(DownloaderError::NoSuchVersion);
+            return Err(DownloaderError::NoSuchVersion.into());
         }
 
-        let version = version_option.unwrap();
+        let version = version_option.context("version_option must be Some")?;
         let data = client.get(&version.url).send().await?.json().await?;
 
         self.download_version(data, dir).await?;
