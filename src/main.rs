@@ -7,7 +7,6 @@ pub mod manifest;
 pub mod utils;
 
 use commands::download_version;
-use loaders::{fabric::FabricLoader, maven::MavenUrl};
 
 slint::include_modules!();
 #[tokio::main]
