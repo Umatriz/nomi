@@ -8,10 +8,9 @@ use crate::{
     utils::GetPath,
 };
 
+use anyhow::Result;
 use serde::Serialize;
 use thiserror::Error;
-use anyhow::Result;
-
 
 #[derive(Serialize, Clone)]
 struct Downloading {
@@ -59,7 +58,7 @@ pub async fn launch(username: String, version: String) -> Result<()> {
             uuid: Some(uuid::Uuid::new_v4().to_string()),
         },
         game_dir: GetPath::game(),
-        java_bin: GetPath::java_bin().ok_or_else(|| {CommandsError::CantFindJavaBin})?,
+        java_bin: GetPath::java_bin().ok_or_else(|| CommandsError::CantFindJavaBin)?,
         libraries_dir: GetPath::game().join("libraries"),
         manifest_file: GetPath::game()
             .join("versions")
@@ -86,12 +85,12 @@ pub async fn launch(username: String, version: String) -> Result<()> {
 
 #[derive(Error, Debug)]
 pub enum CommandsError {
-  #[error("Can't find java executables")]
-  CantFindJavaBin,
+    #[error("Can't find java executables")]
+    CantFindJavaBin,
 
-  #[error("Failed to download minecraft manifest file")]
-  FailedToDownloadManifest(reqwest::Error),
+    #[error("Failed to download minecraft manifest file")]
+    FailedToDownloadManifest(reqwest::Error),
 
-  #[error("Can't parse minecraft manifest file to json")]
-  CantParseManifestToJson(reqwest::Error),
+    #[error("Can't parse minecraft manifest file to json")]
+    CantParseManifestToJson(reqwest::Error),
 }
