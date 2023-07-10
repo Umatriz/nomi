@@ -31,7 +31,7 @@ cargo run
 
 #### Contact us
 
-- Discord server: https://discord.gg/MjxGtugM
+- Discord server: https://discord.gg/qRD5XEJKc4
 - Discord DMs: @umatriz
 
 ---
