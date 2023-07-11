@@ -1,8 +1,11 @@
 use async_trait::async_trait;
 use reqwest::Client;
 
+use crate::utils::GetPath;
+
 use super::{
     fabric_meta::{Meta, VersionLoader},
+    maven::MavenData,
     Loader,
 };
 
@@ -31,8 +34,30 @@ impl FabricLoader {
         })
     }
 
-    fn download_libraries(&self) -> anyhow::Result<()> {
-        todo!()
+    pub async fn download_libraries(&self) -> anyhow::Result<()> {
+        for i in self.latest.launcher_meta.libraries.common.iter() {
+            let maven = MavenData::new(&i.name);
+
+            self.dowload_file(
+                GetPath::libraries()
+                    .join(maven.local_file_path)
+                    .join(maven.local_file),
+                format!(
+                    "{}{}",
+                    {
+                        let mut url = String::new();
+                        if let Some(i) = i.url.chars().collect::<Vec<_>>().pop() {
+                            url.push(i)
+                        }
+
+                        url
+                    },
+                    maven.url_file
+                ),
+            )
+            .await?;
+        }
+        Ok(())
     }
 }
 
