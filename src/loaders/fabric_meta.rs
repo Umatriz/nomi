@@ -1,5 +1,3 @@
-use std::default;
-
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -36,7 +34,7 @@ pub struct Intermediary {
 pub struct LauncherMeta {
     pub version: i32,
     pub libraries: Libraries,
-    pub main_class: MainClass,
+    pub main_class: Value,
     pub arguments: Option<Arguments>,
     pub launchwrapper: Option<Launchwrapper>,
 }
@@ -44,14 +42,14 @@ pub struct LauncherMeta {
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Libraries {
-    pub client: Vec<Value>,
-    pub common: Vec<Common>,
+    pub client: Vec<Library>,
+    pub common: Vec<Library>,
     pub server: Vec<Server>,
 }
 
-#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Common {
+pub struct Library {
     pub name: String,
     pub url: Option<String>,
 }
@@ -65,28 +63,19 @@ pub struct Server {
     pub url: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct MainClass {
+    pub client: String,
+    pub server: String,
+}
+
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Arguments {
     pub client: Vec<Value>,
     pub common: Vec<Value>,
     pub server: Vec<Value>,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub enum MainClass {
-    String(String),
-    Struct { client: String, server: String },
-}
-
-impl Default for MainClass {
-    fn default() -> Self {
-        MainClass::Struct {
-            client: String::new(),
-            server: String::new(),
-        }
-    }
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]

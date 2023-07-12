@@ -6,7 +6,7 @@ use crate::utils::GetPath;
 use super::{
     fabric_meta::{Meta, VersionLoader},
     maven::MavenData,
-    Loader,
+    Loader, FABRIC_MAVEN,
 };
 
 pub struct FabricLoader {
@@ -26,7 +26,9 @@ impl FabricLoader {
             .json()
             .await?;
 
-        let latest = response.0.iter().find(|i| i.loader.stable);
+        let latest = response.iter().find(|i| i.loader.stable);
+
+        println!("{:#?}", latest.unwrap());
 
         Ok(Self {
             meta: response.clone(),
@@ -43,15 +45,14 @@ impl FabricLoader {
                     .join(maven.local_file_path)
                     .join(maven.local_file),
                 format!(
-                    "{}{}",
+                    "{}{}{}",
                     {
-                        let mut url = String::new();
-                        if let Some(i) = i.url.chars().collect::<Vec<_>>().pop() {
-                            url.push(i)
-                        }
+                        let mut url = i.url.clone().unwrap();
+                        url.pop();
 
                         url
                     },
+                    maven.url,
                     maven.url_file
                 ),
             )
@@ -59,12 +60,41 @@ impl FabricLoader {
         }
         Ok(())
     }
+
+    pub async fn download_intermediary(&self) -> anyhow::Result<()> {
+        let maven = MavenData::new(self.latest.intermediary.maven.as_str());
+
+        self.dowload_file(
+            GetPath::libraries()
+                .join(maven.local_file_path)
+                .join(maven.local_file),
+            format!("{}{}{}", FABRIC_MAVEN, maven.url, maven.url_file),
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    pub async fn create_json(&self) {
+        todo!()
+    }
 }
 
 #[async_trait(?Send)]
 impl Loader for FabricLoader {
     async fn download(&self) -> anyhow::Result<()> {
-        todo!()
+        let maven = MavenData::new(self.latest.loader.maven.as_str());
+
+        self.dowload_file(
+            GetPath::versions().join(maven.local_file),
+            format!("{}{}{}", FABRIC_MAVEN, maven.url, maven.url_file),
+        )
+        .await?;
+
+        self.download_libraries().await?;
+        self.download_intermediary().await?;
+
+        Ok(())
     }
 
     fn create_json() -> anyhow::Result<()> {

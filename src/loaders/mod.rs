@@ -9,7 +9,7 @@ pub const QUILT_META: &str = "https://meta.quiltmc.org/";
 pub const QUILT_MAVEN: &str = "https://maven.quiltmc.org/";
 
 pub const FABRIC_META: &str = "https://meta.fabricmc.net/v2";
-pub const FABRIC_MAVEN: &str = "https://maven.fabricmc.net/";
+pub const FABRIC_MAVEN: &str = "https://maven.fabricmc.net";
 
 #[async_trait(?Send)]
 pub trait Loader {
