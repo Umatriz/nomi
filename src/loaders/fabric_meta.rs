@@ -1,7 +1,9 @@
-use serde::{Deserialize, Serialize};
+use std::default;
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
-pub struct Meta(pub Vec<VersionLoader>);
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+pub type Meta = Vec<VersionLoader>;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -35,26 +37,68 @@ pub struct LauncherMeta {
     pub version: i32,
     pub libraries: Libraries,
     pub main_class: MainClass,
+    pub arguments: Option<Arguments>,
+    pub launchwrapper: Option<Launchwrapper>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Libraries {
-    pub client: Vec<Library>,
-    pub common: Vec<Library>,
-    pub server: Vec<Library>,
+    pub client: Vec<Value>,
+    pub common: Vec<Common>,
+    pub server: Vec<Server>,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Library {
+pub struct Common {
+    pub name: String,
+    pub url: Option<String>,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Server {
+    #[serde(rename = "_comment")]
+    pub comment: String,
     pub name: String,
     pub url: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct MainClass {
-    pub client: String,
-    pub server: String,
+pub struct Arguments {
+    pub client: Vec<Value>,
+    pub common: Vec<Value>,
+    pub server: Vec<Value>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub enum MainClass {
+    String(String),
+    Struct { client: String, server: String },
+}
+
+impl Default for MainClass {
+    fn default() -> Self {
+        MainClass::Struct {
+            client: String::new(),
+            server: String::new(),
+        }
+    }
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Launchwrapper {
+    pub tweakers: Tweakers,
+}
+
+#[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Tweakers {
+    pub client: Vec<String>,
+    pub common: Vec<Value>,
+    pub server: Vec<String>,
 }
