@@ -12,6 +12,10 @@ impl GetPath {
         std::env::current_dir().unwrap().join("minecraft")
     }
 
+    pub fn versions() -> PathBuf {
+        Self::game().join("versions")
+    }
+
     pub fn libraries() -> PathBuf {
         Self::game().join("libraries")
     }
