@@ -4,7 +4,7 @@ use reqwest::Client;
 use crate::utils::GetPath;
 
 use super::{
-    fabric_meta::{FabricProfile, Meta, VersionLoader},
+    fabric_meta::{FabricProfile, Meta},
     maven::MavenData,
     Loader, FABRIC_MAVEN,
 };
