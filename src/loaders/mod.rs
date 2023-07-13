@@ -15,7 +15,7 @@ pub const FABRIC_MAVEN: &str = "https://maven.fabricmc.net";
 pub trait Loader {
     async fn download(&self) -> anyhow::Result<()>;
 
-    fn create_json() -> anyhow::Result<()>;
+    fn create_json(&self) -> anyhow::Result<()>;
 
     async fn dowload_file<P: AsRef<std::path::Path>>(
         &self,

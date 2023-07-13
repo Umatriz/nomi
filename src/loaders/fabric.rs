@@ -10,12 +10,13 @@ use super::{
 };
 
 pub struct FabricLoader {
-    pub latest: VersionLoader,
     pub meta: Meta,
     pub version: String,
 
     pub profile: FabricProfile,
 }
+
+// TODO: define `retry()` method
 
 impl FabricLoader {
     pub async fn new(version: &str) -> anyhow::Result<Self> {
@@ -50,14 +51,14 @@ impl FabricLoader {
 
         Ok(Self {
             meta: meta_response.clone(),
-            latest: latest.clone(),
+            // latest: latest.clone(),
             version: version.to_string(),
             profile: profile_reponse,
         })
     }
 
     pub async fn download_libraries(&self) -> anyhow::Result<()> {
-        for i in self.latest.launcher_meta.libraries.common.iter() {
+        for i in self.profile.libraries.iter() {
             let maven = MavenData::new(&i.name);
 
             self.dowload_file(
@@ -67,6 +68,7 @@ impl FabricLoader {
                 format!(
                     "{}{}{}",
                     {
+                        // FIXME
                         let mut url = i.url.clone().unwrap();
                         url.pop();
 
@@ -80,44 +82,47 @@ impl FabricLoader {
         }
         Ok(())
     }
-
-    pub async fn download_intermediary(&self) -> anyhow::Result<()> {
-        let maven = MavenData::new(self.latest.intermediary.maven.as_str());
-
-        self.dowload_file(
-            GetPath::libraries()
-                .join(maven.local_file_path)
-                .join(maven.local_file),
-            format!("{}{}{}", FABRIC_MAVEN, maven.url, maven.url_file),
-        )
-        .await?;
-
-        Ok(())
-    }
-
-    pub async fn create_json(&self) {
-        todo!()
-    }
 }
 
 #[async_trait(?Send)]
 impl Loader for FabricLoader {
     async fn download(&self) -> anyhow::Result<()> {
-        let maven = MavenData::new(self.latest.loader.maven.as_str());
+        let maven = MavenData::new(
+            self.profile
+                .libraries
+                .iter()
+                .find(|i| i.name.contains("fabric-loader"))
+                // we realy need it
+                .unwrap()
+                .name
+                .as_str(),
+        );
 
         self.dowload_file(
-            GetPath::versions().join(maven.local_file),
+            // FIXME
+            GetPath::versions()
+                .join(&self.profile.id)
+                .join(format!("{}.jar", &self.profile.id)),
             format!("{}{}{}", FABRIC_MAVEN, maven.url, maven.url_file),
         )
         .await?;
 
+        self.create_json()?;
+
         self.download_libraries().await?;
-        self.download_intermediary().await?;
 
         Ok(())
     }
 
-    fn create_json() -> anyhow::Result<()> {
-        Ok(())
+    fn create_json(&self) -> anyhow::Result<()> {
+        let file_name = format!("{}.json", self.profile.id);
+
+        let path = GetPath::versions().join(&self.profile.id).join(file_name);
+
+        let _ = std::fs::create_dir_all(path.parent().unwrap());
+
+        let file = std::fs::File::create(path)?;
+
+        Ok(serde_json::to_writer_pretty(&file, &self.profile)?)
     }
 }
