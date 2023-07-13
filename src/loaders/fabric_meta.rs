@@ -91,3 +91,25 @@ pub struct Tweakers {
     pub common: Vec<Value>,
     pub server: Vec<String>,
 }
+
+/// Profile
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FabricProfile {
+    pub id: String,
+    pub inherits_from: String,
+    pub release_time: String,
+    pub time: String,
+    #[serde(rename = "type")]
+    pub _type: String,
+    pub main_class: String,
+    pub arguments: FabricProfileArguments,
+    pub libraries: Vec<Library>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct FabricProfileArguments {
+    pub game: Value,
+    pub jvm: Vec<String>,
+}

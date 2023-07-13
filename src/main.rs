@@ -14,7 +14,7 @@ slint::include_modules!();
 async fn main() {
     let fabric = fabric::FabricLoader::new("1.18.2").await.unwrap();
 
-    fabric.download().await.unwrap();
+    // fabric.download().await.unwrap();
 
     let ui = MainWindow::new().unwrap();
     ui.global::<State>().on_launch(|_id| {
