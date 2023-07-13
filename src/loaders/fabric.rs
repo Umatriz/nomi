@@ -4,7 +4,7 @@ use reqwest::Client;
 use crate::utils::GetPath;
 
 use super::{
-    fabric_meta::{Meta, VersionLoader},
+    fabric_meta::{FabricProfile, Meta, VersionLoader},
     maven::MavenData,
     Loader, FABRIC_MAVEN,
 };
@@ -12,11 +12,14 @@ use super::{
 pub struct FabricLoader {
     pub latest: VersionLoader,
     pub meta: Meta,
+    pub version: String,
+
+    pub profile: FabricProfile,
 }
 
 impl FabricLoader {
     pub async fn new(version: &str) -> anyhow::Result<Self> {
-        let response: Meta = Client::new()
+        let meta_response: Meta = Client::new()
             .get(format!(
                 "https://meta.fabricmc.net/v2/versions/loader/{}",
                 version
@@ -26,13 +29,30 @@ impl FabricLoader {
             .json()
             .await?;
 
-        let latest = response.iter().find(|i| i.loader.stable);
+        let latest = match meta_response.iter().find(|i| i.loader.stable) {
+            Some(last) => last,
+            None => &meta_response[0],
+        };
 
-        println!("{:#?}", latest.unwrap());
+        println!("{:#?}", latest);
+
+        let profile_reponse: FabricProfile = Client::new()
+            .get(format!(
+                "https://meta.fabricmc.net/v2/versions/loader/{}/{}/profile/json",
+                version, latest.loader.version
+            ))
+            .send()
+            .await?
+            .json()
+            .await?;
+
+        println!("{:#?}", profile_reponse);
 
         Ok(Self {
-            meta: response.clone(),
-            latest: latest.unwrap().clone(),
+            meta: meta_response.clone(),
+            latest: latest.clone(),
+            version: version.to_string(),
+            profile: profile_reponse,
         })
     }
 
