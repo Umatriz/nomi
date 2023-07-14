@@ -24,7 +24,7 @@ slint = "1.1.0"
 urlencoding = "2.1.2"
 async-trait = "0.1.71"
 log = "0.4"
-simplelog = { version = "^0.12.1", features = ["paris"] }
+log4rs = "1.2.0"
 chrono = "0.4.26"
 
 [build-dependencies]

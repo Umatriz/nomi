@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use log::{info, trace};
 use reqwest::{blocking, Client};
 use thiserror::Error;
 use tokio::task::spawn_blocking;
@@ -63,7 +64,8 @@ impl Download {
 
         let _response =
             spawn_blocking(move || blocking::get(url).unwrap().copy_to(&mut file).unwrap()).await;
-        println!("Downloaded {}", path.to_str().unwrap())
+
+        trace!("Downloaded successfully {}", path.to_string_lossy());
     }
 
     pub async fn create_version_json(
@@ -74,9 +76,14 @@ impl Download {
         let filen = format!("{}.json", manifest.id);
         let path = version_dir.join(filen);
 
-        let file = std::fs::File::create(path).unwrap();
+        let file = std::fs::File::create(&path).unwrap();
 
         let _ = serde_json::to_writer_pretty(&file, &manifest);
+
+        info!(
+            "Version json {} created successfully",
+            path.to_string_lossy()
+        );
 
         Ok(())
     }
@@ -94,13 +101,19 @@ impl Download {
         self.dowload_file(&jar_file, manifest.downloads.client.url.clone())
             .await;
 
+        info!("Client dowloaded successfully");
+
         let asset = assets::AssetsDownload::new(
             manifest.asset_index.url.clone(),
             manifest.asset_index.id.clone(),
         )
         .await;
+
         asset.download_assets(&dir).await;
+        info!("Assets dowloaded successfully");
+
         asset.get_assets_json(&dir).await?;
+        info!("Assets json created successfully");
 
         self.create_version_json(&manifest, versions_path).await?;
 
