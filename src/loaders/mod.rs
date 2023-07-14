@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use log::trace;
 
 pub mod fabric;
-pub mod fabric_meta;
+pub mod quilt;
 
 pub mod maven;
 

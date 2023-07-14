@@ -1,10 +1,12 @@
 use async_trait::async_trait;
 use reqwest::Client;
 
+pub mod fabric_meta;
+
 use crate::utils::GetPath;
 
 use super::{
-    fabric_meta::{FabricProfile, Meta},
+    fabric::fabric_meta::{FabricProfile, Meta},
     maven::MavenData,
     Loader, FABRIC_MAVEN,
 };
