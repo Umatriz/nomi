@@ -1,3 +1,4 @@
+use log::{error, trace};
 use reqwest::{blocking, Client};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -16,12 +17,6 @@ pub struct Assets {
 pub struct AssetInformation {
     pub hash: String,
     pub size: i64,
-}
-
-impl AssetInformation {
-    pub fn get_asset_dir_name(&self) -> &str {
-        &self.hash[0..3]
-    }
 }
 
 #[derive(Debug)]
@@ -55,7 +50,7 @@ impl AssetsDownload {
         let _ = std::fs::create_dir_all(&path);
 
         // TODO: remove this after debug
-        println!("Dir {} created successfully", path.to_str().unwrap());
+        trace!("Dir {} created successfully", path.to_string_lossy());
 
         path
     }
@@ -72,8 +67,8 @@ impl AssetsDownload {
         let body = Client::new().get(&self.url).send().await?.text().await?;
 
         match std::fs::write(&path, body) {
-            Ok(_) => println!("Downloaded successfully {}", path.to_str().unwrap()),
-            Err(e) => println!("Error: {}", e),
+            Ok(_) => trace!("Dowloaded successfully {}", path.to_string_lossy()),
+            Err(e) => error!("Dowload error {}", e),
         }
 
         Ok(())
@@ -82,8 +77,6 @@ impl AssetsDownload {
     pub async fn download_assets(&self, dir: &str) {
         for (_k, v) in self.assets.objects.iter() {
             let path = self.create_dir(dir, &v.hash[0..2]);
-
-            println!("{:?}, {}", path.join(&v.hash), &v.hash[0..2]);
 
             let mut file = std::fs::File::create(path.join(&v.hash)).unwrap();
 
@@ -95,6 +88,12 @@ impl AssetsDownload {
             let _response =
                 spawn_blocking(move || blocking::get(url).unwrap().copy_to(&mut file).unwrap())
                     .await;
+
+            trace!(
+                "Asset {:?} with hash {} dowloaded successfully",
+                path.join(&v.hash),
+                &v.hash[0..2]
+            );
         }
     }
 }

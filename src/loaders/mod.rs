@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use log::trace;
 
 pub mod fabric;
 pub mod fabric_meta;
@@ -27,11 +28,19 @@ pub trait Loader {
 
         let mut file = std::fs::File::create(path)?;
 
+        let log_url = url.clone();
         let _response = tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
             reqwest::blocking::get(url)?.copy_to(&mut file)?;
             Ok(())
         })
         .await??;
+
+        trace!(
+            "Dowloaded successfully. url: {}, path: {}",
+            log_url,
+            path.to_string_lossy()
+        );
+
         Ok(())
     }
 }
