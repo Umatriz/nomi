@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+pub mod logging;
+
 pub struct GetPath;
 
 impl GetPath {
@@ -18,6 +20,10 @@ impl GetPath {
 
     pub fn libraries() -> PathBuf {
         Self::game().join("libraries")
+    }
+
+    pub fn logs() -> PathBuf {
+        std::env::current_dir().unwrap().join("logs")
     }
 
     pub fn java_bin() -> Option<PathBuf> {
