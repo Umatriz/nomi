@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use log::info;
 use reqwest::Client;
 
 pub mod fabric_meta;
@@ -68,14 +69,8 @@ impl FabricLoader {
                     .join(maven.local_file_path)
                     .join(maven.local_file),
                 format!(
-                    "{}{}{}",
-                    {
-                        // FIXME
-                        let mut url = i.url.clone().unwrap();
-                        url.pop();
-
-                        url
-                    },
+                    "{}{}/{}",
+                    &i.url.clone().unwrap()[0..i.url.clone().unwrap().len() - 1],
                     maven.url,
                     maven.url_file
                 ),

@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 pub type QuiltMeta = Vec<QuiltVersion>;
 
