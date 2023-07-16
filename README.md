@@ -18,10 +18,10 @@ cargo run
 - [ ] Profiles features
 - [ ] Mod loaders support
   * [ ] Quilt
-    + [ ] Downloads
+    + [x] Downloads
     + [ ] Launch
   * [ ] Fabric
-    + [ ] Downloads
+    + [x] Downloads
     + [ ] Launch
   * [ ] Forge
     + [ ] Downloads

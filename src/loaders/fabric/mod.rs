@@ -1,5 +1,4 @@
 use async_trait::async_trait;
-use log::info;
 use reqwest::Client;
 
 pub mod fabric_meta;
