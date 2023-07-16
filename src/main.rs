@@ -14,7 +14,7 @@ use std::time::SystemTime;
 
 use crate::{
     downloads::Download,
-    loaders::quilt::QuiltLoader,
+    loaders::{fabric::FabricLoader, quilt::QuiltLoader, Loader},
     utils::{logging::setup_logger, GetPath},
 };
 
@@ -25,7 +25,13 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Start");
 
-    let _ = QuiltLoader::get_versions().await.unwrap();
+    let quilt = QuiltLoader::new("1.18.2", None).await.unwrap();
+
+    quilt.download().await.unwrap();
+
+    // let fabric = FabricLoader::new("1.18.2").await.unwrap();
+
+    // fabric.download().await.unwrap();
 
     let ui = MainWindow::new().unwrap();
     ui.global::<State>().on_launch(|_id| {
