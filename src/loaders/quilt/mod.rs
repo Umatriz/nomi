@@ -139,6 +139,11 @@ impl Loader for QuiltLoader {
         .await?;
 
         self.create_json()?;
+        self.get_local_manifest(
+            self.game_version.as_str(),
+            GetPath::versions().join(&self.profile.id),
+        )
+        .await?;
 
         self.download_libraries().await?;
 
