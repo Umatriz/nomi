@@ -38,7 +38,7 @@ impl Download {
         }
     }
 
-    async fn init() -> Result<LauncherManifest, DownloaderError> {
+    pub async fn init() -> Result<LauncherManifest, DownloaderError> {
         let data: LauncherManifest = Client::new()
             .get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
             .send()
