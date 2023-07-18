@@ -12,6 +12,7 @@ pub mod quilt;
 
 pub mod errors;
 pub mod maven;
+pub mod profile;
 
 pub const QUILT_META: &str = "https://meta.quiltmc.org/";
 pub const QUILT_MAVEN: &str = "https://maven.quiltmc.org/";

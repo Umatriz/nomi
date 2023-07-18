@@ -1,13 +1,17 @@
 mod classpath;
+pub mod profile;
 pub mod rules;
 
 use std::{path::PathBuf, process::Command};
 
 use thiserror::Error;
 
-use crate::manifest::{read_manifest_from_file, JvmArgument};
+use crate::{
+    loaders::{fabric::fabric_meta::FabricProfile, quilt::quilt_meta::QuiltProfile},
+    manifest::{read_manifest_from_file, JvmArgument},
+};
 
-use self::rules::is_all_rules_satisfied;
+use self::{profile::Loader, rules::is_all_rules_satisfied};
 
 // TODO: IMPORTANT Rewrite all this
 
@@ -37,7 +41,8 @@ pub struct ClientAuth {
 
 pub struct ClientVersion {
     pub version: String,
-    pub version_type: String,
+    pub version_type: VersionType,
+    pub loader: Loader,
 }
 
 pub struct ClientSettings {
@@ -47,6 +52,7 @@ pub struct ClientSettings {
     pub java_bin: PathBuf,
     pub libraries_dir: PathBuf,
     pub manifest_file: PathBuf,
+    pub profile_path: Option<PathBuf>,
     pub natives_dir: PathBuf,
     pub version: ClientVersion,
     pub version_jar_file: PathBuf,
@@ -56,66 +62,57 @@ pub struct ClientBootstrap {
     pub settings: ClientSettings,
 }
 
+pub enum VersionType {
+    Release,
+    Snapshot,
+}
+
 impl ClientBootstrap {
     pub fn new(settings: ClientSettings) -> Self {
         Self { settings }
     }
 
-    pub fn get_assets_dir(&self) -> PathBuf {
-        self.settings.assets.clone()
-    }
-
-    pub fn get_game_dir(&self) -> PathBuf {
-        self.settings.game_dir.clone()
-    }
-
-    pub fn get_json_file(&self) -> PathBuf {
-        self.settings.manifest_file.clone()
-    }
-
-    pub fn get_jar_file(&self) -> PathBuf {
-        self.settings.version_jar_file.clone()
-    }
-
-    pub fn get_libs_dir(&self) -> PathBuf {
-        self.settings.libraries_dir.clone()
-    }
-
-    pub fn get_natives_dir(&self) -> PathBuf {
-        self.settings.natives_dir.clone()
-    }
-
-    pub fn build_args(&self) -> Result<Vec<String>, BootstrapError> {
+    pub fn build_args(&self) -> anyhow::Result<Vec<String>> {
         let auth = &self.settings.auth;
-        let assets_dir = self.get_assets_dir();
-        let game_dir = self.get_game_dir();
+        let assets_dir = &self.settings.assets;
+        let game_dir = &self.settings.game_dir;
         let java_bin = self.settings.java_bin.clone();
-        let json_file = self.get_json_file();
-        let natives_dir = self.get_natives_dir();
+        let json_file = self.settings.manifest_file.clone();
+        let natives_dir = &self.settings.natives_dir;
         let version = &self.settings.version;
 
         if !game_dir.is_dir() {
-            return Err(BootstrapError::GameDirNotExist);
+            return Err(BootstrapError::GameDirNotExist.into());
         }
 
         if !java_bin.is_file() {
-            return Err(BootstrapError::JavaBinNotExist);
+            return Err(BootstrapError::JavaBinNotExist.into());
         }
 
         if !json_file.is_file() {
-            return Err(BootstrapError::VersionFileNotFound);
+            return Err(BootstrapError::VersionFileNotFound.into());
         }
 
         let manifest = read_manifest_from_file(json_file).unwrap();
 
         let assets_index = &manifest.asset_index.id;
         let classpath = classpath::create_classpath(
-            self.get_jar_file(),
-            self.get_libs_dir(),
+            self.settings.version_jar_file.clone(),
+            self.settings.libraries_dir.clone(),
             manifest.libraries,
         );
 
         let mut args: Vec<String> = vec![];
+
+        let loader = self
+            .settings
+            .version
+            .loader
+            // FIXME: `profile_path`
+            .load_profile(self.settings.profile_path.clone().unwrap())?;
+
+        // TODO: replce second unwrap
+        let profile_option = loader.unwrap();
 
         for arg in manifest.arguments.jvm {
             match arg {
@@ -140,7 +137,16 @@ impl ClientBootstrap {
             }
         }
 
-        args.push(manifest.main_class);
+        if let Some(profile) = profile_option {
+            for i in profile.get_args().jvm.unwrap_or_default() {
+                args.push(i)
+            }
+        }
+
+        args.push(match profile_option {
+            Some(profile) => profile.get_main_class(),
+            None => manifest.main_class,
+        });
 
         for arg in manifest.arguments.game {
             match arg {
@@ -150,6 +156,12 @@ impl ClientBootstrap {
                 JvmArgument::Struct { .. } => {
                     break;
                 }
+            }
+        }
+
+        if let Some(profile) = profile_option {
+            for i in profile.get_args().game.unwrap_or_default() {
+                args.push(i)
             }
         }
 
@@ -173,7 +185,7 @@ impl ClientBootstrap {
                         "${auth_uuid}",
                         auth.uuid.clone().unwrap_or("null".to_string()).as_str(),
                     )
-                    .replace("${version_type}", &version.version_type)
+                    .replace("${version_type}", "release")
                     .replace("${version_name}", &version.version)
                     .replace("${assets_index_name}", assets_index)
                     .replace("${user_properties}", "{}")

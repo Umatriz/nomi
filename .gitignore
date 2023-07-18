@@ -9,3 +9,4 @@ log/
 nomi_logs/
 
 debug/
+*.log

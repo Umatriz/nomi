@@ -3,6 +3,8 @@ use std::path::{Path, PathBuf};
 use super::rules::is_all_rules_satisfied;
 use crate::manifest::ManifestLibrary;
 
+// TODO: Add loaders support
+
 pub fn should_use_library(lib: &ManifestLibrary) -> bool {
     let rules_opt = &lib.rules;
     if !rules_opt.is_some() {

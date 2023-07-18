@@ -1,5 +1,5 @@
 use crate::{
-    bootstrap::{ClientAuth, ClientBootstrap, ClientSettings, ClientVersion},
+    bootstrap::{profile::Loader, ClientAuth, ClientBootstrap, ClientSettings, ClientVersion},
     configs::launcher::Launcher,
     downloads::{
         launcher_manifest::{LauncherManifest, LauncherManifestVersion},
@@ -8,10 +8,9 @@ use crate::{
     utils::GetPath,
 };
 
+use anyhow::Result;
 use serde::Serialize;
 use thiserror::Error;
-use anyhow::Result;
-
 
 #[derive(Serialize, Clone)]
 struct Downloading {
@@ -50,7 +49,7 @@ pub async fn get_config() -> Result<Launcher, ()> {
     Ok(launcher_config)
 }
 
-pub async fn launch(username: String, version: String) -> Result<()> {
+pub async fn launch(username: String, version: String, loader_verion: String) -> Result<()> {
     let bootstrap = ClientBootstrap::new(ClientSettings {
         assets: GetPath::game().join("assets"),
         auth: ClientAuth {
@@ -59,24 +58,30 @@ pub async fn launch(username: String, version: String) -> Result<()> {
             uuid: Some(uuid::Uuid::new_v4().to_string()),
         },
         game_dir: GetPath::game(),
-        java_bin: GetPath::java_bin().ok_or_else(|| {CommandsError::CantFindJavaBin})?,
+        java_bin: GetPath::java_bin().ok_or_else(|| CommandsError::CantFindJavaBin)?,
         libraries_dir: GetPath::game().join("libraries"),
         manifest_file: GetPath::game()
             .join("versions")
-            .join(&version)
+            .join(&loader_verion)
             .join(format!("{}.json", version)),
         natives_dir: GetPath::game()
             .join("versions")
-            .join(&version)
+            .join(&loader_verion)
             .join("natives"),
         version: ClientVersion {
             version: version.clone(),
-            version_type: "release".to_string(),
+            version_type: crate::bootstrap::VersionType::Release,
+            loader: Loader::Quilt,
         },
         version_jar_file: GetPath::game()
             .join("versions")
-            .join(&version)
-            .join(format!("{}.jar", version)),
+            .join(&loader_verion)
+            .join(format!("{}.jar", loader_verion)),
+        profile_path: Some(
+            GetPath::versions()
+                .join(&loader_verion)
+                .join(format!("{}.json", loader_verion)),
+        ),
     });
 
     bootstrap.launch()?;
@@ -86,12 +91,12 @@ pub async fn launch(username: String, version: String) -> Result<()> {
 
 #[derive(Error, Debug)]
 pub enum CommandsError {
-  #[error("Can't find java executables")]
-  CantFindJavaBin,
+    #[error("Can't find java executables")]
+    CantFindJavaBin,
 
-  #[error("Failed to download minecraft manifest file")]
-  FailedToDownloadManifest(reqwest::Error),
+    #[error("Failed to download minecraft manifest file")]
+    FailedToDownloadManifest(reqwest::Error),
 
-  #[error("Can't parse minecraft manifest file to json")]
-  CantParseManifestToJson(reqwest::Error),
+    #[error("Can't parse minecraft manifest file to json")]
+    CantParseManifestToJson(reqwest::Error),
 }

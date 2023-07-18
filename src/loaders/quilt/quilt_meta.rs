@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::loaders::profile::LoaderProfile;
+
 pub type QuiltMeta = Vec<QuiltVersion>;
 
 /// https://meta.quiltmc.org/v3/versions/loader
@@ -27,6 +29,19 @@ pub struct QuiltProfile {
     pub libraries: Vec<QuiltLibrary>,
     pub release_time: String,
     pub time: String,
+}
+
+impl LoaderProfile for QuiltProfile {
+    fn get_args(&self) -> crate::loaders::profile::LoaderProfileArguments {
+        crate::loaders::profile::LoaderProfileArguments {
+            game: Some(self.arguments.game.clone()),
+            jvm: None,
+        }
+    }
+
+    fn get_main_class(&self) -> String {
+        self.main_class.clone()
+    }
 }
 
 #[derive(Deserialize, Serialize, Default, Debug)]
