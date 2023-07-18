@@ -23,6 +23,7 @@ sha256 = "1.1.4"
 slint = "1.1.0"
 async-trait = "0.1.71"
 urlencoding = "2.1.2"
+modrinth = "0.2.0"
 
 [build-dependencies]
 slint-build = "1.1.0"
