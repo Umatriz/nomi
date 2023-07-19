@@ -2,14 +2,6 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    loaders::{
-        maven::MavenData,
-        profile::{LoaderLibrary, LoaderProfile},
-    },
-    utils::GetPath,
-};
-
 pub type QuiltMeta = Vec<QuiltVersion>;
 
 /// https://meta.quiltmc.org/v3/versions/loader
@@ -37,26 +29,6 @@ pub struct QuiltProfile {
     pub libraries: Vec<QuiltLibrary>,
     pub release_time: String,
     pub time: String,
-}
-
-impl LoaderProfile for QuiltProfile {
-    fn get_args(&self) -> crate::loaders::profile::LoaderProfileArguments {
-        crate::loaders::profile::LoaderProfileArguments {
-            game: Some(self.arguments.game.clone()),
-            jvm: None,
-        }
-    }
-
-    fn get_main_class(&self) -> String {
-        self.main_class.clone()
-    }
-
-    fn get_libraries(&self) -> Vec<PathBuf> {
-        self.libraries
-            .iter()
-            .map(|i| i.get_path())
-            .collect::<Vec<PathBuf>>()
-    }
 }
 
 #[derive(Deserialize, Serialize, Default, Debug)]

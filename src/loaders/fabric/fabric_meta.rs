@@ -1,14 +1,5 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::path::PathBuf;
-
-use crate::{
-    loaders::{
-        maven::MavenData,
-        profile::{LoaderLibrary, LoaderProfile},
-    },
-    utils::GetPath,
-};
 
 pub type Meta = Vec<VersionLoader>;
 
@@ -114,36 +105,6 @@ pub struct FabricProfile {
     pub main_class: String,
     pub arguments: FabricProfileArguments,
     pub libraries: Vec<Library>,
-}
-
-impl LoaderProfile for FabricProfile {
-    fn get_args(&self) -> crate::loaders::profile::LoaderProfileArguments {
-        crate::loaders::profile::LoaderProfileArguments {
-            game: None,
-            jvm: Some(self.arguments.jvm.clone()),
-        }
-    }
-
-    fn get_main_class(&self) -> String {
-        self.main_class.clone()
-    }
-
-    fn get_libraries(&self) -> Vec<PathBuf> {
-        self.libraries
-            .iter()
-            .map(|i| i.get_path())
-            .collect::<Vec<PathBuf>>()
-    }
-}
-
-impl LoaderLibrary for Library {
-    fn get_path(&self) -> PathBuf {
-        let maven = MavenData::new(&self.name);
-
-        GetPath::libraries()
-            .join(maven.local_file_path)
-            .join(maven.local_file)
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
