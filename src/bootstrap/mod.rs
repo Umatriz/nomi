@@ -111,8 +111,8 @@ impl ClientBootstrap {
 
         let assets_index = &manifest.asset_index.id;
         let classpath = classpath::create_classpath(
-            self.get_jar_file(),
-            self.get_libs_dir(),
+            self.settings.version_jar_file.clone(),
+            self.settings.libraries_dir.clone(),
             manifest.libraries,
         )?;
 
@@ -194,8 +194,9 @@ impl ClientBootstrap {
             .spawn()
             .context("command failed to start")?;
 
+
         let status = process.wait()?.code().context("can't get minecraft exit code")?;
-        // TODO!: return result instead of 🤮🤮 exit code
+
         Ok(status)
     }
 }

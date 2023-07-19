@@ -2,21 +2,34 @@ use anyhow::{Context, Result};
 use std::path::PathBuf;
 use thiserror::Error;
 
+pub mod logging;
+
 pub struct GetPath;
 
 impl GetPath {
-    pub fn config() -> Result<PathBuf> {
+    pub fn config() -> PathBuf {
         // TODO: Remove this .join()
-        return Ok(std::env::current_dir()?.join("config.json"));
+        std::env::current_dir().unwrap().join("config.json")
     }
 
-    pub fn game() -> Result<PathBuf> {
-        return Ok(std::env::current_dir()?.join("minecraft"));
+    pub fn game() -> PathBuf {
+        std::env::current_dir().unwrap().join("minecraft")
     }
 
-    pub fn get_java_bin() -> Result<PathBuf> {
-        // TODO: looks like it \/ will not work on linux
-        let _path = std::env::var("Path").context("failed to get `path` env var")?;
+    pub fn versions() -> PathBuf {
+        Self::game().join("versions")
+    }
+
+    pub fn libraries() -> PathBuf {
+        Self::game().join("libraries")
+    }
+
+    pub fn logs() -> PathBuf {
+        std::env::current_dir().unwrap().join("logs")
+    }
+
+    pub fn java_bin() -> Option<PathBuf> {
+        let _path = std::env::var("Path").unwrap();
         let path_vec = _path.split(';').collect::<Vec<&str>>();
         let mut java_bin: Option<PathBuf> = None;
         for i in path_vec.iter() {
@@ -28,12 +41,6 @@ impl GetPath {
                 }
             }
         }
-        return java_bin.ok_or(GetPathError::CantFindJavaBin.into());
+        java_bin
     }
-}
-
-#[derive(Error, Debug)]
-pub enum GetPathError {
-    #[error("can't find java executables")]
-    CantFindJavaBin,
 }
