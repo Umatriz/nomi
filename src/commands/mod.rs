@@ -46,12 +46,12 @@ pub async fn get_manifest() -> Result<Vec<LauncherManifestVersion>> {
 pub async fn get_config() -> Result<Launcher> {
     let launcher_config = Launcher::from_file(None)?;
 
-    return Ok(launcher_config);
+    Ok(launcher_config)
 }
 
 pub async fn launch(username: String, version: String) -> Result<()> {
     let bootstrap = ClientBootstrap::new(ClientSettings {
-        assets: GetPath::game()?.join("assets"),
+        assets: GetPath::game().join("assets"),
         auth: ClientAuth {
             username,
             access_token: None,
@@ -64,7 +64,7 @@ pub async fn launch(username: String, version: String) -> Result<()> {
             .join("versions")
             .join(&version)
             .join(format!("{}.json", version)),
-        natives_dir: GetPath::game()?
+        natives_dir: GetPath::game()
             .join("versions")
             .join(&version)
             .join("natives"),
@@ -72,7 +72,7 @@ pub async fn launch(username: String, version: String) -> Result<()> {
             version: version.clone(),
             version_type: "release".to_string(),
         },
-        version_jar_file: GetPath::game()?
+        version_jar_file: GetPath::game()
             .join("versions")
             .join(&version)
             .join(format!("{}.jar", version)),

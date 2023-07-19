@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
+use anyhow::{Context, Result};
 use log::{info, trace};
-use anyhow::{Result, Context};
 use reqwest::{blocking, Client};
 use thiserror::Error;
 use tokio::task::spawn_blocking;
@@ -34,11 +34,9 @@ pub struct Download {
 
 impl Download {
     pub async fn new() -> Result<Self> {
-        Ok(
-            Self {
-                global_manifest: Self::init().await?,
-            }
-        )
+        Ok(Self {
+            global_manifest: Self::init().await?,
+        })
     }
 
     pub async fn init() -> Result<LauncherManifest, DownloaderError> {
@@ -59,7 +57,7 @@ impl Download {
             .find(|&version| version.id == id)
     }
 
-    async fn dowload_file<P: AsRef<Path>>(&self, path: P, url: String) -> Result<()>{
+    async fn dowload_file<P: AsRef<Path>>(&self, path: P, url: String) -> Result<()> {
         let path = path.as_ref();
         let _ = std::fs::create_dir_all(path.parent().context("failed to get parent dir")?);
 
@@ -69,6 +67,8 @@ impl Download {
             spawn_blocking(move || blocking::get(url).unwrap().copy_to(&mut file).unwrap()).await;
 
         trace!("Downloaded successfully {}", path.to_string_lossy());
+
+        Ok(())
     }
 
     pub async fn create_version_json(
@@ -79,7 +79,7 @@ impl Download {
         let filen = format!("{}.json", manifest.id);
         let path = version_dir.join(filen);
 
-        let file = std::fs::File::create(path)?;
+        let file = std::fs::File::create(&path)?;
 
         let _ = serde_json::to_writer_pretty(&file, &manifest);
 
@@ -91,11 +91,7 @@ impl Download {
         Ok(())
     }
 
-    async fn download_version(
-        &self,
-        manifest: Manifest,
-        dir: String,
-    ) -> Result<()> {
+    async fn download_version(&self, manifest: Manifest, dir: String) -> Result<()> {
         let main_dir = Path::new(&dir);
         let jar_name = format!("{}.jar", &manifest.id);
         let versions_path = main_dir.join("versions").join(&manifest.id);
@@ -110,9 +106,9 @@ impl Download {
             manifest.asset_index.url.clone(),
             manifest.asset_index.id.clone(),
         )
-        .await;
+        .await?;
 
-        asset.download_assets(&dir).await;
+        asset.download_assets(&dir).await?;
         info!("Assets dowloaded successfully");
 
         asset.get_assets_json(&dir).await?;
@@ -128,7 +124,8 @@ impl Download {
                 let final_path = main_dir
                     .join("libraries")
                     .join(path)
-                    .to_str().context("")?
+                    .to_str()
+                    .context("")?
                     .to_string()
                     .replace('/', "\\");
                 self.dowload_file(&final_path, download.url).await?;

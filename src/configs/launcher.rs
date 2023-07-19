@@ -1,4 +1,4 @@
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 
 use crate::configs::ConfigFile;
@@ -67,7 +67,7 @@ impl Profile {
 
 impl Launcher {
     pub fn from_file(username: Option<String>) -> Result<Self> {
-        let conf: ConfigFile = ConfigFile::new(GetPath::config()?);
+        let conf: ConfigFile = ConfigFile::new(GetPath::config());
         match conf.0 {
             true => {
                 let f = std::fs::File::open(conf.1).context("Could not open file")?;

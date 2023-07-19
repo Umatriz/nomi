@@ -1,5 +1,5 @@
+use anyhow::{Context, Result};
 use log::{error, trace};
-use anyhow::{Result, Context};
 use reqwest::{blocking, Client};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -29,13 +29,11 @@ pub struct AssetsDownload {
 
 impl AssetsDownload {
     pub async fn new(url: String, id: String) -> Result<Self> {
-        Ok(
-            Self {
-                assets: Self::init(url.clone()).await?,
-                id,
-                url,
-            }
-        )   
+        Ok(Self {
+            assets: Self::init(url.clone()).await?,
+            id,
+            url,
+        })
     }
 
     async fn init(url: String) -> Result<Assets> {
@@ -63,7 +61,7 @@ impl AssetsDownload {
         // TODO: remove this after debug
         trace!("Dir {} created successfully", path.to_string_lossy());
 
-        return Ok(path);
+        Ok(path)
     }
 
     pub async fn get_assets_json(&self, assets_dir: &String) -> Result<()> {
@@ -85,7 +83,7 @@ impl AssetsDownload {
         Ok(())
     }
 
-    pub async fn download_assets(&self, dir: &str) -> Result<()>{
+    pub async fn download_assets(&self, dir: &str) -> Result<()> {
         for (_k, v) in self.assets.objects.iter() {
             let path = self.create_dir(dir, &v.hash[0..2])?;
 
@@ -106,6 +104,7 @@ impl AssetsDownload {
                 &v.hash[0..2]
             );
         }
-        return Ok(());
+
+        Ok(())
     }
 }

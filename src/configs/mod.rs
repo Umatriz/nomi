@@ -5,7 +5,7 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use serde::Serialize;
 use thiserror::Error;
 
@@ -52,9 +52,11 @@ pub trait Config {
 
                 let _ = serde_json::to_writer_pretty(&mut file, &self);
             }
-            false => self.write(conf.1).context("failed to write data into config file")?,
+            false => self
+                .write(conf.1)
+                .context("failed to write data into config file")?,
         };
-        return Ok(());
+        Ok(())
     }
 
     fn read_config(&self, path: PathBuf) -> Result<Self>
