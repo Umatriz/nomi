@@ -95,15 +95,6 @@ impl ClientBootstrap {
 
         let manifest = read_manifest_from_file(json_file).unwrap();
 
-        let assets_index = &manifest.asset_index.id;
-        let classpath = classpath::create_classpath(
-            self.settings.version_jar_file.clone(),
-            self.settings.libraries_dir.clone(),
-            manifest.libraries,
-        );
-
-        let mut args: Vec<String> = vec![];
-
         let loader = self
             .settings
             .version
@@ -113,6 +104,22 @@ impl ClientBootstrap {
 
         // TODO: replce second unwrap
         let profile_option = loader.unwrap();
+
+        let profile_libs = if let Some(profile) = profile_option {
+            profile.get_libraries()
+        } else {
+            vec![]
+        };
+
+        let assets_index = &manifest.asset_index.id;
+        let classpath = classpath::create_classpath(
+            self.settings.version_jar_file.clone(),
+            self.settings.libraries_dir.clone(),
+            manifest.libraries,
+            profile_libs,
+        );
+
+        let mut args: Vec<String> = vec![];
 
         for arg in manifest.arguments.jvm {
             match arg {

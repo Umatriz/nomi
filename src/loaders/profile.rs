@@ -19,7 +19,13 @@ pub trait LoaderProfile {
         Ok(read)
     }
 
+    fn get_libraries(&self) -> Vec<PathBuf>;
+
     fn get_args(&self) -> LoaderProfileArguments;
 
     fn get_main_class(&self) -> String;
+}
+
+pub trait LoaderLibrary {
+    fn get_path(&self) -> PathBuf;
 }

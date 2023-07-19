@@ -1,6 +1,14 @@
+use std::path::PathBuf;
+
 use serde::{Deserialize, Serialize};
 
-use crate::loaders::profile::LoaderProfile;
+use crate::{
+    loaders::{
+        maven::MavenData,
+        profile::{LoaderLibrary, LoaderProfile},
+    },
+    utils::GetPath,
+};
 
 pub type QuiltMeta = Vec<QuiltVersion>;
 
@@ -42,6 +50,13 @@ impl LoaderProfile for QuiltProfile {
     fn get_main_class(&self) -> String {
         self.main_class.clone()
     }
+
+    fn get_libraries(&self) -> Vec<PathBuf> {
+        self.libraries
+            .iter()
+            .map(|i| i.get_path())
+            .collect::<Vec<PathBuf>>()
+    }
 }
 
 #[derive(Deserialize, Serialize, Default, Debug)]
@@ -55,4 +70,14 @@ pub struct QuiltArguments {
 pub struct QuiltLibrary {
     pub name: String,
     pub url: String,
+}
+
+impl LoaderLibrary for QuiltLibrary {
+    fn get_path(&self) -> std::path::PathBuf {
+        let maven = MavenData::new(self.name.as_str());
+
+        GetPath::libraries()
+            .join(maven.local_file_path)
+            .join(maven.local_file)
+    }
 }

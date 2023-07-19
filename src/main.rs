@@ -34,10 +34,20 @@ async fn main() -> anyhow::Result<()> {
 
     // fabric.download().await.unwrap();
 
+    // let version = Download::new().await;
+
+    // version
+    //     .download(
+    //         "1.18.2".to_string(),
+    //         GetPath::game().to_string_lossy().to_string(),
+    //     )
+    //     .await
+    //     .unwrap();
+
     launch(
         "username".to_string(),
         "1.18.2".to_string(),
-        "quilt-loader-0.19.2-1.18.2".to_string(),
+        "1.18.2".to_string(),
     )
     .await
     .unwrap();
