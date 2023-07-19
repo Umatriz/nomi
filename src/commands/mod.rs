@@ -70,18 +70,12 @@ pub async fn launch(username: String, version: String) -> Result<()> {
             .join("natives"),
         version: ClientVersion {
             version: version.clone(),
-            version_type: crate::bootstrap::VersionType::Release,
-            loader: Loader::Quilt,
+            version_type: "release".to_string(),
         },
         version_jar_file: GetPath::game()
             .join("versions")
-            .join(&loader_verion)
-            .join(format!("{}.jar", loader_verion)),
-        profile_path: Some(
-            GetPath::versions()
-                .join(&loader_verion)
-                .join(format!("{}.json", loader_verion)),
-        ),
+            .join(&version)
+            .join(format!("{}.jar", version)),
     });
 
     bootstrap.launch()?;

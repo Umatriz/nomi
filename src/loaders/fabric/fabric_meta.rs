@@ -1,8 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::loaders::profile::LoaderProfile;
-
 pub type Meta = Vec<VersionLoader>;
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -107,19 +105,6 @@ pub struct FabricProfile {
     pub main_class: String,
     pub arguments: FabricProfileArguments,
     pub libraries: Vec<Library>,
-}
-
-impl LoaderProfile for FabricProfile {
-    fn get_args(&self) -> crate::loaders::profile::LoaderProfileArguments {
-        crate::loaders::profile::LoaderProfileArguments {
-            game: None,
-            jvm: Some(self.arguments.jvm.clone()),
-        }
-    }
-
-    fn get_main_class(&self) -> String {
-        self.main_class.clone()
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
