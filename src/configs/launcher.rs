@@ -1,3 +1,4 @@
+use anyhow::{Result, Context};
 use serde::{Deserialize, Serialize};
 
 use crate::configs::ConfigFile;
@@ -65,27 +66,27 @@ impl Profile {
 }
 
 impl Launcher {
-    pub fn from_file(username: Option<String>) -> Self {
-        let conf: ConfigFile = ConfigFile::new(GetPath::config());
+    pub fn from_file(username: Option<String>) -> Result<Self> {
+        let conf: ConfigFile = ConfigFile::new(GetPath::config()?);
         match conf.0 {
             true => {
-                let f = std::fs::File::open(conf.1).expect("Could not open file");
-                let mut read: Self = serde_json::from_reader(f).expect("Could not read values");
+                let f = std::fs::File::open(conf.1).context("Could not open file")?;
+                let mut read: Self = serde_json::from_reader(f).context("Could not read values")?;
                 match username {
                     Some(u) => {
                         read.username = u;
-                        read
+                        Ok(read)
                     }
-                    None => read,
+                    None => Ok(read),
                 }
             }
-            false => Self {
+            false => Ok(Self {
                 username: match username {
                     Some(u) => u,
                     None => "nomi".to_string(),
                 },
                 profiles: vec![],
-            },
+            }),
         }
     }
 
