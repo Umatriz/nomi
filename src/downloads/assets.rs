@@ -1,4 +1,5 @@
 use log::{error, trace};
+use anyhow::{Result, Context};
 use reqwest::{blocking, Client};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -27,21 +28,31 @@ pub struct AssetsDownload {
 }
 
 impl AssetsDownload {
-    pub async fn new(url: String, id: String) -> Self {
-        Self {
-            assets: Self::init(url.clone()).await.unwrap(),
-            id,
-            url,
-        }
+    pub async fn new(url: String, id: String) -> Result<Self> {
+        Ok(
+            Self {
+                assets: Self::init(url.clone()).await?,
+                id,
+                url,
+            }
+        )   
     }
 
-    async fn init(url: String) -> Result<Assets, reqwest::Error> {
-        let data: Assets = Client::new().get(url).send().await?.json().await?;
+    async fn init(url: String) -> Result<Assets> {
+        let data: Assets = Client::new()
+            .get(url)
+            .send()
+            .await
+            .context("failed to send get request")?
+            .json()
+            .await
+            .context("failed to parse json")?;
 
         Ok(data)
     }
 
-    fn create_dir(&self, main_dir: &str, asset_dir_name: &str) -> PathBuf {
+    // FIXME!!!:
+    fn create_dir(&self, main_dir: &str, asset_dir_name: &str) -> Result<PathBuf> {
         let path = Path::new(main_dir)
             .join("assets")
             .join("objects")
@@ -52,17 +63,17 @@ impl AssetsDownload {
         // TODO: remove this after debug
         trace!("Dir {} created successfully", path.to_string_lossy());
 
-        path
+        return Ok(path);
     }
 
-    pub async fn get_assets_json(&self, assets_dir: &String) -> Result<(), reqwest::Error> {
+    pub async fn get_assets_json(&self, assets_dir: &String) -> Result<()> {
         let filen = format!("{}.json", self.id);
         let path = Path::new(&assets_dir)
             .join("assets")
             .join("indexes")
             .join(filen);
 
-        let _ = std::fs::create_dir_all(path.parent().unwrap());
+        let _ = std::fs::create_dir_all(path.parent().context("")?);
 
         let body = Client::new().get(&self.url).send().await?.text().await?;
 
@@ -74,9 +85,9 @@ impl AssetsDownload {
         Ok(())
     }
 
-    pub async fn download_assets(&self, dir: &str) {
+    pub async fn download_assets(&self, dir: &str) -> Result<()>{
         for (_k, v) in self.assets.objects.iter() {
-            let path = self.create_dir(dir, &v.hash[0..2]);
+            let path = self.create_dir(dir, &v.hash[0..2])?;
 
             let mut file = std::fs::File::create(path.join(&v.hash)).unwrap();
 
@@ -95,5 +106,6 @@ impl AssetsDownload {
                 &v.hash[0..2]
             );
         }
+        return Ok(());
     }
 }
