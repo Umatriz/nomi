@@ -69,7 +69,7 @@ pub async fn launch(username: String, version: String, loader_verion: String) ->
             .join(&loader_verion)
             .join("natives"),
         version: ClientVersion {
-            version: version.clone(),
+            version: loader_verion.clone(),
             version_type: crate::bootstrap::VersionType::Release,
             loader: Loader::Quilt,
         },
@@ -77,11 +77,12 @@ pub async fn launch(username: String, version: String, loader_verion: String) ->
             .join("versions")
             .join(&loader_verion)
             .join(format!("{}.jar", loader_verion)),
-        profile_path: Some(
-            GetPath::versions()
-                .join(&loader_verion)
-                .join(format!("{}.json", loader_verion)),
-        ),
+        // profile_path: Some(
+        //     GetPath::versions()
+        //         .join(&loader_verion)
+        //         .join(format!("{}.json", loader_verion)),
+        // ),
+        profile_path: None,
     });
 
     bootstrap.launch()?;
