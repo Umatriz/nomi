@@ -32,8 +32,6 @@ cargo run
 - [ ] Update UI
 - [x] `config` mod update
 - [ ] `downloads` mod update
-- [ ] `bootstrap` refactor
-  * [ ] Assets checking
 - [ ] Change all `Result` to `anyhow::Result`
 
 ### FAQ

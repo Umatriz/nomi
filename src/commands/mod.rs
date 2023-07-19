@@ -1,5 +1,5 @@
 use crate::{
-    bootstrap::{profile::Loader, ClientAuth, ClientBootstrap, ClientSettings, ClientVersion},
+    bootstrap::{ClientAuth, ClientBootstrap, ClientSettings, ClientVersion},
     configs::launcher::Launcher,
     downloads::{
         launcher_manifest::{LauncherManifest, LauncherManifestVersion},
@@ -49,7 +49,7 @@ pub async fn get_config() -> Result<Launcher, ()> {
     Ok(launcher_config)
 }
 
-pub async fn launch(username: String, version: String, loader_verion: String) -> Result<()> {
+pub async fn launch(username: String, version: String) -> Result<()> {
     let bootstrap = ClientBootstrap::new(ClientSettings {
         assets: GetPath::game().join("assets"),
         auth: ClientAuth {
@@ -62,27 +62,20 @@ pub async fn launch(username: String, version: String, loader_verion: String) ->
         libraries_dir: GetPath::game().join("libraries"),
         manifest_file: GetPath::game()
             .join("versions")
-            .join(&loader_verion)
+            .join(&version)
             .join(format!("{}.json", version)),
         natives_dir: GetPath::game()
             .join("versions")
-            .join(&loader_verion)
+            .join(&version)
             .join("natives"),
         version: ClientVersion {
-            version: loader_verion.clone(),
-            version_type: crate::bootstrap::VersionType::Release,
-            loader: Loader::Quilt,
+            version: version.clone(),
+            version_type: "release".to_string(),
         },
         version_jar_file: GetPath::game()
             .join("versions")
-            .join(&loader_verion)
-            .join(format!("{}.jar", loader_verion)),
-        // profile_path: Some(
-        //     GetPath::versions()
-        //         .join(&loader_verion)
-        //         .join(format!("{}.json", loader_verion)),
-        // ),
-        profile_path: None,
+            .join(&version)
+            .join(format!("{}.jar", version)),
     });
 
     bootstrap.launch()?;
