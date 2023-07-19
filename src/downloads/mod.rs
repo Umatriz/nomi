@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+use log::{info, trace};
 use anyhow::{Result, Context};
 use reqwest::{blocking, Client};
 use thiserror::Error;
@@ -40,7 +41,7 @@ impl Download {
         )
     }
 
-    async fn init() -> Result<LauncherManifest, DownloaderError> {
+    pub async fn init() -> Result<LauncherManifest, DownloaderError> {
         let data: LauncherManifest = Client::new()
             .get("https://piston-meta.mojang.com/mc/game/version_manifest_v2.json")
             .send()
@@ -64,17 +65,10 @@ impl Download {
 
         let mut file = std::fs::File::create(path).context("failed to create file")?;
 
-        spawn_blocking(
-            move || -> Result<()> {
-                blocking::get(url)
-                .context("failed to download file")?
-                .copy_to(&mut file)
-                .context("failed to copy data into file")?;
-                Ok(())
-            }
-        ).await??;
-        println!("Downloaded {}", path.to_str().context("")?);
-        return Ok(());
+        let _response =
+            spawn_blocking(move || blocking::get(url).unwrap().copy_to(&mut file).unwrap()).await;
+
+        trace!("Downloaded successfully {}", path.to_string_lossy());
     }
 
     pub async fn create_version_json(
@@ -88,6 +82,11 @@ impl Download {
         let file = std::fs::File::create(path)?;
 
         let _ = serde_json::to_writer_pretty(&file, &manifest);
+
+        info!(
+            "Version json {} created successfully",
+            path.to_string_lossy()
+        );
 
         Ok(())
     }
@@ -105,13 +104,19 @@ impl Download {
         self.dowload_file(&jar_file, manifest.downloads.client.url.clone())
             .await?;
 
+        info!("Client dowloaded successfully");
+
         let asset = assets::AssetsDownload::new(
             manifest.asset_index.url.clone(),
             manifest.asset_index.id.clone(),
         )
-        .await?;
-        asset.download_assets(&dir).await?;
+        .await;
+
+        asset.download_assets(&dir).await;
+        info!("Assets dowloaded successfully");
+
         asset.get_assets_json(&dir).await?;
+        info!("Assets json created successfully");
 
         self.create_version_json(&manifest, versions_path).await?;
 

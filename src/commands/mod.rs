@@ -57,10 +57,10 @@ pub async fn launch(username: String, version: String) -> Result<()> {
             access_token: None,
             uuid: Some(uuid::Uuid::new_v4().to_string()),
         },
-        game_dir: GetPath::game()?,
-        java_bin: GetPath::get_java_bin()?,
-        libraries_dir: GetPath::game()?.join("libraries"),
-        manifest_file: GetPath::game()?
+        game_dir: GetPath::game(),
+        java_bin: GetPath::java_bin().ok_or_else(|| CommandsError::CantFindJavaBin)?,
+        libraries_dir: GetPath::game().join("libraries"),
+        manifest_file: GetPath::game()
             .join("versions")
             .join(&version)
             .join(format!("{}.json", version)),
@@ -85,6 +85,9 @@ pub async fn launch(username: String, version: String) -> Result<()> {
 
 #[derive(Error, Debug)]
 pub enum CommandsError {
+    #[error("Can't find java executables")]
+    CantFindJavaBin,
+
     #[error("Failed to download minecraft manifest file")]
     FailedToDownloadManifest(reqwest::Error),
 

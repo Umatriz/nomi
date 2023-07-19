@@ -1,3 +1,4 @@
+use log::{error, trace};
 use anyhow::{Result, Context};
 use reqwest::{blocking, Client};
 use serde::{Deserialize, Serialize};
@@ -17,12 +18,6 @@ pub struct Assets {
 pub struct AssetInformation {
     pub hash: String,
     pub size: i64,
-}
-
-impl AssetInformation {
-    pub fn get_asset_dir_name(&self) -> &str {
-        &self.hash[0..3]
-    }
 }
 
 #[derive(Debug)]
@@ -66,7 +61,7 @@ impl AssetsDownload {
         let _ = std::fs::create_dir_all(&path);
 
         // TODO: remove this after debug
-        println!("Dir {} created successfully", path.to_str().context("")?);
+        trace!("Dir {} created successfully", path.to_string_lossy());
 
         return Ok(path);
     }
@@ -83,8 +78,8 @@ impl AssetsDownload {
         let body = Client::new().get(&self.url).send().await?.text().await?;
 
         match std::fs::write(&path, body) {
-            Ok(_) => println!("Downloaded successfully {}", path.to_str().context("")?),
-            Err(e) => println!("Error: {}", e), // FIXME
+            Ok(_) => trace!("Dowloaded successfully {}", path.to_string_lossy()),
+            Err(e) => error!("Dowload error {}", e),
         }
 
         Ok(())
@@ -94,25 +89,22 @@ impl AssetsDownload {
         for (_k, v) in self.assets.objects.iter() {
             let path = self.create_dir(dir, &v.hash[0..2])?;
 
-            println!("{:?}, {}", path.join(&v.hash), &v.hash[0..2]);
-
-            let mut file = std::fs::File::create(path.join(&v.hash))
-            .context("failed to create file for minecraft assets")?;
+            let mut file = std::fs::File::create(path.join(&v.hash)).unwrap();
 
             let url = format!(
                 "https://resources.download.minecraft.net/{}/{}",
                 &v.hash[0..2],
                 v.hash
             );
-            spawn_blocking(
-                move || -> Result<()> {
-                    blocking::get(url)
-                    .context("failed to download asset")?
-                    .copy_to(&mut file)
-                    .context("failed to copy asset into file")?;
-                    Ok(())
-                }
-            ).await??;
+            let _response =
+                spawn_blocking(move || blocking::get(url).unwrap().copy_to(&mut file).unwrap())
+                    .await;
+
+            trace!(
+                "Asset {:?} with hash {} dowloaded successfully",
+                path.join(&v.hash),
+                &v.hash[0..2]
+            );
         }
         return Ok(());
     }

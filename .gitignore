@@ -5,5 +5,7 @@ target/
 minecraft/
 
 logs/
+log/
+nomi_logs/
 
 debug/

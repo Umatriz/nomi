@@ -17,8 +17,15 @@ cargo run
 - [ ] Java downloading
 - [ ] Profiles features
 - [ ] Mod loaders support
-  * [ ] Downloads
-  * [ ] Launch
+  * [ ] Quilt
+    + [x] Downloads
+    + [ ] Launch
+  * [ ] Fabric
+    + [x] Downloads
+    + [ ] Launch
+  * [ ] Forge
+    + [ ] Downloads
+    + [ ] Launch
 - [ ] Mods download features
   * [ ] Mods config
     + [ ] Short code to share modpacks
