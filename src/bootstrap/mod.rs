@@ -117,16 +117,6 @@ impl ClientBootstrap {
 
         let mut args: Vec<String> = vec![];
 
-        let loader = self
-            .settings
-            .version
-            .loader
-            // FIXME: `profile_path`
-            .load_profile(self.settings.profile_path.clone().unwrap())?;
-
-        // TODO: replce second unwrap
-        let profile_option = loader.unwrap();
-
         for arg in manifest.arguments.jvm {
             match arg {
                 JvmArgument::String(value) => {
@@ -203,7 +193,7 @@ impl ClientBootstrap {
             .expect("command failed to start");
 
         let status = process.wait().unwrap().code().unwrap();
-        // TODO!: return result instead of 🤮🤮 exit code
+
         Ok(status)
     }
 }
