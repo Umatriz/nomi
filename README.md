@@ -1,6 +1,6 @@
 # Nomi
 
-Next gen Minecraft launcher powered by Rust. 
+🚀🚀🚀🚀**BLAZINGLY FAST**🚀🚀🚀🚀 and 🌱🌱🌱🌱**MEMORY SAFE**🌱🌱🌱🌱 minecraft launcher powered by 🦀🦀;crab:🦀🦀🦀🦀**RUST**🦀🦀🦀🦀🦀🦀
 
 ## Requirements
 
