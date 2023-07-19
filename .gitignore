@@ -9,3 +9,6 @@ log/
 nomi_logs/
 
 debug/
+
+node_modules
+dist

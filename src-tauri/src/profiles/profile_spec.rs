@@ -4,14 +4,14 @@ use super::mod_files::{Loader, DownloadedFromSiteModFile};
 
 
 
-pub struct ProfileSpec<'a> {
-    pub mod_files: Vec<&'a dyn DownloadedFromSiteModFile>,
-    pub loader: Loader,
-    pub mc_version: String,
+struct ProfileSpec<'a> {
+    mod_files: Vec<&'a dyn DownloadedFromSiteModFile>,
+    loader: Loader,
+    mc_version: String,
 }
 
 impl ProfileSpec<'_> {
-    pub fn check_modfiles(&self) -> Result<Vec<ModFileError>> {
+    fn check_modfiles(&self) -> Result<Vec<ModFileError>> {
         let mut errors = vec![];
         
         for modfile in &self.mod_files {
@@ -39,7 +39,7 @@ impl ProfileSpec<'_> {
 
 
 #[derive(Clone)]
-pub enum ModFileError {
+enum ModFileError {
     ModFileDoesNotSupportProfileVersion {
         profile_version: String,
         modfile_versions: Vec<String>,

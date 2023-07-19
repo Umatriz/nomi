@@ -15,23 +15,17 @@ pub struct ModrinthModFile {
 
 pub trait ShortCodableModFile {
     fn short_code(&self) -> Result<String>;
-    fn create_with_downloaded_by_short_code_data(short_code: &String) -> Result<Self> where Self: Sized;
+    fn create_with_downloaded_data_by_short_code(short_code: &String) -> Result<Self> where Self: Sized;
 }
 
 #[async_trait]
 pub trait DownloadedFromSiteModFile {
     fn url_to_file(&self) -> String;
 
-    fn original_filename(&self) -> String;
-
-    fn modfile_id(&self) -> String;
-
-    fn filename_with_modfile_id(&self) -> String {
-        format!("{}-{}", self.modfile_id(), self.original_filename())
-    }
+    fn filename(&self) -> String;
 
     async fn download_to_dir(&self, path_to_dir: PathBuf) -> Result<()> {
-        let mut file = File::create(path_to_dir.join(self.original_filename()))?;
+        let mut file = File::create(path_to_dir.join(self.filename()))?;
         let file_url = self.url_to_file();
         spawn_blocking(move || -> Result<(), reqwest::Error> {
             blocking::get(file_url)?.copy_to(&mut file)?;
@@ -55,12 +49,8 @@ impl DownloadedFromSiteModFile for ModrinthModFile {
         self.file.url.clone()
     }
 
-    fn original_filename(&self) -> String {
+    fn filename(&self) -> String {
         self.file.filename.clone()
-    }
-
-    fn modfile_id(&self) -> String {
-        format!("{}-{}-{}", self.project.id, self.version.id, self.file.filename)
     }
 
     fn supports_loader(&self, loader: &Loader) -> Result<bool> {
@@ -80,7 +70,6 @@ impl DownloadedFromSiteModFile for ModrinthModFile {
 
 impl ShortCodableModFile for ModrinthModFile {
     fn short_code(&self) -> Result<String> {
-        // TODO: change slug to id
         let mod_name = escape_for_shortcode(
             &self.project.slug.clone().context("failed to get project slug")?
         );
@@ -89,7 +78,7 @@ impl ShortCodableModFile for ModrinthModFile {
         Ok(format!("m:{mod_name}:{file_name}"))
     }
 
-    fn create_with_downloaded_by_short_code_data(short_code: &String) -> Result<Self> where Self: Sized {
+    fn create_with_downloaded_data_by_short_code(short_code: &String) -> Result<Self> where Self: Sized {
         // TODO!!:
         todo!();    
     }
