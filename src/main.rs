@@ -33,6 +33,14 @@ async fn main() -> anyhow::Result<()> {
 
     // fabric.download().await.unwrap();
 
+    launch(
+        "username".to_string(),
+        "1.18.2".to_string(),
+        "quilt-loader-0.19.2-1.18.2".to_string(),
+    )
+    .await
+    .unwrap();
+
     let ui = MainWindow::new().unwrap();
     ui.global::<State>().on_launch(|_id| {
         tokio::spawn(download_version("id".to_string()));
