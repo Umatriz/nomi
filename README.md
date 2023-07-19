@@ -1,6 +1,6 @@
 # Nomi
 
-🚀🚀🚀🚀**BLAZINGLY FAST**🚀🚀🚀🚀 and 🌱🌱🌱🌱**MEMORY SAFE**🌱🌱🌱🌱 minecraft launcher powered by 🦀🦀;crab:🦀🦀🦀🦀**RUST**🦀🦀🦀🦀🦀🦀
+Minecraft launcher powered by Rust
 
 ## Requirements
 
