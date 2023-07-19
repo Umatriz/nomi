@@ -1766,27 +1766,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "library"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "fern",
- "log",
- "modrinth",
- "reqwest",
- "serde",
- "serde_json",
- "sha256",
- "thiserror",
- "tokio",
- "urlencoding",
- "uuid",
- "zip-extract",
-]
-
-[[package]]
 name = "libz-sys"
 version = "1.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2020,6 +1999,29 @@ name = "nodrop"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72ef4a56884ca558e5ddb05a1d1e7e1bfd9a68d9ed024c21704cc98872dae1bb"
+
+[[package]]
+name = "nomi"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "fern",
+ "log",
+ "modrinth",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha256",
+ "tauri",
+ "tauri-build",
+ "thiserror",
+ "tokio",
+ "urlencoding",
+ "uuid",
+ "zip-extract",
+]
 
 [[package]]
 name = "nu-ansi-term"
@@ -3856,16 +3858,6 @@ name = "typenum"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "497961ef93d974e23eb6f433eb5fe1b7930b659f06d12dec6fc44a8f554c0bba"
-
-[[package]]
-name = "ui"
-version = "0.0.0"
-dependencies = [
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
-]
 
 [[package]]
 name = "unicode-bidi"
