@@ -15,7 +15,7 @@ pub struct ModrinthModFile {
 
 pub trait ShortCodableModFile {
     fn short_code(&self) -> Result<String>;
-    fn from_short_code(short_code: String) -> Result<Self> where Self: Sized;
+    fn create_with_downloaded_data_by_short_code(short_code: &String) -> Result<Self> where Self: Sized;
 }
 
 #[async_trait]
@@ -36,7 +36,11 @@ pub trait DownloadedFromSiteModFile {
         Ok(())
     }
     
-    fn supports_loader(&self, loader: Loader) -> Result<bool>;
+    fn supports_loader(&self, loader: &Loader) -> Result<bool>;
+
+    fn supports_version(&self, mc_version: &String) -> bool;
+
+    fn string_versions(&self) -> Vec<String>;
 }
 
 
@@ -49,8 +53,17 @@ impl DownloadedFromSiteModFile for ModrinthModFile {
         self.file.filename.clone()
     }
 
-    fn supports_loader(&self, loader: Loader) -> Result<bool> {
+    fn supports_loader(&self, loader: &Loader) -> Result<bool> {
         Ok(self.version.loaders.contains(&loader.to_modrinth_loadersupport()?))
+    }
+
+    fn supports_version(&self, mc_version: &String) -> bool {
+        // TODO: prevent errors caused by different versions formatting
+        self.version.game_versions.contains(mc_version)
+    }
+
+    fn string_versions(&self) -> Vec<String> {
+        self.version.game_versions.clone()
     }
 }
 
@@ -65,7 +78,7 @@ impl ShortCodableModFile for ModrinthModFile {
         Ok(format!("m:{mod_name}:{file_name}"))
     }
 
-    fn from_short_code(short_code: String) -> Result<Self> where Self: Sized {
+    fn create_with_downloaded_data_by_short_code(short_code: &String) -> Result<Self> where Self: Sized {
         // TODO!!:
         todo!();    
     }
@@ -80,6 +93,7 @@ fn escape_for_shortcode(string: &str) -> String {
 }
 
 
+#[derive(Clone)]
 pub enum Loader {
     Forge,
     Fabric,
