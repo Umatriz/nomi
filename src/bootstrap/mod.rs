@@ -110,12 +110,22 @@ impl ClientBootstrap {
 
         let assets_index = &manifest.asset_index.id;
         let classpath = classpath::create_classpath(
-            self.get_jar_file(),
-            self.get_libs_dir(),
+            self.settings.version_jar_file.clone(),
+            self.settings.libraries_dir.clone(),
             manifest.libraries,
         );
 
         let mut args: Vec<String> = vec![];
+
+        let loader = self
+            .settings
+            .version
+            .loader
+            // FIXME: `profile_path`
+            .load_profile(self.settings.profile_path.clone().unwrap())?;
+
+        // TODO: replce second unwrap
+        let profile_option = loader.unwrap();
 
         for arg in manifest.arguments.jvm {
             match arg {
