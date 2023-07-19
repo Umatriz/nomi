@@ -38,8 +38,8 @@ impl JavaInstaller {
         Ok(())
     }
 
-    fn check_hash(&self, path: &Path, hash: &str) -> anyhow::Result<()> {
-        if sha256::try_digest(path)? != hash {
+    async fn check_hash(&self, path: &Path, hash: &str) -> anyhow::Result<()> {
+        if sha256::try_async_digest(path).await? != hash {
             return Err(JavaInstallerError::HashDoesNotMatch.into());
         };
         Ok(())
@@ -53,7 +53,8 @@ impl JavaInstaller {
         self.check_hash(
             &temporary_dir_path.join(installer_file_name),
             JDK_17_0_7_INSTALLER_SHA256,
-        )?;
+        )
+        .await?;
 
         let path = {
             let joined_path = temporary_dir_path.join(installer_file_name);
@@ -81,7 +82,8 @@ impl JavaInstaller {
         self.check_hash(
             &temporary_dir_path.join(archive_filename),
             JDK_17_0_7_PORTABLE_SHA256,
-        )?;
+        )
+        .await?;
 
         zip_extract::extract(
             Cursor::new(std::fs::read(temporary_dir_path.join(archive_filename))?),

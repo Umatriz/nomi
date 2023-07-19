@@ -1,15 +1,16 @@
+use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
-use anyhow::{Result, Context};
 
 use super::rules::is_all_rules_satisfied;
 use crate::manifest::ManifestLibrary;
 
 pub fn should_use_library(lib: &ManifestLibrary) -> Result<bool> {
     let rules_opt = &lib.rules;
-    return match rules_opt {
-        None => Ok(true),
+
+    match rules_opt {
         Some(rules) => Ok(is_all_rules_satisfied(rules)?),
-    };
+        None => Ok(true),
+    }
 }
 
 pub fn create_classpath(
@@ -17,7 +18,10 @@ pub fn create_classpath(
     libraries_path: PathBuf,
     libraries: Vec<ManifestLibrary>,
 ) -> Result<String> {
-    let mut classpath = jar_file.to_str().context("failed to convert classpath to string")?.to_string();
+    let mut classpath = jar_file
+        .to_str()
+        .context("failed to convert classpath to string")?
+        .to_string();
 
     for lib in libraries.iter() {
         let should_use = should_use_library(lib)?;
@@ -30,5 +34,5 @@ pub fn create_classpath(
         }
     }
 
-    classpath
+    Ok(classpath)
 }
