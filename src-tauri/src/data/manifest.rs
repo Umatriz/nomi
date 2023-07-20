@@ -1,10 +1,5 @@
-use std::{fs, path::PathBuf};
-
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
-// TODO: remove Debug
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Manifest {
@@ -107,33 +102,4 @@ pub struct ManifestLibrary {
 #[serde(rename_all = "camelCase")]
 pub struct ManifestLibraryDownloads {
     pub artifact: Option<ManifestFile>,
-}
-
-#[derive(Error, Debug)]
-pub enum ManifestError {
-    #[error("The game directory doesn't exist.")]
-    GameDirNotExist,
-
-    #[error("The java bin doesn't exist.")]
-    JavaBinNotExist,
-
-    #[error("An unexpected error has ocurred.")]
-    UnknownError,
-
-    #[error("{0}")]
-    IO(#[from] std::io::Error),
-
-    #[error("{0}")]
-    Json(#[from] serde_json::Error),
-}
-
-pub fn read_manifest_from_str(string: &str) -> Result<Manifest, ManifestError> {
-    let manifest: Manifest = serde_json::from_str(string)?;
-    Ok(manifest)
-}
-
-pub fn read_manifest_from_file(file: PathBuf) -> Result<Manifest, ManifestError> {
-    let raw = fs::read_to_string(file)?;
-    let manifest: Manifest = read_manifest_from_str(&raw)?;
-    Ok(manifest)
 }
