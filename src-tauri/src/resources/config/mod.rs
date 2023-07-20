@@ -1,5 +1,3 @@
-pub mod launcher;
-
 use std::{
     fs::{File, OpenOptions},
     path::PathBuf,
@@ -7,7 +5,10 @@ use std::{
 
 use anyhow::{Context, Result};
 use serde::Serialize;
-use thiserror::Error;
+
+use self::errors::ConfigError;
+
+pub mod errors;
 
 struct ConfigFile(bool, PathBuf);
 
@@ -15,12 +16,6 @@ impl ConfigFile {
     pub fn new(path: PathBuf) -> Self {
         Self(path.exists(), path)
     }
-}
-
-#[derive(Error, Debug)]
-pub enum ConfigError {
-    #[error("Config file does not exist")]
-    ConfigFileDoesNotExist,
 }
 
 pub trait Config {

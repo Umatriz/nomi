@@ -1,12 +1,18 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-pub mod bootstrap;
-pub mod configs;
-pub mod downloads;
-pub mod loaders;
+// pub mod bootstrap;
+// pub mod configs;
+// pub mod downloads;
+// pub mod loaders;
+// pub mod manifest;
+// pub mod profiles;
+// pub mod utils;
 
-pub mod manifest;
+pub mod data;
+pub mod resources;
+pub mod services;
+
 pub mod utils;
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
