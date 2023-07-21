@@ -13,6 +13,7 @@ pub mod data;
 pub mod resources;
 pub mod services;
 
+pub mod error;
 pub mod utils;
 
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command

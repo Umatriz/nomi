@@ -5,6 +5,7 @@ use log::info;
 use reqwest::blocking;
 use tokio::task::spawn_blocking;
 
+pub mod config;
 pub mod logging;
 
 pub async fn dowload<P: AsRef<Path>>(path: P, url: String) -> anyhow::Result<()> {
