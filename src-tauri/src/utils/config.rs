@@ -6,9 +6,15 @@ use std::{
 use anyhow::{Context, Result};
 use serde::Serialize;
 
-use self::errors::ConfigError;
+use thiserror::Error;
 
-pub mod errors;
+use crate::resources::read_from::ReadFrom;
+
+#[derive(Error, Debug)]
+pub enum ConfigError {
+    #[error("Config file does not exist")]
+    ConfigFileDoesNotExist,
+}
 
 struct ConfigFile(bool, PathBuf);
 
