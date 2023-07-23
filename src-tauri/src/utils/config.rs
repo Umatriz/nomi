@@ -8,8 +8,6 @@ use serde::Serialize;
 
 use thiserror::Error;
 
-use crate::resources::read_from::ReadFrom;
-
 #[derive(Error, Debug)]
 pub enum ConfigError {
     #[error("Config file does not exist")]
