@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/*", "crates/nomi/src-tauri", "xtask"]
+exclude = ["crates/nomi"]

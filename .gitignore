@@ -12,3 +12,5 @@ debug/
 
 node_modules
 dist
+
+temp/
