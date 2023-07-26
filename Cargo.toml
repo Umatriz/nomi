@@ -1,3 +1,12 @@
+# reqwest = { version = "0.11.18", features = ["json", "blocking"] }
+# tokio = { version = "1.28.2", features = ["full"] }
+# thiserror = "1.0.40"
+# anyhow = "1.0"
+
 [workspace]
-members = ["crates/*", "crates/nomi/src-tauri", "xtask"]
-exclude = ["crates/nomi"]
+members = [
+    "crates/*",
+    "apps/*",
+    "apps/nomi/src-tauri",
+    ]
+exclude = ["apps/nomi"]
