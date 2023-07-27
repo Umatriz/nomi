@@ -1,8 +1,11 @@
+use serde::{Deserialize, Serialize};
+
 pub mod toml;
 
-pub(crate) trait Config {
-    fn write() -> anyhow::Result<()>;
-    fn read() -> anyhow::Result<Self>
-    where
-        Self: std::marker::Sized;
+pub trait Config<T>
+where
+    T: Sized + Clone + for<'de> Deserialize<'de> + Serialize,
+{
+    fn write(&self) -> anyhow::Result<()>;
+    fn read(&self) -> anyhow::Result<T>;
 }
