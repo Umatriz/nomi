@@ -470,6 +470,9 @@ name = "config"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "log",
+ "serde",
+ "toml 0.7.6",
 ]
 
 [[package]]
@@ -2035,7 +2038,7 @@ checksum = "72ef4a56884ca558e5ddb05a1d1e7e1bfd9a68d9ed024c21704cc98872dae1bb"
 name = "nomi"
 version = "0.0.0"
 dependencies = [
- "downloads",
+ "config",
  "serde",
  "serde_json",
  "tauri",
