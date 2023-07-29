@@ -1,7 +1,8 @@
+use std::io::Write;
 use std::path::Path;
 
-use anyhow::Context;
-use reqwest::blocking;
+use futures_util::stream::StreamExt;
+use reqwest::{blocking, Client};
 use tokio::task::spawn_blocking;
 
 pub(crate) mod launcher_manifest;
@@ -19,23 +20,31 @@ pub(crate) async fn dowload_file<P: AsRef<Path>>(path: P, url: String) -> anyhow
         std::fs::create_dir_all(path)?;
     }
 
-    let mut file = std::fs::File::create(path).context("failed to create file")?;
+    let client = Client::new();
+    let res = client.get(url).send().await?;
 
-    let _response = spawn_blocking(move || -> anyhow::Result<()> {
-        blocking::get(&url)
-            .map_err(|err| {
-                log::error!("Error occurred during GET\nUrl: {}\nError: {}", &url, err);
-                err
-            })?
-            .copy_to(&mut file)
-            .map_err(|err| {
-                log::error!("Error occurred during content copying\nError: {}", err);
-                err
-            })?;
+    let mut file = std::fs::File::create(path).map_err(|err| {
+        log::error!(
+            "Error occurred during file creating\nPath: {}\nError: {}",
+            path.to_string_lossy(),
+            err
+        );
+        err
+    })?;
 
-        Ok(())
-    })
-    .await?;
+    let mut stream = res.bytes_stream();
+
+    while let Some(item) = stream.next().await {
+        let chunk = item.map_err(|err| {
+            log::error!("Error occurred during file downloading\nError: {}", err);
+            err
+        })?;
+
+        file.write_all(&chunk).map_err(|err| {
+            log::error!("Error occurred during writing to file\nError: {}", err);
+            err
+        })?;
+    }
 
     log::info!("Downloaded successfully {}", path.to_string_lossy());
 
