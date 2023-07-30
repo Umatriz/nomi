@@ -13,4 +13,6 @@ debug/
 node_modules
 dist
 
+java
+
 temp/

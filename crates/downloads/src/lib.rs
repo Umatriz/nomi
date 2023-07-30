@@ -2,8 +2,7 @@ use std::io::Write;
 use std::path::Path;
 
 use futures_util::stream::StreamExt;
-use reqwest::{blocking, Client};
-use tokio::task::spawn_blocking;
+use reqwest::Client;
 
 pub(crate) mod launcher_manifest;
 pub(crate) mod manifest;
