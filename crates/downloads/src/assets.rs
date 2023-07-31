@@ -1,12 +1,13 @@
 use anyhow::{Context, Result};
 use log::{error, trace};
-use reqwest::{blocking, Client};
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
-use tokio::task::spawn_blocking;
+
+use crate::dowload_file;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Assets {
@@ -49,27 +50,19 @@ impl AssetsDownload {
         Ok(data)
     }
 
-    // FIXME!!!:
-    fn create_dir(&self, main_dir: &str, asset_dir_name: &str) -> Result<PathBuf> {
-        let path = Path::new(main_dir)
-            .join("assets")
-            .join("objects")
-            .join(asset_dir_name);
+    fn create_dir(&self, main_dir: &Path, asset_dir_name: &str) -> Result<PathBuf> {
+        let path = main_dir.join("assets").join("objects").join(asset_dir_name);
 
         let _ = std::fs::create_dir_all(&path);
 
-        // TODO: remove this after debug
         trace!("Dir {} created successfully", path.to_string_lossy());
 
         Ok(path)
     }
 
-    pub async fn get_assets_json(&self, assets_dir: &String) -> Result<()> {
+    pub async fn get_assets_json(&self, assets_dir: &Path) -> Result<()> {
         let filen = format!("{}.json", self.id);
-        let path = Path::new(&assets_dir)
-            .join("assets")
-            .join("indexes")
-            .join(filen);
+        let path = assets_dir.join("assets").join("indexes").join(filen);
 
         let _ = std::fs::create_dir_all(path.parent().context("")?);
 
@@ -83,20 +76,16 @@ impl AssetsDownload {
         Ok(())
     }
 
-    pub async fn download_assets(&self, dir: &str) -> Result<()> {
+    pub async fn download_assets(&self, dir: &Path) -> Result<()> {
         for (_k, v) in self.assets.objects.iter() {
             let path = self.create_dir(dir, &v.hash[0..2])?;
-
-            let mut file = std::fs::File::create(path.join(&v.hash)).unwrap();
-
             let url = format!(
                 "https://resources.download.minecraft.net/{}/{}",
                 &v.hash[0..2],
                 v.hash
             );
-            let _response =
-                spawn_blocking(move || blocking::get(url).unwrap().copy_to(&mut file).unwrap())
-                    .await;
+
+            dowload_file(path.join(&v.hash), url).await?;
 
             trace!(
                 "Asset {:?} with hash {} dowloaded successfully",
