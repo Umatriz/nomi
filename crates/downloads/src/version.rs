@@ -72,10 +72,9 @@ impl Download {
         Ok(())
     }
 
-    async fn download_version(&self, manifest: Manifest, dir: String) -> Result<()> {
-        let main_dir = Path::new(&dir);
+    async fn download_version(&self, manifest: Manifest, dir: &Path) -> Result<()> {
         let jar_name = format!("{}.jar", &manifest.id);
-        let versions_path = main_dir.join("versions").join(&manifest.id);
+        let versions_path = dir.join("versions").join(&manifest.id);
         let jar_file = versions_path.join(jar_name);
 
         dowload_file(&jar_file, manifest.downloads.client.url.clone()).await?;
@@ -88,10 +87,10 @@ impl Download {
         )
         .await?;
 
-        asset.download_assets(&dir).await?;
+        asset.download_assets(dir).await?;
         log::info!("Assets dowloaded successfully");
 
-        asset.get_assets_json(&dir).await?;
+        asset.get_assets_json(dir).await?;
         log::info!("Assets json created successfully");
 
         self.create_version_json(&manifest, versions_path).await?;
@@ -101,13 +100,7 @@ impl Download {
             if artifact.is_some() {
                 let download = artifact.context("`artifact` must be Some")?;
                 let path = download.path.context("`download.path` must be Some")?;
-                let final_path = main_dir
-                    .join("libraries")
-                    .join(path)
-                    .to_str()
-                    .context("")?
-                    .to_string()
-                    .replace('/', "\\");
+                let final_path = dir.join("libraries").join(path);
                 dowload_file(&final_path, download.url).await?;
             }
         }
@@ -115,7 +108,7 @@ impl Download {
         Ok(())
     }
 
-    pub async fn download(&self, version_id: String, dir: String) -> Result<()> {
+    pub async fn download(&self, version_id: String, dir: &PathBuf) -> Result<()> {
         let client = Client::new();
         let version_option = self.get_version(version_id);
 
