@@ -175,6 +175,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "bootstrap"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "tokio",
+]
+
+[[package]]
 name = "brotli"
 version = "3.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
