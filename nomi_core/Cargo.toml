@@ -21,3 +21,4 @@ fern = { version = "0.6.2", features = ["date-based"] }
 chrono = "0.4.30"
 zip = "0.6.6"
 sha256 = "1.4.0"
+async-trait = "0.1.73"
