@@ -33,7 +33,6 @@ cargo run
 - [x] `config` mod update
 - [ ] `downloads` mod update
 - [ ] Change all `Result` to `anyhow::Result`
-- [ ] Setup `xtask` or other build tool
 
 ### FAQ
 

@@ -1,5 +1,3 @@
-use owo_colors::OwoColorize;
-
 pub fn setup_logger() -> Result<(), fern::InitError> {
     let logs = std::env::current_dir()?.join("logs");
 
@@ -16,21 +14,7 @@ pub fn setup_logger() -> Result<(), fern::InitError> {
             ))
         })
         .level(log::LevelFilter::Info)
-        // .chain(std::io::stdout())
-        .chain(
-            fern::Dispatch::new()
-                .format(|out, message, record| {
-                    out.finish(format_args!(
-                        "{} [{}] [{}] {}",
-                        chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]").yellow(),
-                        record.level().blue(),
-                        record.target().green(),
-                        message
-                    ))
-                })
-                .level(log::LevelFilter::Debug)
-                .chain(std::io::stdout()),
-        )
+        .chain(std::io::stdout())
         .chain(fern::DateBased::new("logs/", "%Y-%m-%d-nomi.log"))
         .apply()?;
     Ok(())

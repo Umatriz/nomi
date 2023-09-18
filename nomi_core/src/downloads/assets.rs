@@ -1,17 +1,18 @@
 use anyhow::{Context, Result};
-use log::{error, trace};
+use log::trace;
+use owo_colors::OwoColorize;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
+use tokio::{io::AsyncWriteExt, task::JoinSet};
 
 use super::download_file;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Assets {
-    // pub objects: Vec<HashMap<String, AssetInformation>>
     pub objects: HashMap<String, AssetInformation>,
 }
 
@@ -50,10 +51,10 @@ impl AssetsDownload {
         Ok(data)
     }
 
-    fn create_dir(&self, main_dir: &Path, asset_dir_name: &str) -> Result<PathBuf> {
+    async fn create_dir(&self, main_dir: &Path, asset_dir_name: &str) -> Result<PathBuf> {
         let path = main_dir.join("assets").join("objects").join(asset_dir_name);
 
-        let _ = std::fs::create_dir_all(&path);
+        tokio::fs::create_dir_all(&path).await?;
 
         trace!("Dir {} created successfully", path.to_string_lossy());
 
@@ -64,35 +65,43 @@ impl AssetsDownload {
         let filen = format!("{}.json", self.id);
         let path = assets_dir.join("assets").join("indexes").join(filen);
 
-        let _ = std::fs::create_dir_all(path.parent().context("")?);
+        tokio::fs::create_dir_all(path.parent().context("")?).await?;
 
         let body = Client::new().get(&self.url).send().await?.text().await?;
 
-        match std::fs::write(&path, body) {
-            Ok(_) => trace!("Dowloaded successfully {}", path.to_string_lossy()),
-            Err(e) => error!("Dowload error {}", e),
-        }
+        let mut file = tokio::fs::File::create(path).await?;
+        file.write_all(body.as_bytes()).await?;
 
         Ok(())
     }
 
     pub async fn download_assets(&self, dir: &Path) -> Result<()> {
+        let mut set = JoinSet::new();
+
         for (_k, v) in self.assets.objects.iter() {
-            let path = self.create_dir(dir, &v.hash[0..2])?;
+            let path = self.create_dir(dir, &v.hash[0..2]).await?;
             let url = format!(
                 "https://resources.download.minecraft.net/{}/{}",
                 &v.hash[0..2],
                 v.hash
             );
 
-            download_file(path.join(&v.hash), url).await?;
-
-            trace!(
-                "Asset {:?} with hash {} dowloaded successfully",
-                path.join(&v.hash),
-                &v.hash[0..2]
-            );
+            set.spawn(download_file(path.join(&v.hash), url));
         }
+
+        // let mut pull = vec![];
+
+        while let Some(res) = set.join_next().await {
+            let result = res.unwrap();
+            if result.is_err() {
+                let str = "MISSING ASSET".bright_red();
+                log::error!("{}", str)
+            }
+        }
+
+        // pull.iter().for_each(|(path, url)| {
+        //     download_file(path, url);
+        // });
 
         Ok(())
     }
