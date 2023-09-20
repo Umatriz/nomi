@@ -58,3 +58,15 @@ enum JavaInstallerError {
     #[error("Join error")]
     JoinError(#[from] tokio::task::JoinError),
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn it_works() {
+        download_java(Path::new("java_t"), Path::new("java"))
+            .await
+            .unwrap();
+    }
+}

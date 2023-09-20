@@ -97,6 +97,7 @@ pub struct ManifestJavaVersion {
 pub struct ManifestLibrary {
     pub downloads: ManifestLibraryDownloads,
     pub name: String,
+    // pub natives: Option<ManifestNatives>,
     pub rules: Option<Vec<Rules>>,
 }
 
@@ -104,6 +105,15 @@ pub struct ManifestLibrary {
 #[serde(rename_all = "camelCase")]
 pub struct ManifestLibraryDownloads {
     pub artifact: Option<ManifestFile>,
+    pub classifiers: Option<ManifestClassifiers>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub struct ManifestClassifiers {
+    pub natives_macos: Option<ManifestFile>,
+    pub natives_windows: Option<ManifestFile>,
+    pub natives_linux: Option<ManifestFile>,
 }
 
 pub fn read_manifest_from_file<P: AsRef<Path>>(path: &P) -> anyhow::Result<Manifest> {
