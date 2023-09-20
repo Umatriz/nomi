@@ -10,6 +10,12 @@ use crate::repository::manifest::{read_manifest_from_file, JvmArgument};
 
 use self::rules::is_all_rules_satisfied;
 
+#[cfg(target_os = "windows")]
+const CLASSPATH_SEPARATOR: &str = ";";
+
+#[cfg(not(target_os = "windows"))]
+const CLASSPATH_SEPARATOR: &str = ":";
+
 // TODO: IMPORTANT Rewrite all this
 
 #[derive(Error, Debug)]
@@ -30,17 +36,44 @@ pub enum BootstrapError {
     Json(#[from] serde_json::Error),
 }
 
+#[derive(Default)]
 pub struct ClientAuth {
     pub access_token: Option<String>,
     pub username: String,
     pub uuid: Option<String>,
 }
 
+impl ClientAuth {
+    pub fn set_access_token(&mut self, access_token: Option<String>) {
+        self.access_token = access_token;
+    }
+
+    pub fn set_username(&mut self, username: String) {
+        self.username = username;
+    }
+
+    pub fn set_uuid(&mut self, uuid: Option<String>) {
+        self.uuid = uuid;
+    }
+}
+
+#[derive(Default)]
 pub struct ClientVersion {
     pub version: String,
     pub version_type: String,
 }
 
+impl ClientVersion {
+    pub fn set_version(&mut self, version: String) {
+        self.version = version;
+    }
+
+    pub fn set_version_type(&mut self, version_type: String) {
+        self.version_type = version_type;
+    }
+}
+
+#[derive(Default)]
 pub struct ClientSettings {
     pub assets: PathBuf,
     pub auth: ClientAuth,
@@ -51,6 +84,44 @@ pub struct ClientSettings {
     pub natives_dir: PathBuf,
     pub version: ClientVersion,
     pub version_jar_file: PathBuf,
+}
+
+impl ClientSettings {
+    pub fn set_assets(&mut self, assets: PathBuf) {
+        self.assets = assets;
+    }
+
+    pub fn set_auth(&mut self, auth: ClientAuth) {
+        self.auth = auth;
+    }
+
+    pub fn set_game_dir(&mut self, game_dir: PathBuf) {
+        self.game_dir = game_dir;
+    }
+
+    pub fn set_java_bin(&mut self, java_bin: PathBuf) {
+        self.java_bin = java_bin;
+    }
+
+    pub fn set_libraries_dir(&mut self, libraries_dir: PathBuf) {
+        self.libraries_dir = libraries_dir;
+    }
+
+    pub fn set_manifest_file(&mut self, manifest_file: PathBuf) {
+        self.manifest_file = manifest_file;
+    }
+
+    pub fn set_natives_dir(&mut self, natives_dir: PathBuf) {
+        self.natives_dir = natives_dir;
+    }
+
+    pub fn set_version(&mut self, version: ClientVersion) {
+        self.version = version;
+    }
+
+    pub fn set_version_jar_file(&mut self, version_jar_file: PathBuf) {
+        self.version_jar_file = version_jar_file;
+    }
 }
 
 pub struct ClientBootstrap {
@@ -148,8 +219,20 @@ impl ClientBootstrap {
                 JvmArgument::String(value) => {
                     args.push(value);
                 }
-                JvmArgument::Struct { .. } => {
-                    break;
+                JvmArgument::Struct { value, rules, .. } => {
+                    if !is_all_rules_satisfied(&rules)? {
+                        continue;
+                    }
+
+                    if let Some(value) = value.as_str() {
+                        args.push(value.to_string());
+                    } else if let Some(value_arr) = value.as_array() {
+                        for value in value_arr {
+                            if let Some(value) = value.as_str() {
+                                args.push(value.to_string());
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -189,10 +272,15 @@ impl ClientBootstrap {
     pub fn launch(&self) -> Result<i32> {
         let args = self.build_args()?;
 
-        let mut process = Command::new(&self.settings.java_bin)
-            .args(args)
-            .spawn()
-            .context("command failed to start")?;
+        let mut process =
+            // E:\\programming\\code\\nomi\\nomi_core\\java\\jdk-17.0.8\\bin\\java.exe
+            Command::new("java")
+                // .arg("-Xms256m")
+                // .arg("-Xmx1024m")
+                .args(args)
+                .current_dir(&self.settings.game_dir)
+                .spawn()
+                .context("command failed to start")?;
 
         let status = process
             .wait()?
@@ -200,5 +288,84 @@ impl ClientBootstrap {
             .context("can't get minecraft exit code")?;
 
         Ok(status)
+    }
+}
+
+pub fn java_bin() -> Option<PathBuf> {
+    let _path = std::env::var("Path").unwrap();
+    let path_vec = _path.split(';').collect::<Vec<&str>>();
+    let mut java_bin: Option<PathBuf> = None;
+    for i in path_vec.iter() {
+        if i.contains("java") {
+            let pb = PathBuf::from(i).join("java.exe");
+            match pb.exists() {
+                true => java_bin = Some(pb),
+                false => java_bin = None,
+            }
+        }
+    }
+    java_bin
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_config() -> ClientSettings {
+        let mc_dir = std::env::current_dir().unwrap().join("minecraft");
+        ClientSettings {
+            assets: mc_dir.join("assets"),
+            auth: ClientAuth {
+                access_token: None,
+                username: "ItWorks".to_string(),
+                uuid: None,
+            },
+            game_dir: mc_dir.clone(),
+            java_bin: java_bin().unwrap(),
+            libraries_dir: mc_dir.clone().join("libraries"),
+            manifest_file: mc_dir
+                .clone()
+                .join("versions")
+                .join("1.18.2")
+                .join("1.18.2.json"),
+            natives_dir: mc_dir
+                .clone()
+                .join("versions")
+                .join("1.18.2")
+                .join("natives"),
+            version: ClientVersion {
+                version: "1.18.2".to_string(),
+                version_type: "release".to_string(),
+            },
+            version_jar_file: mc_dir.join("versions").join("1.18.2").join("1.18.2.jar"),
+        }
+    }
+
+    #[test]
+    fn it_works() {
+        let settings = fake_config();
+
+        let bootstrap = ClientBootstrap::new(settings);
+        bootstrap.launch().unwrap();
+    }
+
+    #[test]
+    fn args_test() {
+        let settings = fake_config();
+
+        let bootstrap = ClientBootstrap::new(settings);
+        let args = bootstrap.build_args().unwrap();
+        println!("{:?}", args);
+    }
+
+    #[test]
+    fn java_call() {
+        let mut cmd =
+            Command::new("E:\\programming\\code\\nomi\\nomi_core\\java\\jdk-17.0.8\\bin\\java.exe")
+                .arg("--version")
+                .spawn()
+                .unwrap();
+
+        cmd.wait().unwrap().code().unwrap();
     }
 }

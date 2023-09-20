@@ -5,4 +5,3 @@ pub mod logger;
 pub mod repository;
 
 pub mod error;
-pub(crate) mod version;

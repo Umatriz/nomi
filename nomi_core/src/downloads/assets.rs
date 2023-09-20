@@ -89,7 +89,7 @@ impl AssetsDownload {
             set.spawn(download_file(path.join(&v.hash), url));
         }
 
-        // let mut pull = vec![];
+        // TODO: Implement retry pull for missing assets
 
         while let Some(res) = set.join_next().await {
             let result = res.unwrap();
@@ -98,10 +98,6 @@ impl AssetsDownload {
                 log::error!("{}", str)
             }
         }
-
-        // pull.iter().for_each(|(path, url)| {
-        //     download_file(path, url);
-        // });
 
         Ok(())
     }
