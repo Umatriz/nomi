@@ -13,15 +13,15 @@ cargo run
 
 ### TODO
 
-- [x] UUID generation
-- [ ] Java downloading
+- [ ] UUID generation
+- [x] Java downloading
 - [ ] Profiles features
 - [ ] Mod loaders support
   * [ ] Quilt
-    + [x] Downloads
+    + [ ] Downloads
     + [ ] Launch
   * [ ] Fabric
-    + [x] Downloads
+    + [ ] Downloads
     + [ ] Launch
   * [ ] Forge
     + [ ] Downloads
@@ -31,8 +31,8 @@ cargo run
     + [ ] Short code to share modpacks
 - [ ] Update UI
 - [x] `config` mod update
-- [ ] `downloads` mod update
-- [ ] Change all `Result` to `anyhow::Result`
+- [x] `downloads` mod update
+- [ ] Migrate from `fern` to `tracing`
 
 ### FAQ
 

@@ -1,6 +1,5 @@
 use anyhow::{Context, Result};
-use log::trace;
-use owo_colors::OwoColorize;
+use itertools::Itertools;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -8,6 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use tokio::{io::AsyncWriteExt, task::JoinSet};
+use tracing::{debug, error, trace};
 
 use super::download_file;
 
@@ -91,11 +91,65 @@ impl AssetsDownload {
 
         // TODO: Implement retry pull for missing assets
 
+        let mut ok_assets = 0;
+        let mut err_assets = 0;
+
         while let Some(res) = set.join_next().await {
             let result = res.unwrap();
-            if result.is_err() {
-                let str = "MISSING ASSET".bright_red();
-                log::error!("{}", str)
+            if let Err(_err) = result {
+                error!("MISSING ASSET");
+
+                err_assets += 1;
+                error!("{} - OK", ok_assets);
+                error!("{} - MISSING", err_assets)
+            } else {
+                ok_assets += 1;
+                error!("{} - OK", ok_assets);
+                error!("{} - MISSING", err_assets)
+            }
+        }
+
+        Ok(())
+    }
+
+    pub async fn download_assets_chunked(&self, dir: &Path) -> anyhow::Result<()> {
+        let assets_chunks = self.assets.objects.iter().chunks(100);
+
+        for asset in &assets_chunks {
+            let assets: Vec<_> = asset.collect();
+
+            let mut set = JoinSet::new();
+            for (_k, v) in assets {
+                let path = self.create_dir(dir, &v.hash[0..2]).await?;
+                let url = format!(
+                    "https://resources.download.minecraft.net/{}/{}",
+                    &v.hash[0..2],
+                    v.hash
+                );
+
+                set.spawn(download_file(path.join(&v.hash), url));
+            }
+
+            let mut ok_assets = 0;
+            let mut err_assets = 0;
+
+            while let Some(res) = set.join_next().await {
+                let result = res.unwrap();
+                if let Err(_err) = result {
+                    error!("MISSING ASSET");
+
+                    err_assets += 1;
+                    debug!("{} - OK", ok_assets);
+                    if err_assets > 0 {
+                        error!("{} - MISSING", err_assets)
+                    }
+                } else {
+                    ok_assets += 1;
+                    debug!("{} - OK", ok_assets);
+                    if err_assets > 0 {
+                        error!("{} - MISSING", err_assets)
+                    }
+                }
             }
         }
 

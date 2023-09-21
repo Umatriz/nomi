@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+use tracing::error;
 
 use super::download_file;
 
@@ -38,7 +39,7 @@ pub async fn download_java(temporary_dir_path: &Path, java_dir_path: &Path) -> a
     zip.extract(java_dir_path)?;
 
     if let Err(err) = std::fs::remove_file(temporary_dir_path.join(archive_filename)) {
-        log::error!("Error occurred during file removing\nError: {}", err);
+        error!("Error occurred during file removing\nError: {}", err);
     }
 
     Ok(())
