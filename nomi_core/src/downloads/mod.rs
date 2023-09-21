@@ -9,6 +9,7 @@ use std::path::Path;
 use futures_util::stream::StreamExt;
 use reqwest::Client;
 use tokio::io::AsyncWriteExt;
+use tracing::{debug, error};
 
 /*
     TODO: Improve downloading speed
@@ -31,7 +32,7 @@ pub(crate) async fn download_file<P: AsRef<Path>>(
     let res = client.get(&url.into()).send().await?;
 
     let mut file = tokio::fs::File::create(path).await.map_err(|err| {
-        log::error!(
+        error!(
             "Error occurred during file creating\nPath: {}\nError: {}",
             path.to_string_lossy(),
             err
@@ -43,17 +44,17 @@ pub(crate) async fn download_file<P: AsRef<Path>>(
 
     while let Some(item) = stream.next().await {
         let chunk = item.map_err(|err| {
-            log::error!("Error occurred during file downloading\nError: {}", err);
+            error!("Error occurred during file downloading\nError: {}", err);
             err
         })?;
 
         file.write_all(&chunk).await.map_err(|err| {
-            log::error!("Error occurred during writing to file\nError: {}", err);
+            error!("Error occurred during writing to file\nError: {}", err);
             err
         })?;
     }
 
-    log::info!("Downloaded successfully {}", path.to_string_lossy());
+    debug!("Downloaded successfully {}", path.to_string_lossy());
 
     Ok(())
 }
