@@ -1,7 +1,7 @@
 pub mod assets;
 #[cfg(target_os = "windows")]
 pub mod jvm_dowload;
-pub mod vanilla;
+pub mod utils;
 pub mod version;
 
 use std::path::Path;
@@ -10,6 +10,8 @@ use futures_util::stream::StreamExt;
 use reqwest::Client;
 use tokio::io::AsyncWriteExt;
 use tracing::{debug, error};
+
+pub const LAUNCHER_MANIFEST: &str = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
 
 /*
     TODO: Improve downloading speed
