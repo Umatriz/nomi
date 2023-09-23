@@ -1917,7 +1917,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72ef4a56884ca558e5ddb05a1d1e7e1bfd9a68d9ed024c21704cc98872dae1bb"
 
 [[package]]
-name = "nomi_core"
+name = "nomi-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -3377,7 +3377,7 @@ dependencies = [
  "dioxus",
  "dioxus-desktop",
  "log",
- "nomi_core",
+ "nomi-core",
  "serde",
  "serde_json",
  "tokio",
