@@ -1,5 +1,5 @@
 [package]
-name = "nomi_core"
+name = "nomi-core"
 version = "0.1.0"
 edition = "2021"
 

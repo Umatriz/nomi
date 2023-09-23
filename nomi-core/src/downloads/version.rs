@@ -3,7 +3,7 @@ use std::path::Path;
 use async_trait::async_trait;
 
 #[async_trait(?Send)]
-pub trait Version {
+pub trait DownloadVersion {
     async fn download<P: AsRef<Path>>(&self, dir: P) -> anyhow::Result<()>;
 
     async fn download_libraries<P: AsRef<Path>>(&self, dir: P) -> anyhow::Result<()>;

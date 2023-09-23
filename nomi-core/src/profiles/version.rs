@@ -2,9 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::toml::TomlConfig;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct VersionProfile {
-    id: i32,
+    pub id: i32,
     pub version: String,
     pub version_type: String,
     pub path: String,
