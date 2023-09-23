@@ -32,7 +32,7 @@ cargo run
 - [ ] Update UI
 - [x] `config` mod update
 - [x] `downloads` mod update
-- [ ] Migrate from `fern` to `tracing`
+- [x] Migrate from `fern` to `tracing`
 
 ### FAQ
 
