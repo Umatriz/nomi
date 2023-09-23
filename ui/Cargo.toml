@@ -15,7 +15,7 @@ serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
-nomi_core = { path = "../nomi_core"}
+nomi-core = { path = "../nomi-core"}
 
 dioxus = "0.4.0"
 dioxus-desktop = "0.4.0"

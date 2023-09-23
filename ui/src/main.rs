@@ -1,7 +1,9 @@
-// import the prelude to get access to the `rsx!` macro and the `Scope` and `Element` types
+#![allow(non_snake_case)]
 use dioxus::prelude::*;
-use nomi_core::downloads::{vanilla::Vanilla, version::Version};
+use nomi_core::{downloads::version::DownloadVersion, loaders::vanilla::Vanilla};
 use tracing::Level;
+
+pub mod components;
 
 fn main() {
     let subscriber = tracing_subscriber::fmt()
@@ -9,24 +11,26 @@ fn main() {
         .pretty()
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
-    // launch the dioxus app in a webview
-    dioxus_desktop::launch(app);
+
+    dioxus_desktop::launch(App);
 }
 
-// define a component that renders a div with the text "Hello, world!"
-fn app(cx: Scope) -> Element {
+fn App(cx: Scope) -> Element {
     cx.render(rsx! {
-        div { "Hello, world!" }
+        div {
+            style { include_str!("./style.css") }
+            div { class: "test", "Hello, world!" }
 
-        button {
-            onclick: |_| {
-                cx.spawn(async {
-                    let version = Vanilla::new("1.18.2").await.unwrap();
-                    version.download("./minecraft").await.unwrap();
-                    println!("FIN")
-                })
-            },
-            "Download libs"
+            button {
+                onclick: |_| {
+                    cx.spawn(async {
+                        let version = Vanilla::new("1.18.2").await.unwrap();
+                        version.download("./minecraft").await.unwrap();
+                        println!("FIN")
+                    })
+                },
+                "Download libs"
+            }
         }
     })
 }
