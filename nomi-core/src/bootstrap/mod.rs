@@ -10,10 +10,10 @@ use crate::repository::manifest::{read_manifest_from_file, JvmArgument};
 
 use self::rules::is_all_rules_satisfied;
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 const CLASSPATH_SEPARATOR: &str = ";";
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(not(windows))]
 const CLASSPATH_SEPARATOR: &str = ":";
 
 // TODO: IMPORTANT Rewrite all this

@@ -66,7 +66,7 @@ mod tests {
 
     #[tokio::test]
     async fn it_works() {
-        download_java(Path::new("java_t"), Path::new("java"))
+        download_java(Path::new("./"), Path::new("java"))
             .await
             .unwrap();
     }
