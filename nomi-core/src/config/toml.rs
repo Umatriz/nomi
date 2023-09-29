@@ -1,87 +1,74 @@
-use std::path::{Path, PathBuf};
-
-use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tracing::{error, info};
+use tokio::io::AsyncWriteExt;
 
-use super::Config;
+use super::{Config, ConfigSetter, ConfigState};
 
-pub struct TomlConfig<P>
-where
-    P: Sized + for<'de> Deserialize<'de> + serde::de::DeserializeOwned + Serialize,
-{
-    pub payload: Option<P>,
-    pub path: PathBuf,
+#[async_trait::async_trait(?Send)]
+pub trait Toml {
+    async fn write(&self) -> anyhow::Result<()>;
+    async fn read(&mut self) -> anyhow::Result<()>;
 }
 
-impl<P> TomlConfig<P>
+#[async_trait::async_trait(?Send)]
+impl<State> Toml for Config<State>
 where
-    P: Sized + Clone + for<'de> Deserialize<'de> + Serialize,
-{
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new(path: impl AsRef<Path>, payload: Option<P>) -> Self {
-        Self {
-            payload,
-            path: path.as_ref().to_path_buf(),
-        }
-    }
-}
-
-#[async_trait(?Send)]
-impl<T> Config<T> for TomlConfig<T>
-where
-    T: Sized + Clone + for<'de> Deserialize<'de> + Serialize,
+    State: ConfigState + ConfigSetter,
 {
     async fn write(&self) -> anyhow::Result<()> {
-        let content = toml::to_string_pretty(&self.payload.as_ref())?;
-
-        if let Some(path) = self.path.parent() {
-            tokio::fs::create_dir_all(path).await.map_err(|err| {
-                error!(
-                    "Error occurred during dirs creating\nPath: {}\nError: {}",
-                    self.path.to_string_lossy(),
-                    err
-                );
-                err
-            })?;
+        if let Some(path) = &self.path.parent() {
+            tokio::fs::create_dir_all(path).await?;
         }
 
-        match tokio::fs::write(&self.path, content).await {
-            Ok(_) => {
-                info!("Config {} updated", &self.path.to_string_lossy());
-                Ok(())
-            }
-            Err(err) => {
-                error!(
-                    "Error occurred during config writing\nConfig path: {}\nError: {}",
-                    &self.path.to_string_lossy(),
-                    err
-                );
+        let data = toml::to_string_pretty(self.data.convert())?;
 
-                Err(err.into())
-            }
-        }
+        let mut file = tokio::fs::File::create(&self.path).await?;
+        file.write_all(data.as_bytes()).await?;
+
+        Ok(())
     }
 
-    async fn read(&self) -> anyhow::Result<T> {
-        let content = tokio::fs::read_to_string(&self.path).await.map_err(|err| {
-            error!(
-                "Error occurred during config reading\nConfig path: {}\nError: {}",
-                self.path.to_string_lossy(),
-                err
-            );
-            err
-        })?;
+    async fn read(&mut self) -> anyhow::Result<()> {
+        let data = tokio::fs::read_to_string(&self.path).await?;
 
-        let data: T = toml::from_str(&content).map_err(|err| {
-            error!(
-                "Error occurred during config converting\nConfig path: {}\nError: {}",
-                self.path.to_string_lossy(),
-                err
-            );
-            err
-        })?;
+        let deserialized = toml::from_str(&data)?;
+        self.data.set(deserialized);
 
-        Ok(data)
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde::{Deserialize, Serialize};
+
+    use super::*;
+
+    #[derive(Serialize, Deserialize)]
+    struct Mock {
+        name: String,
+        vec: Vec<i32>,
+    }
+
+    #[tokio::test]
+    async fn borrowed_write_test() {
+        let data = Mock {
+            name: "".to_string(),
+            vec: vec![],
+        };
+        let cfg = Config::borrowed(&data, "./borrowed_write_test.toml");
+
+        cfg.read().await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn borrowed_read_test() {
+        let cfg = Config::owned(
+            Mock {
+                name: "unread".to_string(),
+                vec: vec![],
+            },
+            "./borrowed_write_test.toml",
+        );
+        cfg.read().await.unwrap();
     }
 }
