@@ -13,13 +13,6 @@ use tracing::{debug, error};
 
 pub const LAUNCHER_MANIFEST: &str = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
 
-/*
-    TODO: Improve downloading speed
-    Step 1 would be to run the downloads concurrently
-        For step 1 you can use a tokio JoinSet. In your loop, you spawn the download into the JoinSet.
-        After the loop you will await all entries in the JoinSet
-    Step 2 would be to switch to tokio::fs instead of std::fs
-*/
 pub(crate) async fn download_file<P: AsRef<Path>>(
     path: P,
     url: impl Into<String>,

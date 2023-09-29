@@ -42,7 +42,7 @@ impl Vanilla {
 
 #[async_trait(?Send)]
 impl DownloadVersion for Vanilla {
-    async fn download<P: AsRef<Path>>(&self, dir: P) -> anyhow::Result<()> {
+    async fn download(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
         let jar_name = format!("{}.jar", &self.manifest.id);
         let versions_path = dir.as_ref().join("versions").join(&self.manifest.id);
         let jar_file = versions_path.join(jar_name);
@@ -71,7 +71,7 @@ impl DownloadVersion for Vanilla {
         Ok(())
     }
 
-    async fn download_libraries<P: AsRef<Path>>(&self, dir: P) -> anyhow::Result<()> {
+    async fn download_libraries(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
         let mut set = JoinSet::new();
 
         let mut download_lib = |file: Option<&ManifestFile>| -> anyhow::Result<()> {
@@ -113,7 +113,7 @@ impl DownloadVersion for Vanilla {
         Ok(())
     }
 
-    async fn create_json<P: AsRef<Path>>(&self, dir: P) -> anyhow::Result<()> {
+    async fn create_json(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
         let file_name = format!("{}.json", self.manifest.id);
         let path = dir.as_ref().join(file_name);
 

@@ -4,16 +4,16 @@ pub type FabricVersions = Vec<Version>;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Version {
-    loader: VersionLoader,
+    pub loader: VersionLoader,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct VersionLoader {
-    separator: String,
-    build: i32,
-    maven: String,
-    version: String,
-    stable: bool,
+    pub separator: String,
+    pub build: i32,
+    pub maven: String,
+    pub version: String,
+    pub stable: bool,
 }
 
 #[cfg(test)]
