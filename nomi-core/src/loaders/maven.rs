@@ -20,8 +20,6 @@ impl MavenData {
         let name = format!("{}-{}.jar", chunks[1][0], chunks[2][0]);
         flatten.push(&name);
 
-        println!("{:?}", flatten);
-
         let path_iter = flatten.iter().copied();
         let path = itertools::intersperse(path_iter, "/").collect::<String>();
 
@@ -35,7 +33,9 @@ impl MavenData {
 
 #[cfg(test)]
 mod tests {
-    use reqwest::Client;
+    use std::env::current_dir;
+
+    use crate::downloads::download_file;
 
     use super::*;
 
@@ -53,10 +53,11 @@ mod tests {
 
         let maven = MavenData::new(artifact);
 
-        let _req = Client::new()
-            .get(format!("https://maven.fabricmc.net/{}", maven.url))
-            .send()
-            .await
-            .unwrap();
+        download_file(
+            current_dir().unwrap().join(maven.path),
+            format!("https://maven.fabricmc.net/{}", maven.url),
+        )
+        .await
+        .unwrap();
     }
 }
