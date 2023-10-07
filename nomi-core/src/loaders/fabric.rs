@@ -2,13 +2,19 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use reqwest::Client;
+use tokio::{io::AsyncWriteExt, task::JoinSet};
+use tracing::info;
 
 use crate::{
-    downloads::{utils::get_launcher_manifest, version::DownloadVersion},
+    downloads::{download_file, utils::get_launcher_manifest},
     repository::{fabric_meta::FabricVersions, fabric_profile::FabricProfile},
+    version::download::DownloadVersion,
 };
 
+use super::{maven::MavenData, vanilla::Vanilla};
+
 pub struct Fabric {
+    game_version: String,
     versions: FabricVersions,
     profile: FabricProfile,
 }
@@ -61,21 +67,92 @@ impl Fabric {
             .json()
             .await?;
 
-        Ok(Self { versions, profile })
+        Ok(Self {
+            versions,
+            profile,
+            game_version,
+        })
     }
 }
 
 #[async_trait(?Send)]
 impl DownloadVersion for Fabric {
-    async fn download(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
+    async fn download(
+        &self,
+        dir: impl AsRef<Path>,
+        file_name: impl Into<String>,
+    ) -> anyhow::Result<()> {
+        let dir = dir.as_ref();
+        Vanilla::new(&self.game_version)
+            .await?
+            .download(dir, file_name)
+            .await?;
+
+        self.download_libraries(&dir.join("libraries")).await?;
+        self.create_json(dir.join("versions").join(&self.game_version))
+            .await?;
+
+        info!("Fabric downloaded successfully");
+
         Ok(())
     }
 
     async fn download_libraries(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
+        let dir = dir.as_ref();
+        let mut set = JoinSet::new();
+
+        self.profile.libraries.iter().for_each(|lib| {
+            let maven = MavenData::new(&lib.name);
+            set.spawn(download_file(
+                dir.join(maven.path),
+                format!("{}{}", lib.url, maven.url),
+            ));
+        });
+
+        while let Some(res) = set.join_next().await {
+            res??
+        }
+
         Ok(())
     }
 
     async fn create_json(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
+        let file_name = format!("{}.json", self.profile.id);
+        let path = dir.as_ref().join(file_name);
+
+        let mut file = tokio::fs::File::create(&path).await?;
+
+        let body = serde_json::to_string_pretty(&self.profile)?;
+
+        file.write_all(body.as_bytes()).await?;
+
+        info!(
+            "Version json {} created successfully",
+            path.to_string_lossy()
+        );
+
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::env::current_dir;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn download_test() {
+        let subscriber = tracing_subscriber::fmt().pretty().finish();
+        tracing::subscriber::set_global_default(subscriber).unwrap();
+
+        let cur = current_dir().unwrap();
+
+        Fabric::new("1.18.2", None::<String>)
+            .await
+            .unwrap()
+            .download(cur.join("minecraft"), "1.18.2.fabric")
+            .await
+            .unwrap();
     }
 }

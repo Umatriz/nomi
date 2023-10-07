@@ -2,7 +2,6 @@ pub mod assets;
 #[cfg(target_os = "windows")]
 pub mod jvm_dowload;
 pub mod utils;
-pub mod version;
 
 use std::path::Path;
 

@@ -2,15 +2,19 @@ use std::path::Path;
 
 use anyhow::Context;
 use async_trait::async_trait;
-use owo_colors::OwoColorize;
 use reqwest::Client;
 use tokio::{io::AsyncWriteExt, task::JoinSet};
 
 use tracing::{error, info};
 
 use crate::{
-    downloads::{assets, download_file, utils::get_launcher_manifest, version::DownloadVersion},
+    downloads::{
+        assets::{self, Assets, AssetsDownload},
+        download_file,
+        utils::get_launcher_manifest,
+    },
     repository::manifest::{Manifest, ManifestFile},
+    version::download::DownloadVersion,
 };
 
 pub struct Vanilla {
@@ -38,18 +42,13 @@ impl Vanilla {
 
         Ok(Self { manifest })
     }
-}
 
-#[async_trait(?Send)]
-impl DownloadVersion for Vanilla {
-    async fn download(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
-        let jar_name = format!("{}.jar", &self.manifest.id);
-        let versions_path = dir.as_ref().join("versions").join(&self.manifest.id);
-        let jar_file = versions_path.join(jar_name);
-
-        download_file(&jar_file, &self.manifest.downloads.client.url.clone()).await?;
-
-        info!("Client dowloaded successfully");
+    pub async fn download_version(
+        &self,
+        dir: impl AsRef<Path>,
+        file_name: impl Into<String>,
+    ) -> anyhow::Result<()> {
+        self.download(&dir, file_name).await?;
 
         let asset = assets::AssetsDownload::new(
             self.manifest.asset_index.url.clone(),
@@ -67,6 +66,24 @@ impl DownloadVersion for Vanilla {
             .await?;
         self.download_libraries(dir.as_ref()).await?;
         info!("Libraries downloaded successfully");
+
+        Ok(())
+    }
+}
+
+#[async_trait(?Send)]
+impl DownloadVersion for Vanilla {
+    async fn download(
+        &self,
+        dir: impl AsRef<Path>,
+        file_name: impl Into<String>,
+    ) -> anyhow::Result<()> {
+        let jar_name = format!("{}.jar", file_name.into());
+        let path = dir.as_ref().join(jar_name);
+
+        download_file(&path, &self.manifest.downloads.client.url).await?;
+
+        info!("Client downloaded successfully");
 
         Ok(())
     }
@@ -105,7 +122,7 @@ impl DownloadVersion for Vanilla {
         while let Some(res) = set.join_next().await {
             let result = res.unwrap();
             if result.is_err() {
-                let str = "MISSING LIBRARY".bright_red();
+                let str = "MISSING LIBRARY";
                 error!("{}", str)
             }
         }
@@ -129,43 +146,5 @@ impl DownloadVersion for Vanilla {
         );
 
         Ok(())
-    }
-}
-
-pub async fn download_vanilla(
-    version_id: impl Into<String>,
-    dir: impl AsRef<Path>,
-) -> anyhow::Result<()> {
-    Vanilla::new(version_id).await?.download(dir).await
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn download_test() {
-        let subscriber = tracing_subscriber::fmt().pretty().finish();
-        tracing::subscriber::set_global_default(subscriber).unwrap();
-
-        let current_dir = std::env::current_dir().unwrap();
-
-        let version = Vanilla::new("1.18.2").await.unwrap();
-        version
-            .download(current_dir.join("minecraft"))
-            .await
-            .unwrap();
-    }
-
-    #[test]
-    fn sync_test() {
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            let subscriber = tracing_subscriber::fmt().pretty().finish();
-            tracing::subscriber::set_global_default(subscriber).unwrap();
-
-            let version = Vanilla::new("1.18.2").await.unwrap();
-            version.download("./minecraft").await.unwrap();
-        })
     }
 }
