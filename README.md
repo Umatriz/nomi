@@ -2,7 +2,19 @@
 
 Minecraft launcher powered by Rust
 
-## Requirements
+---
+
+#### Work in progress
+
+Current goals:
+
+- [x] Implement basic downloading and lunching for vanilla minecraft
+- [ ] Implement downloading and lunching for fabric loader
+- [ ] GUI
+
+#### Expected 0.1.0 version release date - 27.10.2023
+
+## Requirements (outdated)
 
 - [Rust](https://www.rust-lang.org/) >= 1.70
 
