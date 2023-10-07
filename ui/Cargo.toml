@@ -16,7 +16,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 tracing-appender = "0.2"
 
-nomi-core = { path = "../nomi-core"}
+nomi-core = { path = "../nomi-core" }
 
-dioxus = "0.4.0"
-dioxus-desktop = "0.4.0"
+freya = "0.1"
+dioxus = { version = "0.4", features = ["macro", "hooks"] }

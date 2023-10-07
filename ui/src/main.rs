@@ -1,14 +1,20 @@
 #![allow(non_snake_case)]
-use dioxus::prelude::*;
+use app::App;
+use freya::prelude::*;
 use nomi_core::{downloads::version::DownloadVersion, loaders::vanilla::Vanilla};
 use tracing::Level;
 use tracing_subscriber::{
+    filter::filter_fn,
     fmt::{writer::MakeWriterExt, Layer},
     prelude::__tracing_subscriber_SubscriberExt,
-    Registry,
+    Layer as LayerFilterExt, Registry,
 };
 
+use crate::theme::colors;
+
+mod app;
 pub mod components;
+mod theme;
 
 fn main() {
     let file_appender = tracing_appender::rolling::hourly("./logs", "nomi.log");
@@ -24,30 +30,22 @@ fn main() {
         .with(
             Layer::default()
                 .with_writer(std::io::stdout.with_max_level(Level::DEBUG))
-                .pretty(),
+                .pretty()
+                .with_filter(filter_fn(|metadata| {
+                    if !metadata.target().contains("nomi") && metadata.level() == &Level::DEBUG {
+                        return false;
+                    }
+                    true
+                })),
         );
-
     tracing::subscriber::set_global_default(registry).unwrap();
-
-    dioxus_desktop::launch(App);
+    launch(Main);
 }
-
-fn App(cx: Scope) -> Element {
+fn Main(cx: Scope) -> Element {
     cx.render(rsx! {
-        div {
-            style { include_str!("./style.css") }
-            div { class: "test", "Hello, world!" }
-
-            button {
-                onclick: |_| {
-                    cx.spawn(async {
-                        let version = Vanilla::new("1.18.2").await.unwrap();
-                        version.download("./minecraft").await.unwrap();
-                        println!("FIN")
-                    })
-                },
-                "Download libs"
-            }
+        ThemeProvider {
+            theme: theme::NOMI_THEME_LIGHT,
+            App {}
         }
     })
 }
