@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use tokio::{io::AsyncWriteExt, task::JoinSet};
-use tracing::{debug, error, trace};
+use tracing::{info, trace};
 
 use super::download_file;
 
@@ -63,9 +63,11 @@ impl AssetsDownload {
 
     pub async fn get_assets_json(&self, assets_dir: &Path) -> Result<()> {
         let filen = format!("{}.json", self.id);
-        let path = assets_dir.join("assets").join("indexes").join(filen);
+        let path = assets_dir.join(filen);
 
-        tokio::fs::create_dir_all(path.parent().context("")?).await?;
+        if let Some(path) = path.parent() {
+            tokio::fs::create_dir_all(path).await?;
+        }
 
         let body = Client::new().get(&self.url).send().await?.text().await?;
 
@@ -75,45 +77,10 @@ impl AssetsDownload {
         Ok(())
     }
 
-    pub async fn download_assets(&self, dir: &Path) -> Result<()> {
-        let mut set = JoinSet::new();
-
-        for (_k, v) in self.assets.objects.iter() {
-            let path = self.create_dir(dir, &v.hash[0..2]).await?;
-            let url = format!(
-                "https://resources.download.minecraft.net/{}/{}",
-                &v.hash[0..2],
-                v.hash
-            );
-
-            set.spawn(download_file(path.join(&v.hash), url));
-        }
-
-        // TODO: Implement retry pull for missing assets
-
-        let mut ok_assets = 0;
-        let mut err_assets = 0;
-
-        while let Some(res) = set.join_next().await {
-            let result = res.unwrap();
-            if let Err(_err) = result {
-                error!("MISSING ASSET");
-
-                err_assets += 1;
-                error!("{} - OK", ok_assets);
-                error!("{} - MISSING", err_assets)
-            } else {
-                ok_assets += 1;
-                error!("{} - OK", ok_assets);
-                error!("{} - MISSING", err_assets)
-            }
-        }
-
-        Ok(())
-    }
-
     pub async fn download_assets_chunked(&self, dir: &Path) -> anyhow::Result<()> {
         let assets_chunks = self.assets.objects.iter().chunks(100);
+
+        // TODO: Implement retry pull for missing assets
 
         for asset in &assets_chunks {
             let assets: Vec<_> = asset.collect();
@@ -134,23 +101,19 @@ impl AssetsDownload {
             let mut err_assets = 0;
 
             while let Some(res) = set.join_next().await {
+                // FIXME
                 let result = res.unwrap();
                 if let Err(_err) = result {
-                    error!("MISSING ASSET");
-
                     err_assets += 1;
-                    debug!("{} - OK", ok_assets);
-                    if err_assets > 0 {
-                        error!("{} - MISSING", err_assets)
-                    }
                 } else {
                     ok_assets += 1;
-                    debug!("{} - OK", ok_assets);
-                    if err_assets > 0 {
-                        error!("{} - MISSING", err_assets)
-                    }
                 }
             }
+
+            info!(
+                "Chunk downloaded: OK - {}; MISSING - {}",
+                ok_assets, err_assets
+            );
         }
 
         Ok(())

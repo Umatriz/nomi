@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
 use super::{rules::is_all_rules_satisfied, CLASSPATH_SEPARATOR};
-use crate::repository::manifest::ManifestLibrary;
+use crate::repository::{library::SimpleLib, manifest::ManifestLibrary};
 
 pub fn should_use_library(lib: &ManifestLibrary) -> Result<bool> {
     let rules_opt = &lib.rules;
@@ -13,10 +13,11 @@ pub fn should_use_library(lib: &ManifestLibrary) -> Result<bool> {
     }
 }
 
-pub fn create_classpath(
+pub fn classpath(
     jar_file: PathBuf,
     libraries_path: PathBuf,
     libraries: Vec<ManifestLibrary>,
+    extra_libraries: Option<Vec<SimpleLib>>,
 ) -> Result<String> {
     let mut classpath = jar_file.to_string_lossy().to_string();
 
@@ -63,7 +64,7 @@ pub fn create_classpath(
                         lib_path
                     };
 
-                    let final_lib_path = Path::new(&libraries_path).join(replaced_lib_path);
+                    let final_lib_path = &libraries_path.join(replaced_lib_path);
 
                     classpath.push_str(
                         format!(
@@ -76,6 +77,19 @@ pub fn create_classpath(
                 }
             }
         }
+    }
+
+    if let Some(extra_libs) = extra_libraries {
+        extra_libs.iter().for_each(|lib| {
+            classpath.push_str(
+                format!(
+                    "{}{}",
+                    CLASSPATH_SEPARATOR,
+                    &libraries_path.join(&lib.jar).to_string_lossy()
+                )
+                .as_str(),
+            );
+        })
     }
 
     Ok(classpath)
@@ -91,10 +105,31 @@ mod tests {
     async fn it_works() {
         let fake_manifest: Manifest = reqwest::get("https://piston-meta.mojang.com/v1/packages/334b33fcba3c9be4b7514624c965256535bd7eba/1.18.2.json").await.unwrap().json().await.unwrap();
 
-        let classpath = create_classpath(
+        let classpath = classpath(
             PathBuf::from("test.jar"),
             PathBuf::from("test_libs"),
             fake_manifest.libraries,
+            None,
+        )
+        .unwrap();
+
+        println!("{}", classpath);
+    }
+
+    #[tokio::test]
+    async fn extra_libraries() {
+        let fake_manifest: Manifest = reqwest::get("https://piston-meta.mojang.com/v1/packages/334b33fcba3c9be4b7514624c965256535bd7eba/1.18.2.json").await.unwrap().json().await.unwrap();
+
+        let artifact = "net.fabricmc:fabric-loader:0.14.22";
+
+        let maven = crate::loaders::maven::MavenData::new(artifact);
+        let simple_lib = SimpleLib::from(maven);
+
+        let classpath = classpath(
+            PathBuf::from("test.jar"),
+            PathBuf::from("test_libs"),
+            fake_manifest.libraries,
+            Some(vec![simple_lib]),
         )
         .unwrap();
 

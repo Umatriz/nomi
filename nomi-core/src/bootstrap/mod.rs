@@ -6,7 +6,7 @@ use std::{path::PathBuf, process::Command};
 use anyhow::{Context, Result};
 use thiserror::Error;
 
-use crate::repository::manifest::{read_manifest_from_file, JvmArgument};
+use crate::repository::manifest::{read_manifest_from_file, JvmArgument, ManifestLibrary};
 
 use self::rules::is_all_rules_satisfied;
 
@@ -19,7 +19,7 @@ const CLASSPATH_SEPARATOR: &str = ":";
 // TODO: IMPORTANT Rewrite all this
 
 #[derive(Error, Debug)]
-pub enum BootstrapError {
+pub enum LaunchError {
     #[error("The game directory doesn't exist.")]
     GameDirNotExist,
 
@@ -28,12 +28,6 @@ pub enum BootstrapError {
 
     #[error("The version file (.json) doesn't exist.")]
     VersionFileNotFound,
-
-    #[error("An unexpected error has ocurred.")]
-    UnknownError,
-
-    #[error("{0}")]
-    Json(#[from] serde_json::Error),
 }
 
 #[derive(Default)]
@@ -55,65 +49,48 @@ pub struct ClientSettings {
 }
 
 pub struct ClientBootstrap {
+    pub classpath_func:
+        Box<dyn Fn(PathBuf, PathBuf, Vec<ManifestLibrary>) -> anyhow::Result<String>>,
     pub settings: ClientSettings,
+    pub main_class: Option<String>,
 }
 
 impl ClientBootstrap {
-    pub fn new(settings: ClientSettings) -> Self {
-        Self { settings }
-    }
-
-    pub fn get_assets_dir(&self) -> PathBuf {
-        self.settings.assets.clone()
-    }
-
-    pub fn get_game_dir(&self) -> PathBuf {
-        self.settings.game_dir.clone()
-    }
-
-    pub fn get_json_file(&self) -> PathBuf {
-        self.settings.manifest_file.clone()
-    }
-
-    pub fn get_jar_file(&self) -> PathBuf {
-        self.settings.version_jar_file.clone()
-    }
-
-    pub fn get_libs_dir(&self) -> PathBuf {
-        self.settings.libraries_dir.clone()
-    }
-
-    pub fn get_natives_dir(&self) -> PathBuf {
-        self.settings.natives_dir.clone()
+    pub fn new(
+        settings: ClientSettings,
+        classpath_func: impl Fn(PathBuf, PathBuf, Vec<ManifestLibrary>) -> anyhow::Result<String>
+            + 'static,
+        main_class: Option<String>,
+    ) -> Self {
+        Self {
+            settings,
+            classpath_func: Box::new(classpath_func),
+            main_class,
+        }
     }
 
     pub fn build_args(&self) -> Result<Vec<String>> {
-        let assets_dir = self.get_assets_dir();
-        let game_dir = self.get_game_dir();
+        let assets_dir = self.settings.assets.clone();
+        let game_dir = self.settings.game_dir.clone();
         let java_bin = self.settings.java_bin.clone();
-        let json_file = self.get_json_file();
-        let natives_dir = self.get_natives_dir();
+        let json_file = self.settings.manifest_file.clone();
+        let natives_dir = self.settings.natives_dir.clone();
 
         if !game_dir.is_dir() {
-            return Err(BootstrapError::GameDirNotExist.into());
+            return Err(LaunchError::GameDirNotExist.into());
         }
 
         if !java_bin.is_file() {
-            return Err(BootstrapError::JavaBinNotExist.into());
+            return Err(LaunchError::JavaBinNotExist.into());
         }
 
         if !json_file.is_file() {
-            return Err(BootstrapError::VersionFileNotFound.into());
+            return Err(LaunchError::VersionFileNotFound.into());
         }
 
         let manifest = read_manifest_from_file(&json_file)?;
 
         let assets_index = &manifest.asset_index.id;
-        let classpath = classpath::create_classpath(
-            self.settings.version_jar_file.clone(),
-            self.settings.libraries_dir.clone(),
-            manifest.libraries,
-        )?;
 
         let mut args: Vec<String> = vec![];
 
@@ -140,7 +117,7 @@ impl ClientBootstrap {
             }
         }
 
-        args.push(manifest.main_class);
+        args.push(self.main_class.clone().unwrap_or(manifest.main_class));
 
         for arg in manifest.arguments.game {
             match arg {
@@ -164,6 +141,12 @@ impl ClientBootstrap {
                 }
             }
         }
+
+        let classpath = (self.classpath_func)(
+            self.settings.version_jar_file.clone(),
+            self.settings.libraries_dir.clone(),
+            manifest.libraries,
+        )?;
 
         args = args
             .iter()
@@ -242,7 +225,7 @@ pub fn java_bin() -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::{classpath::classpath, *};
 
     fn fake_config() -> ClientSettings {
         let mc_dir = std::env::current_dir().unwrap().join("minecraft");
@@ -274,7 +257,13 @@ mod tests {
     fn it_works() {
         let settings = fake_config();
 
-        let bootstrap = ClientBootstrap::new(settings);
+        let bootstrap = ClientBootstrap::new(
+            settings,
+            |jar_file, libraries_path, libraries| {
+                classpath(jar_file, libraries_path, libraries, None)
+            },
+            None,
+        );
         bootstrap.launch().unwrap();
     }
 
@@ -282,7 +271,13 @@ mod tests {
     fn args_test() {
         let settings = fake_config();
 
-        let bootstrap = ClientBootstrap::new(settings);
+        let bootstrap = ClientBootstrap::new(
+            settings,
+            |jar_file, libraries_path, libraries| {
+                classpath(jar_file, libraries_path, libraries, None)
+            },
+            None,
+        );
         let args = bootstrap.build_args().unwrap();
         println!("{:?}", args);
     }

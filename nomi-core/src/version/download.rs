@@ -4,7 +4,11 @@ use async_trait::async_trait;
 
 #[async_trait(?Send)]
 pub trait DownloadVersion {
-    async fn download(&self, dir: impl AsRef<Path>) -> anyhow::Result<()>;
+    async fn download(
+        &self,
+        dir: impl AsRef<Path>,
+        file_name: impl Into<String>,
+    ) -> anyhow::Result<()>;
 
     async fn download_libraries(&self, dir: impl AsRef<Path>) -> anyhow::Result<()>;
 
