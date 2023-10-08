@@ -8,6 +8,7 @@ members = [
     "nomi-core",
     "client"
     ]
+resolver = "2"
     
 [workspace.dependencies]
 log = "0.4.19"

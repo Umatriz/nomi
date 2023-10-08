@@ -11,8 +11,9 @@ use crate::{
 
 // TODO: Finish this feature
 
-static LAUNCHER_MANIFEST: OnceCell<ManifestState> = OnceCell::const_new();
+pub static LAUNCHER_MANIFEST: OnceCell<ManifestState> = OnceCell::const_new();
 
+#[derive(Debug)]
 pub struct ManifestState {
     pub launcher: LauncherManifest,
 }
@@ -40,4 +41,15 @@ pub async fn try_init() -> anyhow::Result<ManifestState> {
     Ok(ManifestState {
         launcher: get_launcher_manifest().await?,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn init_test() {
+        let m = LAUNCHER_MANIFEST.get_or_try_init(try_init).await.unwrap();
+        println!("{:?}", &m.launcher.versions[..5])
+    }
 }
