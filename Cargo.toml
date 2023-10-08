@@ -6,7 +6,7 @@
 [workspace]
 members = [
     "nomi-core",
-    "client/src-tauri"
+    "client"
     ]
 
 [workspace.dependencies]

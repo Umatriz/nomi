@@ -1,7 +1,6 @@
 #![allow(non_snake_case)]
 use app::App;
 use freya::prelude::*;
-use nomi_core::{downloads::version::DownloadVersion, loaders::vanilla::Vanilla};
 use tracing::Level;
 use tracing_subscriber::{
     filter::filter_fn,
@@ -43,9 +42,6 @@ fn main() {
 }
 fn Main(cx: Scope) -> Element {
     cx.render(rsx! {
-        ThemeProvider {
-            theme: theme::NOMI_THEME_LIGHT,
-            App {}
-        }
+        ThemeProvider { theme: theme::NOMI_THEME_LIGHT, App {} }
     })
 }
