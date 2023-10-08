@@ -25,7 +25,6 @@ cargo run
 
 ### TODO
 
-- [ ] UUID generation
 - [x] Java downloading
 - [ ] Profiles features
 - [ ] Mod loaders support
@@ -47,6 +46,8 @@ cargo run
 - [x] Migrate from `fern` to `tracing`
 
 ### FAQ
+
+NOT AN OFFICIAL MINECRAFT [PRODUCT/SERVICE/EVENT/etc.]. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT
 
 #### Contact us
 
