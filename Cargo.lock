@@ -2703,6 +2703,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "nomi-lazy"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "tokio",
+]
+
+[[package]]
 name = "notify"
 version = "5.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
