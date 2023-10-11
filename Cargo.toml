@@ -5,8 +5,7 @@
 
 [workspace]
 members = [
-    "nomi-core",
-    "client"
+    "crates/*"
     ]
 resolver = "2"
     
