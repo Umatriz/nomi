@@ -14,6 +14,8 @@ serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
+nomi-lazy ={ path = "../nomi-lazy"}
+
 reqwest = { version = "0.11.18", features = ["json", "blocking", "stream"] }
 futures-util = "0.3.28"
 thiserror = "1.0.48"

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
 use freya::prelude::*;
-use nomi_core::loaders::{instance::InstanceBuilder, vanilla::Vanilla};
+use nomi_core::instance::InstanceBuilder;
 
 use crate::theme::colors;
 
@@ -20,16 +20,16 @@ pub fn App(cx: Scope) -> Element {
             Button {
                 onclick: |_| {
                     let v = version.to_string();
-                    cx.spawn(async {
+                    cx.spawn(async move {
                         let instance = InstanceBuilder::new()
                             .version(&v)
                             .game("./minecraft")
                             .libraries("./minecraft/libraries")
                             .version_path(PathBuf::from("./minecraft/versions").join(&v))
-                            .instance(async move { Vanilla::new(&v).await })
-                            .build()
+                            .vanilla(&v)
                             .await
-                            .unwrap();
+                            .unwrap()
+                            .build();
                         instance.download().await.unwrap();
                         tracing::info!("Finished dowloading")
                     })

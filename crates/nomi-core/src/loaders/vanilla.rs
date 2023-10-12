@@ -8,15 +8,12 @@ use tokio::{io::AsyncWriteExt, task::JoinSet};
 use tracing::{error, info};
 
 use crate::{
-    downloads::{
-        assets::{self, Assets, AssetsDownload},
-        download_file,
-        utils::get_launcher_manifest,
-    },
+    downloads::{assets, download_file, utils::get_launcher_manifest},
     repository::manifest::{Manifest, ManifestFile},
     version::download::DownloadVersion,
 };
 
+#[derive(Debug)]
 pub struct Vanilla {
     manifest: Manifest,
 }

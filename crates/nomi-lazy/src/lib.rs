@@ -73,7 +73,7 @@ where
         self.cell.get()
     }
 
-    pub async fn get_or_init(&self) -> anyhow::Result<&T> {
+    pub async fn get_or_try_init(&self) -> anyhow::Result<&T> {
         self.cell.get_or_try_init(&self.init).await
     }
 }
@@ -101,7 +101,7 @@ mod tests {
 
     #[tokio::test]
     async fn try_test() {
-        let t = TRY_STATE.get_or_init().await;
+        let t = TRY_STATE.get_or_try_init().await;
 
         assert_eq!(t.unwrap(), &1 as &i32);
     }

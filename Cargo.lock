@@ -2688,6 +2688,7 @@ dependencies = [
  "fern",
  "futures-util",
  "itertools",
+ "nomi-lazy",
  "owo-colors",
  "reqwest",
  "serde",

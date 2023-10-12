@@ -7,6 +7,7 @@ use tracing::info;
 
 use crate::{
     downloads::{assets::AssetsDownload, utils::get_launcher_manifest},
+    loaders::vanilla::Vanilla,
     repository::manifest::Manifest,
     version::download::DownloadVersion,
 };
@@ -15,27 +16,34 @@ use crate::{
 pub struct Undefined;
 
 #[derive(Debug)]
-pub struct Instance<I>
-where
-    I: DownloadVersion,
-{
-    inner: I,
+pub struct Instance {
+    inner: Inner,
     version: String,
     game: PathBuf,
     libraries: PathBuf,
     version_path: PathBuf,
 }
 
-impl<I> Instance<I>
-where
-    I: DownloadVersion,
-{
+#[derive(Debug)]
+pub enum Inner {
+    Vanilla(Vanilla),
+}
+
+impl Inner {
+    pub async fn vanilla(version_id: impl Into<String>) -> anyhow::Result<Inner> {
+        Ok(Inner::Vanilla(Vanilla::new(version_id).await?))
+    }
+}
+
+impl Instance {
     pub async fn download(&self) -> anyhow::Result<()> {
-        self.inner
-            .download(&self.version_path, &self.version)
-            .await?;
-        self.inner.download_libraries(&self.libraries).await?;
-        self.inner.create_json(&self.version_path).await?;
+        match &self.inner {
+            Inner::Vanilla(inner) => {
+                inner.download(&self.version_path, &self.version).await?;
+                inner.download_libraries(&self.libraries).await?;
+                inner.create_json(&self.version_path).await?;
+            }
+        }
 
         Ok(())
     }
@@ -180,35 +188,41 @@ impl InstanceBuilder<Undefined, Undefined, Undefined, Undefined, Undefined> {
     }
 }
 
-impl<Fut, Out> InstanceBuilder<Fut, String, PathBuf, PathBuf, PathBuf>
-where
-    Fut: Future<Output = anyhow::Result<Out>>,
-    Out: DownloadVersion,
-{
-    pub async fn build(self) -> anyhow::Result<Instance<Out>> {
-        Ok(Instance {
-            inner: self.inner.await?,
-            version: self.version,
-            game: self.game,
-            libraries: self.libraries,
-            version_path: self.version_path,
-        })
-    }
-}
-
-impl<G, N, L, V> InstanceBuilder<Undefined, N, G, L, V> {
-    pub fn instance<Fut, Out>(self, fut: Fut) -> InstanceBuilder<Fut, N, G, L, V>
-    where
-        Fut: Future<Output = anyhow::Result<Out>>,
-        Out: DownloadVersion,
-    {
-        InstanceBuilder {
-            inner: fut,
+impl InstanceBuilder<Inner, String, PathBuf, PathBuf, PathBuf> {
+    pub fn build(self) -> Instance {
+        Instance {
+            inner: self.inner,
             version: self.version,
             game: self.game,
             libraries: self.libraries,
             version_path: self.version_path,
         }
+    }
+}
+
+impl<G, N, L, V> InstanceBuilder<Undefined, N, G, L, V> {
+    pub fn instance(self, inner: Inner) -> InstanceBuilder<Inner, N, G, L, V> {
+        InstanceBuilder {
+            inner,
+            version: self.version,
+            game: self.game,
+            libraries: self.libraries,
+            version_path: self.version_path,
+        }
+    }
+
+    pub async fn vanilla(
+        self,
+        version_id: impl Into<String>,
+    ) -> anyhow::Result<InstanceBuilder<Inner, N, G, L, V>> {
+        let inner = Inner::vanilla(version_id).await?;
+        Ok(InstanceBuilder {
+            inner,
+            version: self.version,
+            game: self.game,
+            libraries: self.libraries,
+            version_path: self.version_path,
+        })
     }
 }
 
@@ -265,8 +279,6 @@ impl<I, G, L, V> InstanceBuilder<I, Undefined, G, L, V> {
 
 #[cfg(test)]
 mod tests {
-    use crate::loaders::vanilla::Vanilla;
-
     use super::*;
 
     #[tokio::test]
@@ -276,10 +288,10 @@ mod tests {
             .game("./minecraft")
             .libraries("./minecraft/libraries")
             .version_path("./minecraft/instances/1.18.2")
-            .instance(async { Vanilla::new("1.18.2").await })
-            .build()
+            .vanilla("1.18.2")
             .await
-            .unwrap();
+            .unwrap()
+            .build();
     }
 
     #[tokio::test]
@@ -289,10 +301,10 @@ mod tests {
             .game("./minecraft")
             .libraries("./minecraft/libraries")
             .version_path("./minecraft/instances/1.18.2")
-            .instance(async { Vanilla::new("1.18.2").await })
-            .build()
+            .vanilla("1.18.2")
             .await
-            .unwrap();
+            .unwrap()
+            .build();
 
         builder
             .assets("1.18.2")
