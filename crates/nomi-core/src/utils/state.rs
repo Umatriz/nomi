@@ -1,6 +1,5 @@
 use anyhow::Context;
 use nomi_lazy::{Lazy, Try};
-use tokio::sync::OnceCell;
 
 use crate::{
     downloads::utils::get_launcher_manifest,
@@ -12,7 +11,7 @@ use crate::{
 
 // TODO: Finish this feature
 
-pub static LAUNCHER_MANIFEST: Lazy<ManifestState, Try, anyhow::Result<ManifestState>> =
+pub static LAUNCHER_MANIFEST_STATE: Lazy<ManifestState, Try, anyhow::Result<ManifestState>> =
     Lazy::new_try(|| Box::pin(async { try_init().await }));
 
 #[derive(Debug)]
@@ -59,11 +58,11 @@ mod tests {
             .finish();
         tracing::subscriber::set_global_default(sub).unwrap();
 
-        let m = LAUNCHER_MANIFEST.get_or_try_init().await.unwrap();
+        let m = LAUNCHER_MANIFEST_STATE.get_or_try_init().await.unwrap();
         println!("{:?}", &m.launcher.versions[..5]);
         println!(
             "{:?}",
-            &LAUNCHER_MANIFEST
+            &LAUNCHER_MANIFEST_STATE
                 .get_or_try_init()
                 .await
                 .unwrap()
