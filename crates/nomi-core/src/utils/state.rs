@@ -1,4 +1,5 @@
 use anyhow::Context;
+use nomi_lazy::{Lazy, Try};
 use tokio::sync::OnceCell;
 
 use crate::{
@@ -11,7 +12,8 @@ use crate::{
 
 // TODO: Finish this feature
 
-pub static LAUNCHER_MANIFEST: OnceCell<ManifestState> = OnceCell::const_new();
+pub static LAUNCHER_MANIFEST: Lazy<ManifestState, Try, anyhow::Result<ManifestState>> =
+    Lazy::new_try(|| Box::pin(async { try_init().await }));
 
 #[derive(Debug)]
 pub struct ManifestState {
@@ -45,11 +47,28 @@ pub async fn try_init() -> anyhow::Result<ManifestState> {
 
 #[cfg(test)]
 mod tests {
+    use tracing::Level;
+
     use super::*;
 
     #[tokio::test]
     async fn init_test() {
-        let m = LAUNCHER_MANIFEST.get_or_try_init(try_init).await.unwrap();
-        println!("{:?}", &m.launcher.versions[..5])
+        let sub = tracing_subscriber::fmt()
+            .compact()
+            .with_max_level(Level::DEBUG)
+            .finish();
+        tracing::subscriber::set_global_default(sub).unwrap();
+
+        let m = LAUNCHER_MANIFEST.get_or_try_init().await.unwrap();
+        println!("{:?}", &m.launcher.versions[..5]);
+        println!(
+            "{:?}",
+            &LAUNCHER_MANIFEST
+                .get_or_try_init()
+                .await
+                .unwrap()
+                .launcher
+                .versions[..5]
+        );
     }
 }
