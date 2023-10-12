@@ -4,9 +4,9 @@ use tokio::sync::OnceCell;
 
 pub type LazyFutureAlias<T> = std::pin::Pin<std::boxed::Box<dyn Future<Output = T>>>;
 
-pub struct Undefined;
-pub struct NotTry;
-pub struct Try;
+pub enum Undefined {}
+pub enum NotTry {}
+pub enum Try {}
 
 #[derive(Debug)]
 pub struct Lazy<
