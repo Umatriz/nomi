@@ -1,15 +1,9 @@
 use std::path::{Path, PathBuf};
-
-use anyhow::Context;
-use futures_util::Future;
-use reqwest::Client;
 use tracing::info;
 
 use crate::{
-    downloads::{assets::AssetsDownload, utils::get_launcher_manifest},
-    loaders::vanilla::Vanilla,
-    repository::manifest::Manifest,
-    version::download::DownloadVersion,
+    downloads::assets::AssetsDownload, loaders::vanilla::Vanilla,
+    utils::state::LAUNCHER_MANIFEST_STATE, version::download::DownloadVersion,
 };
 
 #[derive(Default, Debug)]
@@ -54,26 +48,12 @@ impl Instance {
     ) -> anyhow::Result<AssetsInstanceBuilder<Undefined, Undefined, String, String>> {
         let version = version.into();
 
-        // TODO: Implement global state for manifest
-
-        let manifest = get_launcher_manifest().await?;
-        let version_manifest = manifest
-            .versions
-            .iter()
-            .find(|i| i.id == version)
-            .context("no such version")?;
-
-        let assets = Client::new()
-            .get(&version_manifest.url)
-            .send()
-            .await?
-            .json::<Manifest>()
-            .await?
-            .asset_index;
+        let manifest = LAUNCHER_MANIFEST_STATE.get_or_try_init().await?;
+        let version_manifest = manifest.get_version_manifest(&version).await?;
 
         Ok(AssetsInstanceBuilder::new(version)
-            .id(assets.id)
-            .url(assets.url))
+            .id(version_manifest.asset_index.id)
+            .url(version_manifest.asset_index.url))
     }
 }
 

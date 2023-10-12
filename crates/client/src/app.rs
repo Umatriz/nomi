@@ -20,7 +20,7 @@ pub fn App(cx: Scope) -> Element {
             Button {
                 onclick: |_| {
                     let v = version.to_string();
-                    cx.spawn(async move {
+                    let fut = async move {
                         let instance = InstanceBuilder::new()
                             .version(&v)
                             .game("./minecraft")
@@ -30,9 +30,19 @@ pub fn App(cx: Scope) -> Element {
                             .await
                             .unwrap()
                             .build();
+                        instance
+                            .assets(&v)
+                            .await
+                            .unwrap()
+                            .indexes("./minecraft/assets/indexes")
+                            .objects("./minecraft/assets/objects")
+                            .build()
+                            .await
+                            .unwrap();
                         instance.download().await.unwrap();
                         tracing::info!("Finished dowloading")
-                    })
+                    };
+                    cx.spawn(fut)
                 },
                 label { "Download vanilla {version}" }
             }
