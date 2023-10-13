@@ -31,7 +31,7 @@ pub enum LaunchError {
 }
 
 #[derive(Default)]
-pub struct ClientSettings {
+pub struct Settings {
     pub access_token: Option<String>,
     pub username: String,
     pub uuid: Option<String>,
@@ -48,16 +48,16 @@ pub struct ClientSettings {
     pub version_type: String,
 }
 
-pub struct ClientBootstrap {
+pub struct Launch {
     pub classpath_func:
         Box<dyn Fn(PathBuf, PathBuf, Vec<ManifestLibrary>) -> anyhow::Result<String>>,
-    pub settings: ClientSettings,
+    pub settings: Settings,
     pub main_class: Option<String>,
 }
 
-impl ClientBootstrap {
+impl Launch {
     pub fn new(
-        settings: ClientSettings,
+        settings: Settings,
         classpath_func: impl Fn(PathBuf, PathBuf, Vec<ManifestLibrary>) -> anyhow::Result<String>
             + 'static,
         main_class: Option<String>,
@@ -227,9 +227,9 @@ pub fn java_bin() -> Option<PathBuf> {
 mod tests {
     use super::{classpath::classpath, *};
 
-    fn fake_config() -> ClientSettings {
+    fn fake_config() -> Settings {
         let mc_dir = std::env::current_dir().unwrap().join("minecraft");
-        ClientSettings {
+        Settings {
             assets: mc_dir.join("assets"),
             access_token: None,
             username: "ItWorks".to_string(),
@@ -257,7 +257,7 @@ mod tests {
     fn it_works() {
         let settings = fake_config();
 
-        let bootstrap = ClientBootstrap::new(
+        let bootstrap = Launch::new(
             settings,
             |jar_file, libraries_path, libraries| {
                 classpath(jar_file, libraries_path, libraries, None)
@@ -271,7 +271,7 @@ mod tests {
     fn args_test() {
         let settings = fake_config();
 
-        let bootstrap = ClientBootstrap::new(
+        let bootstrap = Launch::new(
             settings,
             |jar_file, libraries_path, libraries| {
                 classpath(jar_file, libraries_path, libraries, None)

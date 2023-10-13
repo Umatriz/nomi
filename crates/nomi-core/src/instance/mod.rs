@@ -1,6 +1,8 @@
 use std::path::{Path, PathBuf};
 use tracing::info;
 
+pub mod launch;
+
 use crate::{
     downloads::assets::AssetsDownload, loaders::vanilla::Vanilla,
     utils::state::LAUNCHER_MANIFEST_STATE, version::download::DownloadVersion,

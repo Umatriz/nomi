@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+/// Profile struct
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct VersionProfile {
     pub id: i32,
