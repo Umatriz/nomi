@@ -5,9 +5,7 @@ use super::{rules::is_all_rules_satisfied, CLASSPATH_SEPARATOR};
 use crate::repository::{library::SimpleLib, manifest::ManifestLibrary};
 
 pub fn should_use_library(lib: &ManifestLibrary) -> Result<bool> {
-    let rules_opt = &lib.rules;
-
-    match rules_opt {
+    match lib.rules.as_ref() {
         Some(rules) => Ok(is_all_rules_satisfied(rules)?),
         None => Ok(true),
     }

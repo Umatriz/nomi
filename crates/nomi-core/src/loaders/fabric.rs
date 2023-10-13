@@ -120,6 +120,10 @@ impl DownloadVersion for Fabric {
         let file_name = format!("{}.json", self.profile.id);
         let path = dir.as_ref().join(file_name);
 
+        if let Some(p) = dir.as_ref().parent() {
+            tokio::fs::create_dir_all(p).await?;
+        }
+
         let mut file = tokio::fs::File::create(&path).await?;
 
         let body = serde_json::to_string_pretty(&self.profile)?;
