@@ -25,7 +25,7 @@ pub struct Lazy<
 }
 
 impl<T> Lazy<T> {
-    pub const fn new_not_try<F, Fut>(init: F) -> Lazy<T, NotTry, T, F, Fut>
+    pub const fn new<F, Fut>(init: F) -> Lazy<T, NotTry, T, F, Fut>
     where
         F: Fn() -> Fut,
         Fut: Future<Output = T>,
@@ -82,7 +82,7 @@ where
 mod tests {
     use super::*;
 
-    static STATIC_STATE: Lazy<i32, NotTry> = Lazy::new_not_try(|| {
+    static STATIC_STATE: Lazy<i32, NotTry> = Lazy::new(|| {
         Box::pin(async {
             let _ = tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             1
