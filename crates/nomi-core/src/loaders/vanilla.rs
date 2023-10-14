@@ -94,7 +94,7 @@ impl DownloadVersion for Vanilla {
                     .path
                     .clone()
                     .context("`download.path` must be Some")?;
-                let final_path = dir.as_ref().join("libraries").join(path);
+                let final_path = dir.as_ref().join(path);
                 set.spawn(download_file(final_path, download.url.clone()));
             }
 

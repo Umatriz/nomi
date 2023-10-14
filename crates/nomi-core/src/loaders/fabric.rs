@@ -13,6 +13,7 @@ use crate::{
 
 use super::{maven::MavenData, vanilla::Vanilla};
 
+#[derive(Debug)]
 pub struct Fabric {
     game_version: String,
     versions: FabricVersions,
@@ -86,10 +87,6 @@ impl DownloadVersion for Fabric {
         Vanilla::new(&self.game_version)
             .await?
             .download(dir, file_name)
-            .await?;
-
-        self.download_libraries(&dir.join("libraries")).await?;
-        self.create_json(dir.join("versions").join(&self.game_version))
             .await?;
 
         info!("Fabric downloaded successfully");
