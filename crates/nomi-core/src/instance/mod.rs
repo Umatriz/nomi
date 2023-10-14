@@ -4,8 +4,10 @@ use tracing::info;
 pub mod launch;
 
 use crate::{
-    downloads::assets::AssetsDownload, loaders::vanilla::Vanilla,
-    utils::state::LAUNCHER_MANIFEST_STATE, version::download::DownloadVersion,
+    downloads::assets::AssetsDownload,
+    loaders::{fabric::Fabric, vanilla::Vanilla},
+    utils::state::LAUNCHER_MANIFEST_STATE,
+    version::download::DownloadVersion,
 };
 
 #[derive(Default, Debug)]
@@ -22,12 +24,22 @@ pub struct Instance {
 
 #[derive(Debug)]
 pub enum Inner {
-    Vanilla(Vanilla),
+    Vanilla(Box<Vanilla>),
+    Fabric(Box<Fabric>),
 }
 
 impl Inner {
     pub async fn vanilla(version_id: impl Into<String>) -> anyhow::Result<Inner> {
-        Ok(Inner::Vanilla(Vanilla::new(version_id).await?))
+        Ok(Inner::Vanilla(Box::new(Vanilla::new(version_id).await?)))
+    }
+
+    pub async fn fabric(
+        game_version: impl Into<String>,
+        loader_version: Option<impl Into<String>>,
+    ) -> anyhow::Result<Inner> {
+        Ok(Inner::Fabric(Box::new(
+            Fabric::new(game_version, loader_version).await?,
+        )))
     }
 }
 
@@ -35,6 +47,11 @@ impl Instance {
     pub async fn download(&self) -> anyhow::Result<()> {
         match &self.inner {
             Inner::Vanilla(inner) => {
+                inner.download(&self.version_path, &self.version).await?;
+                inner.download_libraries(&self.libraries).await?;
+                inner.create_json(&self.version_path).await?;
+            }
+            Inner::Fabric(inner) => {
                 inner.download(&self.version_path, &self.version).await?;
                 inner.download_libraries(&self.libraries).await?;
                 inner.create_json(&self.version_path).await?;
@@ -206,6 +223,21 @@ impl<G, N, L, V> InstanceBuilder<Undefined, N, G, L, V> {
             version_path: self.version_path,
         })
     }
+
+    pub async fn fabric(
+        self,
+        game_version: impl Into<String>,
+        loader_version: Option<impl Into<String>>,
+    ) -> anyhow::Result<InstanceBuilder<Inner, N, G, L, V>> {
+        let inner = Inner::fabric(game_version, loader_version).await?;
+        Ok(InstanceBuilder {
+            inner,
+            version: self.version,
+            game: self.game,
+            libraries: self.libraries,
+            version_path: self.version_path,
+        })
+    }
 }
 
 impl<I, N, L, V> InstanceBuilder<I, N, Undefined, L, V> {
@@ -300,5 +332,39 @@ mod tests {
             .download()
             .await
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn fabric_test() {
+        let subscriber = tracing_subscriber::fmt()
+            .pretty()
+            .with_max_level(tracing::Level::INFO)
+            .finish();
+        tracing::subscriber::set_global_default(subscriber).unwrap();
+
+        let builder = InstanceBuilder::new()
+            .version("1.18.2")
+            .game("./minecraft")
+            .libraries("./minecraft/libraries")
+            .version_path("./minecraft/instances/1.18.2")
+            .fabric("1.18.2", None::<String>)
+            .await
+            .unwrap()
+            .build();
+
+        // builder
+        //     .assets("1.18.2")
+        //     .await
+        //     .unwrap()
+        //     .indexes("./minecraft/assets/indexes")
+        //     .objects("./minecraft/assets/objects")
+        //     .build()
+        //     .await
+        //     .unwrap()
+        //     .download()
+        //     .await
+        //     .unwrap();
+
+        builder.download().await.unwrap();
     }
 }

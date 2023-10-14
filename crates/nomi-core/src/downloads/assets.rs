@@ -52,7 +52,7 @@ impl AssetsDownload {
     }
 
     async fn create_dir(&self, main_dir: &Path, asset_dir_name: &str) -> Result<PathBuf> {
-        let path = main_dir.join("assets").join("objects").join(asset_dir_name);
+        let path = main_dir.join(asset_dir_name);
 
         tokio::fs::create_dir_all(&path).await?;
 
