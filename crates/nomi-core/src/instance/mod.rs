@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use tracing::info;
 
 pub mod launch;
+pub mod profile;
 
 use crate::{
     downloads::assets::AssetsDownload,
@@ -9,6 +10,8 @@ use crate::{
     utils::state::LAUNCHER_MANIFEST_STATE,
     version::download::DownloadVersion,
 };
+
+use self::launch::{LaunchInstance, LaunchInstanceBuilder, LaunchSettings};
 
 #[derive(Default, Debug)]
 pub struct Undefined;
@@ -73,6 +76,14 @@ impl Instance {
         Ok(AssetsInstanceBuilder::new(version)
             .id(version_manifest.asset_index.id)
             .url(version_manifest.asset_index.url))
+    }
+
+    pub fn launch_instance(&self, settings: LaunchSettings) -> LaunchInstance {
+        let builder = LaunchInstanceBuilder::new().settings(settings);
+        match &self.inner {
+            Inner::Vanilla(_) => builder.build(),
+            Inner::Fabric(inner) => builder.profile(&inner.profile).build(),
+        }
     }
 }
 

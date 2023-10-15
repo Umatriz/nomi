@@ -5,10 +5,12 @@ use const_typed_builder::Builder;
 use thiserror::Error;
 use tokio::process::Command;
 
-use crate::repository::manifest::{read_manifest_from_file, JvmArgument, ManifestLibrary};
+use crate::repository::manifest::{read_manifest_from_file, JvmArgument};
 use rules::is_all_rules_satisfied;
 
-use super::Undefined;
+use self::classpath::classpath;
+
+use super::{profile::Profile, Undefined};
 
 pub mod classpath;
 pub mod rules;
@@ -65,16 +67,12 @@ pub fn java_bin() -> Option<PathBuf> {
     java_bin
 }
 
-type InstanceClasspath =
-    Box<dyn FnOnce(PathBuf, PathBuf, Vec<ManifestLibrary>) -> anyhow::Result<String>>;
-
-pub struct LaunchInstance {
+pub struct LaunchInstance<'a> {
     settings: LaunchSettings,
-    calsspath: Box<dyn FnOnce(PathBuf, PathBuf, Vec<ManifestLibrary>) -> anyhow::Result<String>>,
-    main_class: Option<String>,
+    profile: Option<&'a dyn Profile>,
 }
 
-impl LaunchInstance {
+impl LaunchInstance<'_> {
     fn build_args(self) -> anyhow::Result<Vec<String>> {
         let assets_dir = self.settings.assets.clone();
         let game_dir = self.settings.game_dir.clone();
@@ -100,6 +98,14 @@ impl LaunchInstance {
 
         let mut args: Vec<String> = vec![];
 
+        if let Some(prof) = self.profile {
+            let arguments = prof.arguments();
+            arguments.jvm.iter().for_each(|a| {
+                dbg!(&a);
+                args.push(a.to_owned());
+            })
+        }
+
         for arg in manifest.arguments.jvm {
             match arg {
                 JvmArgument::String(value) => {
@@ -123,35 +129,37 @@ impl LaunchInstance {
             }
         }
 
-        args.push(self.main_class.clone().unwrap_or(manifest.main_class));
+        let main_class = if let Some(prof) = self.profile {
+            prof.main_class()
+        } else {
+            manifest.main_class
+        };
+
+        args.push(main_class.to_owned());
 
         for arg in manifest.arguments.game {
             match arg {
                 JvmArgument::String(value) => {
                     args.push(value);
                 }
-                JvmArgument::Struct { value, rules, .. } => {
-                    if !is_all_rules_satisfied(&rules)? {
-                        continue;
-                    }
-
-                    if let Some(value) = value.as_str() {
-                        args.push(value.to_string());
-                    } else if let Some(value_arr) = value.as_array() {
-                        for value in value_arr {
-                            if let Some(value) = value.as_str() {
-                                args.push(value.to_string());
-                            }
-                        }
-                    }
-                }
+                _ => break,
             }
         }
 
-        let classpath = (self.calsspath)(
+        if let Some(prof) = self.profile {
+            let arguments = prof.arguments();
+            arguments.game.iter().for_each(|a| {
+                dbg!(&a);
+                args.push(a.to_owned());
+            })
+        }
+
+        let extra_libraries = self.profile.map(|prof| prof.libraries());
+        let classpath = classpath(
             self.settings.version_jar_file.clone(),
             self.settings.libraries_dir.clone(),
             manifest.libraries,
+            extra_libraries,
         )?;
 
         args = args
@@ -211,76 +219,50 @@ impl LaunchInstance {
     }
 }
 
-#[derive(Default, Debug)]
-pub struct LaunchInstanceBuilder<S, C, M> {
+#[derive(Default)]
+pub struct LaunchInstanceBuilder<'a, S> {
     settings: S,
-    calsspath: C,
-    main_class: M,
+    profile: Option<&'a dyn Profile>,
 }
 
-impl LaunchInstanceBuilder<Undefined, Undefined, Undefined> {
+impl LaunchInstanceBuilder<'_, Undefined> {
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl<C, M> LaunchInstanceBuilder<Undefined, C, M> {
-    pub fn settings(self, settings: LaunchSettings) -> LaunchInstanceBuilder<LaunchSettings, C, M> {
+impl<'a> LaunchInstanceBuilder<'a, Undefined> {
+    pub fn settings(self, settings: LaunchSettings) -> LaunchInstanceBuilder<'a, LaunchSettings> {
         LaunchInstanceBuilder {
             settings,
-            calsspath: self.calsspath,
-            main_class: self.main_class,
+            profile: self.profile,
         }
     }
 }
 
-impl<S, M> LaunchInstanceBuilder<S, Undefined, M> {
-    pub fn classpath(
-        self,
-        classpath: impl FnOnce(PathBuf, PathBuf, Vec<ManifestLibrary>) -> anyhow::Result<String>
-            + 'static,
-    ) -> LaunchInstanceBuilder<S, InstanceClasspath, M> {
+impl<'a, S> LaunchInstanceBuilder<'a, S> {
+    pub fn profile<P: Profile>(self, profile: &'a P) -> LaunchInstanceBuilder<'a, S> {
         LaunchInstanceBuilder {
             settings: self.settings,
-            calsspath: Box::new(classpath),
-            main_class: self.main_class,
+            profile: Some(profile),
         }
     }
 }
 
-impl<S, C> LaunchInstanceBuilder<S, C, Undefined> {
-    pub fn main_class(
-        self,
-        main_class: Option<String>,
-    ) -> LaunchInstanceBuilder<S, C, Option<String>> {
-        LaunchInstanceBuilder {
-            settings: self.settings,
-            calsspath: self.calsspath,
-            main_class,
-        }
-    }
-}
-
-impl LaunchInstanceBuilder<LaunchSettings, InstanceClasspath, Option<String>> {
-    pub fn build(self) -> LaunchInstance {
+impl<'a> LaunchInstanceBuilder<'a, LaunchSettings> {
+    pub fn build(self) -> LaunchInstance<'a> {
         LaunchInstance {
             settings: self.settings,
-            calsspath: self.calsspath,
-            main_class: self.main_class,
+            profile: self.profile,
         }
     }
 }
+
+// TODO: add nickname validation
 
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
-
-    use crate::{
-        loaders::maven::MavenData,
-        repository::{fabric_profile::FabricProfile, library::SimpleLib},
-    };
-
-    use super::classpath::classpath;
+    use crate::{instance::profile::read, repository::fabric_profile::FabricProfile};
 
     use super::*;
 
@@ -313,52 +295,15 @@ mod tests {
             .version_jar_file(mc_dir.join("instances").join("1.18.2").join("1.18.2.jar"))
             .version_type("release".to_string())
             .build();
-        // let settings = LaunchSettings {
-        //     assets: mc_dir.join("assets"),
-        //     access_token: None,
-        //     username: "ItWorks".to_string(),
-        //     uuid: None,
-        //     game_dir: mc_dir.clone(),
-        //     java_bin: "./java/jdk-17.0.8/bin/java.exe".into(),
-        //     libraries_dir: mc_dir.clone().join("libraries"),
-        //     manifest_file: mc_dir
-        //         .clone()
-        //         .join("instances")
-        //         .join("1.18.2")
-        //         .join("1.18.2.json"),
-        //     natives_dir: mc_dir
-        //         .clone()
-        //         .join("instances")
-        //         .join("1.18.2")
-        //         .join("natives"),
-        //     version: "1.18.2".to_string(),
-        //     version_type: "release".to_string(),
-        //     version_jar_file: mc_dir.join("instances").join("1.18.2").join("1.18.2.jar"),
-        // };
 
-        // assert_eq!(settings_one, settings);
-
-        let fabric_libs: FabricProfile = async {
-            let content = tokio::fs::read_to_string(
-                "./minecraft/instances/1.18.2/fabric-loader-0.14.23-1.18.2.json",
-            )
-            .await
-            .unwrap();
-
-            serde_json::from_str(&content).unwrap()
-        }
-        .await;
-        let libs = fabric_libs
-            .libraries
-            .iter()
-            .map(|lib| MavenData::new(lib.name.as_str()))
-            .map(SimpleLib::from)
-            .collect_vec();
+        let fabric =
+            read::<FabricProfile>("./minecraft/instances/1.18.2/fabric-loader-0.14.23-1.18.2.json")
+                .await
+                .unwrap();
 
         let builder = LaunchInstanceBuilder::new()
             .settings(settings)
-            .classpath(move |v, d, l| classpath(v, d, l, Some(libs)))
-            .main_class(Some(fabric_libs.main_class))
+            .profile(&fabric)
             .build();
 
         builder.launch().await.unwrap();

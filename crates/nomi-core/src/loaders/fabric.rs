@@ -15,9 +15,8 @@ use super::{maven::MavenData, vanilla::Vanilla};
 
 #[derive(Debug)]
 pub struct Fabric {
-    game_version: String,
-    versions: FabricVersions,
-    profile: FabricProfile,
+    pub game_version: String,
+    pub profile: FabricProfile,
 }
 
 impl Fabric {
@@ -69,10 +68,18 @@ impl Fabric {
             .await?;
 
         Ok(Self {
-            versions,
             profile,
             game_version,
         })
+    }
+}
+
+impl From<FabricProfile> for Fabric {
+    fn from(value: FabricProfile) -> Self {
+        Self {
+            game_version: value.inherits_from.clone(),
+            profile: value,
+        }
     }
 }
 

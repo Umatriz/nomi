@@ -1,6 +1,5 @@
 use serde::de::DeserializeOwned;
 
-pub mod markers;
 pub mod state;
 
 pub async fn get<T: DeserializeOwned>(url: impl Into<String>) -> anyhow::Result<T> {
