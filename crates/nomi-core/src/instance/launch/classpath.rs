@@ -2,7 +2,7 @@ use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 
 use super::{rules::is_all_rules_satisfied, CLASSPATH_SEPARATOR};
-use crate::repository::{library::SimpleLib, manifest::ManifestLibrary};
+use crate::repository::{manifest::ManifestLibrary, simple_lib::SimpleLib};
 
 pub fn should_use_library(lib: &ManifestLibrary) -> Result<bool> {
     match lib.rules.as_ref() {
