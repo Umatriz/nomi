@@ -5,7 +5,10 @@ use const_typed_builder::Builder;
 use thiserror::Error;
 use tokio::process::Command;
 
-use crate::repository::manifest::{read_manifest_from_file, JvmArgument};
+use crate::repository::{
+    manifest::{read_manifest_from_file, JvmArgument},
+    username::Username,
+};
 use rules::is_all_rules_satisfied;
 
 use self::classpath::classpath;
@@ -36,7 +39,7 @@ pub enum LaunchError {
 #[derive(Default, Builder, PartialEq, Debug)]
 pub struct LaunchSettings {
     pub access_token: Option<String>,
-    pub username: String,
+    pub username: Username,
     pub uuid: Option<String>,
 
     pub assets: PathBuf,
@@ -179,7 +182,7 @@ impl LaunchInstance<'_> {
                             .unwrap_or("null".to_string())
                             .as_str(),
                     )
-                    .replace("${auth_player_name}", self.settings.username.as_str())
+                    .replace("${auth_player_name}", self.settings.username.get())
                     .replace(
                         "${auth_uuid}",
                         self.settings
@@ -289,7 +292,7 @@ mod tests {
                     .join("1.18.2")
                     .join("natives"),
             )
-            .username("ItWorks".to_string())
+            .username(Username::new("ItWorks").unwrap())
             .uuid(None)
             .version("1.18.2".to_string())
             .version_jar_file(mc_dir.join("instances").join("1.18.2").join("1.18.2.jar"))

@@ -1,4 +1,7 @@
-use nomi_core::instance::{launch::LaunchSettingsBuilder, InstanceBuilder};
+use nomi_core::{
+    instance::{launch::LaunchSettingsBuilder, InstanceBuilder},
+    repository::username::Username,
+};
 
 #[tokio::test]
 async fn vanilla_test() {
@@ -52,7 +55,7 @@ async fn vanilla_test() {
                 .join("1.20")
                 .join("natives"),
         )
-        .username("ItWorks".to_string())
+        .username(Username::new("ItWorks").unwrap())
         .uuid(None)
         .version("1.20".to_string())
         .version_jar_file(mc_dir.join("instances").join("1.20").join("1.20.jar"))
