@@ -23,28 +23,6 @@ Start project:
 cargo run
 ```
 
-### TODO
-
-- [x] Java downloading
-- [ ] Profiles features
-- [ ] Mod loaders support
-  * [ ] Quilt
-    + [ ] Downloads
-    + [ ] Launch
-  * [ ] Fabric
-    + [ ] Downloads
-    + [ ] Launch
-  * [ ] Forge
-    + [ ] Downloads
-    + [ ] Launch
-- [ ] Mods download features
-  * [ ] Mods config
-    + [ ] Short code to share modpacks
-- [ ] Update UI
-- [x] `config` mod update
-- [x] `downloads` mod update
-- [x] Migrate from `fern` to `tracing`
-
 ### FAQ
 
 NOT AN OFFICIAL MINECRAFT [PRODUCT/SERVICE/EVENT/etc.]. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT
