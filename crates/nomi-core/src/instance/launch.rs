@@ -261,8 +261,6 @@ impl<'a> LaunchInstanceBuilder<'a, LaunchSettings> {
     }
 }
 
-// TODO: add nickname validation
-
 #[cfg(test)]
 mod tests {
     use crate::{instance::profile::read, repository::fabric_profile::FabricProfile};

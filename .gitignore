@@ -4,6 +4,8 @@ target/
 
 minecraft/
 
+*.log
+
 logs/
 log/
 nomi_logs/
@@ -18,3 +20,5 @@ java
 temp/
 
 dead-crates/
+
+logo.txt
