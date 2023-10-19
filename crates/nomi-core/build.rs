@@ -1,5 +1,7 @@
 use std::io::Write;
 
+use dotenv::dotenv;
+
 fn main() {
     let mut file = std::fs::File::create("./build.log").unwrap();
     let binding = std::env::current_dir().unwrap();
