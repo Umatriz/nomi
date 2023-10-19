@@ -1,0 +1,2 @@
+[move_folders]
+"./crates/nomi-core/.nomi" = "./.nomi"
