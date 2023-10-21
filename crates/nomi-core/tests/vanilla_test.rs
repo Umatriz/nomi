@@ -1,6 +1,6 @@
 use nomi_core::{
     instance::{launch::LaunchSettingsBuilder, InstanceBuilder},
-    repository::username::Username,
+    repository::{java_runner::JavaRunner, username::Username},
 };
 
 #[tokio::test]
@@ -12,7 +12,6 @@ async fn vanilla_test() {
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let builder = InstanceBuilder::new()
-        .game("./minecraft")
         .libraries("./minecraft/libraries")
         .version("1.20")
         .version_path("./minecraft/instances/1.20")
@@ -31,15 +30,15 @@ async fn vanilla_test() {
         .await
         .unwrap();
 
-    assets.download().await.unwrap();
-    builder.download().await.unwrap();
+    // assets.download().await.unwrap();
+    // builder.download().await.unwrap();
 
     let mc_dir = std::env::current_dir().unwrap().join("minecraft");
     let settings = LaunchSettingsBuilder::new()
         .access_token(None)
         .assets(mc_dir.join("assets"))
         .game_dir(mc_dir.clone())
-        .java_bin("./java/jdk-17.0.8/bin/java.exe".into())
+        .java_bin(JavaRunner::Path("./java/jdk-17.0.8/bin/java.exe".into()))
         .libraries_dir(mc_dir.clone().join("libraries"))
         .manifest_file(
             mc_dir

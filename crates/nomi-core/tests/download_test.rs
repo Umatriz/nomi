@@ -11,7 +11,6 @@ async fn download_test() {
 
     let instance = InstanceBuilder::new()
         .version("1.18.2")
-        .game("./minecraft")
         .libraries("./minecraft/libraries")
         .version_path("./minecraft/versions/1.18.2")
         .vanilla("1.18.2")

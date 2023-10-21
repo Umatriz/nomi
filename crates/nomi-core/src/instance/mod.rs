@@ -20,7 +20,6 @@ pub struct Undefined;
 pub struct Instance {
     inner: Inner,
     version: String,
-    game: PathBuf,
     libraries: PathBuf,
     version_path: PathBuf,
 }
@@ -184,38 +183,35 @@ impl<O, I, U> AssetsInstanceBuilder<O, I, U, Undefined> {
 }
 
 #[derive(Debug, Default)]
-pub struct InstanceBuilder<I, N, G, L, V> {
+pub struct InstanceBuilder<I, N, L, V> {
     inner: I,
     version: N,
-    game: G,
     libraries: L,
     version_path: V,
 }
 
-impl InstanceBuilder<Undefined, Undefined, Undefined, Undefined, Undefined> {
+impl InstanceBuilder<Undefined, Undefined, Undefined, Undefined> {
     pub fn new() -> Self {
         InstanceBuilder::default()
     }
 }
 
-impl InstanceBuilder<Inner, String, PathBuf, PathBuf, PathBuf> {
+impl InstanceBuilder<Inner, String, PathBuf, PathBuf> {
     pub fn build(self) -> Instance {
         Instance {
             inner: self.inner,
             version: self.version,
-            game: self.game,
             libraries: self.libraries,
             version_path: self.version_path,
         }
     }
 }
 
-impl<G, N, L, V> InstanceBuilder<Undefined, N, G, L, V> {
-    pub fn instance(self, inner: Inner) -> InstanceBuilder<Inner, N, G, L, V> {
+impl<N, L, V> InstanceBuilder<Undefined, N, L, V> {
+    pub fn instance(self, inner: Inner) -> InstanceBuilder<Inner, N, L, V> {
         InstanceBuilder {
             inner,
             version: self.version,
-            game: self.game,
             libraries: self.libraries,
             version_path: self.version_path,
         }
@@ -224,12 +220,11 @@ impl<G, N, L, V> InstanceBuilder<Undefined, N, G, L, V> {
     pub async fn vanilla(
         self,
         version_id: impl Into<String>,
-    ) -> anyhow::Result<InstanceBuilder<Inner, N, G, L, V>> {
+    ) -> anyhow::Result<InstanceBuilder<Inner, N, L, V>> {
         let inner = Inner::vanilla(version_id).await?;
         Ok(InstanceBuilder {
             inner,
             version: self.version,
-            game: self.game,
             libraries: self.libraries,
             version_path: self.version_path,
         })
@@ -239,63 +234,44 @@ impl<G, N, L, V> InstanceBuilder<Undefined, N, G, L, V> {
         self,
         game_version: impl Into<String>,
         loader_version: Option<impl Into<String>>,
-    ) -> anyhow::Result<InstanceBuilder<Inner, N, G, L, V>> {
+    ) -> anyhow::Result<InstanceBuilder<Inner, N, L, V>> {
         let inner = Inner::fabric(game_version, loader_version).await?;
         Ok(InstanceBuilder {
             inner,
             version: self.version,
-            game: self.game,
             libraries: self.libraries,
             version_path: self.version_path,
         })
     }
 }
 
-impl<I, N, L, V> InstanceBuilder<I, N, Undefined, L, V> {
-    pub fn game(self, game: impl AsRef<Path>) -> InstanceBuilder<I, N, PathBuf, L, V> {
+impl<I, N, V> InstanceBuilder<I, N, Undefined, V> {
+    pub fn libraries(self, libraries: impl AsRef<Path>) -> InstanceBuilder<I, N, PathBuf, V> {
         InstanceBuilder {
             inner: self.inner,
             version: self.version,
-            game: game.as_ref().to_path_buf(),
-            libraries: self.libraries,
-            version_path: self.version_path,
-        }
-    }
-}
-
-impl<I, N, G, V> InstanceBuilder<I, N, G, Undefined, V> {
-    pub fn libraries(self, libraries: impl AsRef<Path>) -> InstanceBuilder<I, N, G, PathBuf, V> {
-        InstanceBuilder {
-            inner: self.inner,
-            version: self.version,
-            game: self.game,
             libraries: libraries.as_ref().to_path_buf(),
             version_path: self.version_path,
         }
     }
 }
 
-impl<I, N, G, L> InstanceBuilder<I, N, G, L, Undefined> {
-    pub fn version_path(
-        self,
-        version_path: impl AsRef<Path>,
-    ) -> InstanceBuilder<I, N, G, L, PathBuf> {
+impl<I, N, L> InstanceBuilder<I, N, L, Undefined> {
+    pub fn version_path(self, version_path: impl AsRef<Path>) -> InstanceBuilder<I, N, L, PathBuf> {
         InstanceBuilder {
             inner: self.inner,
             version: self.version,
-            game: self.game,
             libraries: self.libraries,
             version_path: version_path.as_ref().to_path_buf(),
         }
     }
 }
 
-impl<I, G, L, V> InstanceBuilder<I, Undefined, G, L, V> {
-    pub fn version(self, version: impl Into<String>) -> InstanceBuilder<I, String, G, L, V> {
+impl<I, L, V> InstanceBuilder<I, Undefined, L, V> {
+    pub fn version(self, version: impl Into<String>) -> InstanceBuilder<I, String, L, V> {
         InstanceBuilder {
             inner: self.inner,
             version: version.into(),
-            game: self.game,
             libraries: self.libraries,
             version_path: self.version_path,
         }
@@ -310,7 +286,6 @@ mod tests {
     async fn build_test() {
         let _builder = InstanceBuilder::new()
             .version("1.18.2")
-            .game("./minecraft")
             .libraries("./minecraft/libraries")
             .version_path("./minecraft/instances/1.18.2")
             .vanilla("1.18.2")
@@ -323,7 +298,6 @@ mod tests {
     async fn assets_test() {
         let builder = InstanceBuilder::new()
             .version("1.18.2")
-            .game("./minecraft")
             .libraries("./minecraft/libraries")
             .version_path("./minecraft/instances/1.18.2")
             .vanilla("1.18.2")
@@ -355,7 +329,6 @@ mod tests {
 
         let builder = InstanceBuilder::new()
             .version("1.18.2")
-            .game("./minecraft")
             .libraries("./minecraft/libraries")
             .version_path("./minecraft/instances/1.18.2")
             .fabric("1.18.2", None::<String>)

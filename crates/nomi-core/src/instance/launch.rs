@@ -6,6 +6,7 @@ use thiserror::Error;
 use tokio::process::Command;
 
 use crate::repository::{
+    java_runner::JavaRunner,
     manifest::{read_manifest_from_file, JvmArgument},
     username::Username,
 };
@@ -44,7 +45,7 @@ pub struct LaunchSettings {
 
     pub assets: PathBuf,
     pub game_dir: PathBuf,
-    pub java_bin: PathBuf,
+    pub java_bin: JavaRunner<'static>,
     pub libraries_dir: PathBuf,
     pub manifest_file: PathBuf,
     pub natives_dir: PathBuf,
@@ -87,8 +88,10 @@ impl LaunchInstance<'_> {
             return Err(LaunchError::GameDirNotExist.into());
         }
 
-        if !java_bin.is_file() {
-            return Err(LaunchError::JavaBinNotExist.into());
+        if let JavaRunner::Path(p) = java_bin {
+            if !p.is_file() {
+                return Err(LaunchError::JavaBinNotExist.into());
+            }
         }
 
         if !json_file.is_file() {
@@ -274,7 +277,7 @@ mod tests {
             .access_token(None)
             .assets(mc_dir.join("assets"))
             .game_dir(mc_dir.clone())
-            .java_bin("./java/jdk-17.0.8/bin/java.exe".into())
+            .java_bin(JavaRunner::Path("./java/jdk-17.0.8/bin/java.exe".into()))
             .libraries_dir(mc_dir.clone().join("libraries"))
             .manifest_file(
                 mc_dir

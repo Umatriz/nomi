@@ -23,7 +23,6 @@ pub fn App(cx: Scope) -> Element {
                     let fut = async move {
                         let instance = InstanceBuilder::new()
                             .version(&v)
-                            .game("./minecraft")
                             .libraries("./minecraft/libraries")
                             .version_path(PathBuf::from("./minecraft/versions").join(&v))
                             .vanilla(&v)

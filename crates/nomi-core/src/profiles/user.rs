@@ -2,12 +2,14 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+use crate::repository::username::Username;
+
 use super::version::VersionProfile;
 
 /// `Settings` its a global settings of the launcher
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Settings {
-    pub usernames: String,
+    pub username: Username,
     pub access_token: Option<String>,
     pub java_bin: Option<PathBuf>,
     pub uuid: Option<String>,
@@ -33,14 +35,47 @@ impl Settings {
 
 #[cfg(test)]
 mod tests {
-    use crate::profiles::{read_config, version::VersionProfileBuilder, write_config};
+    use std::path::Path;
+
+    use crate::{
+        profiles::{read_config, version::VersionProfileBuilder, write_config},
+        repository::java_runner::JavaRunner,
+    };
 
     use super::*;
 
     #[tokio::test]
+    async fn launch_test() {
+        let data: Settings = read_config("./configs/Settings.toml").await.unwrap();
+
+        let f = data.profiles.into_iter().find(|x| x.id == 1).unwrap();
+        dbg!(&f);
+        let l = f.into_launch(
+            data.username,
+            data.java_bin
+                .map(JavaRunner::Path)
+                .unwrap_or(JavaRunner::STR),
+            data.access_token,
+            data.uuid,
+        );
+        l.launch().await.unwrap();
+    }
+
+    #[test]
+    fn path_test() {
+        let p1 = Path::new("E:/programming/code/nomi/crates/nomi-core");
+        dbg!(&p1);
+        let p2 = Path::new("minecraft");
+        dbg!(&p2);
+
+        let p3 = p1.join(p2);
+        dbg!(p3);
+    }
+
+    #[tokio::test]
     async fn write_test() {
         let mut mock = Settings {
-            usernames: "test".to_owned(),
+            username: Username::new("test").unwrap(),
             profiles: vec![],
             access_token: Some("access_token".into()),
             java_bin: Some("./java/bin/java.exe".into()),

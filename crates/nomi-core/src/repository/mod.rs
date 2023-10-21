@@ -1,6 +1,7 @@
 pub mod launcher_manifest;
 pub mod manifest;
 
+pub mod java_runner;
 pub mod simple_args;
 pub mod simple_lib;
 
