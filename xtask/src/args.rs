@@ -10,7 +10,7 @@ use crate::{config::Config, DynError};
 pub struct Xtask {
     /// Path to `Xtask.toml`
     #[arg(short, long, value_name = "FILE")]
-    pub config: PathBuf,
+    pub config: Option<PathBuf>,
 
     #[command(subcommand)]
     pub command: Commands,
@@ -50,8 +50,15 @@ impl Xtask {
         std::fs::copy(target, &build_dir.join("client.exe"))?;
 
         if move_files {
-            let config = Config::read(&self.config)?;
-            for (origin, new) in config.move_folders.iter() {
+            let path = Path::new("./Xtask.toml").to_path_buf();
+            let config = Config::read(match self.config.as_ref() {
+                Some(c) => c,
+                None => &path,
+            })?;
+            let Some(folders) = config.move_folders else {
+                return Err("You must specify `move_folders` field in `Xtask.toml`".into());
+            };
+            for (origin, new) in folders.iter() {
                 match origin.is_file() || new.is_file() {
                     true => {
                         std::fs::copy(origin, &build_dir.join(new))?;
