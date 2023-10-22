@@ -1,6 +1,6 @@
 use std::{future::Future, marker::PhantomData};
 
-use tokio::sync::{Mutex, OnceCell};
+use tokio::sync::OnceCell;
 
 pub type LazyFutureAlias<T> = std::pin::Pin<std::boxed::Box<dyn Future<Output = T>>>;
 
