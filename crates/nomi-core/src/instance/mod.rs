@@ -7,7 +7,7 @@ pub mod profile;
 use crate::{
     downloads::assets::AssetsDownload,
     loaders::{fabric::Fabric, vanilla::Vanilla},
-    utils::state::LAUNCHER_MANIFEST_STATE,
+    utils::state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
     version::download::DownloadVersion,
 };
 
@@ -69,7 +69,9 @@ impl Instance {
     ) -> anyhow::Result<AssetsInstanceBuilder<Undefined, Undefined, String, String>> {
         let version = version.into();
 
-        let manifest = LAUNCHER_MANIFEST_STATE.get_or_try_init().await?;
+        let manifest = LAUNCHER_MANIFEST_STATE
+            .get_or_try_init(launcher_manifest_state_try_init)
+            .await?;
         let version_manifest = manifest.get_version_manifest(&version).await?;
 
         Ok(AssetsInstanceBuilder::new(version)
