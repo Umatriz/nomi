@@ -4,7 +4,10 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    instance::launch::{LaunchInstance, LaunchInstanceBuilder, LaunchSettingsBuilder},
+    instance::{
+        launch::{LaunchInstance, LaunchInstanceBuilder, LaunchSettingsBuilder},
+        profile::{self, read, Profile},
+    },
     repository::{java_runner::JavaRunner, username::Username},
 };
 
@@ -69,7 +72,16 @@ impl VersionProfile {
             .java_bin(java_bin)
             .uuid(uuid)
             .build();
-        LaunchInstanceBuilder::new().settings(settings).build()
+
+        let builder = LaunchInstanceBuilder::new().settings(settings);
+
+        // Ok(match self.profile_file {
+        //     Some(path) => {
+        //         let profile = read(path).await?;
+        //     }
+        //     None => builder.build(),
+        // })
+        builder.build()
     }
 }
 

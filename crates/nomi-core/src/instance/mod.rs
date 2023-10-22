@@ -1,3 +1,4 @@
+use const_typed_builder::Builder;
 use std::path::{Path, PathBuf};
 use tracing::info;
 
@@ -5,6 +6,7 @@ pub mod launch;
 pub mod profile;
 
 use crate::{
+    configs::profile::{VersionProfile, VersionProfileBuilder, VersionProfilesConfig},
     downloads::assets::AssetsDownload,
     loaders::{fabric::Fabric, vanilla::Vanilla},
     utils::state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
@@ -16,12 +18,15 @@ use self::launch::{LaunchInstance, LaunchInstanceBuilder, LaunchSettings};
 #[derive(Default, Debug)]
 pub struct Undefined;
 
-#[derive(Debug)]
+#[derive(Debug, Builder)]
 pub struct Instance {
-    inner: Inner,
-    version: String,
-    libraries: PathBuf,
-    version_path: PathBuf,
+    instance: Inner,
+    pub version: String,
+    pub libraries: PathBuf,
+    pub version_path: PathBuf,
+    pub assets: PathBuf,
+    pub game: PathBuf,
+    pub name: String,
 }
 
 #[derive(Debug)]
@@ -47,7 +52,7 @@ impl Inner {
 
 impl Instance {
     pub async fn download(&self) -> anyhow::Result<()> {
-        match &self.inner {
+        match &self.instance {
             Inner::Vanilla(inner) => {
                 inner.download(&self.version_path, &self.version).await?;
                 inner.download_libraries(&self.libraries).await?;
@@ -63,27 +68,56 @@ impl Instance {
         Ok(())
     }
 
-    pub async fn assets(
-        &self,
-        version: impl Into<String>,
-    ) -> anyhow::Result<AssetsInstanceBuilder<Undefined, Undefined, String, String>> {
-        let version = version.into();
-
+    pub async fn assets(&self) -> anyhow::Result<AssetsInstance> {
         let manifest = LAUNCHER_MANIFEST_STATE
             .get_or_try_init(launcher_manifest_state_try_init)
             .await?;
-        let version_manifest = manifest.get_version_manifest(&version).await?;
+        let version_manifest = manifest.get_version_manifest(&self.version).await?;
 
-        Ok(AssetsInstanceBuilder::new(version)
+        AssetsInstanceBuilder::new(&self.version)
             .id(version_manifest.asset_index.id)
-            .url(version_manifest.asset_index.url))
+            .url(version_manifest.asset_index.url)
+            .indexes(self.assets.join("indexes"))
+            .objects(self.assets.join("objects"))
+            .build()
+            .await
     }
 
     pub fn launch_instance(&self, settings: LaunchSettings) -> LaunchInstance {
         let builder = LaunchInstanceBuilder::new().settings(settings);
-        match &self.inner {
+        match &self.instance {
             Inner::Vanilla(_) => builder.build(),
             Inner::Fabric(inner) => builder.profile(&inner.profile).build(),
+        }
+    }
+
+    pub fn into_profile(
+        &self,
+        profiles: &VersionProfilesConfig,
+        version_type: String,
+        is_downloaded: bool,
+    ) -> VersionProfile {
+        let builder = VersionProfileBuilder::new()
+            .id(profiles.create_id())
+            .name(self.name.clone())
+            .assets(self.assets.clone())
+            .game_dir(self.game.clone())
+            .is_downloaded(is_downloaded)
+            .libraries_dir(self.libraries.clone())
+            .manifest_file(self.version_path.join(format!("{}.json", self.version)))
+            .natives_dir(self.version_path.join("natives"))
+            .version(self.version.clone())
+            .version_jar_file(self.version_path.join(format!("{}.jar", self.version)))
+            .version_type(version_type);
+
+        match &self.instance {
+            Inner::Fabric(fabric) => builder
+                .profile_file(Some(
+                    self.version_path
+                        .join(format!("{}.json", fabric.profile.id)),
+                ))
+                .build(),
+            Inner::Vanilla(_) => builder.build(),
         }
     }
 }
@@ -184,102 +218,6 @@ impl<O, I, U> AssetsInstanceBuilder<O, I, U, Undefined> {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct InstanceBuilder<I, N, L, V> {
-    inner: I,
-    version: N,
-    libraries: L,
-    version_path: V,
-}
-
-impl InstanceBuilder<Undefined, Undefined, Undefined, Undefined> {
-    pub fn new() -> Self {
-        InstanceBuilder::default()
-    }
-}
-
-impl InstanceBuilder<Inner, String, PathBuf, PathBuf> {
-    pub fn build(self) -> Instance {
-        Instance {
-            inner: self.inner,
-            version: self.version,
-            libraries: self.libraries,
-            version_path: self.version_path,
-        }
-    }
-}
-
-impl<N, L, V> InstanceBuilder<Undefined, N, L, V> {
-    pub fn instance(self, inner: Inner) -> InstanceBuilder<Inner, N, L, V> {
-        InstanceBuilder {
-            inner,
-            version: self.version,
-            libraries: self.libraries,
-            version_path: self.version_path,
-        }
-    }
-
-    pub async fn vanilla(
-        self,
-        version_id: impl Into<String>,
-    ) -> anyhow::Result<InstanceBuilder<Inner, N, L, V>> {
-        let inner = Inner::vanilla(version_id).await?;
-        Ok(InstanceBuilder {
-            inner,
-            version: self.version,
-            libraries: self.libraries,
-            version_path: self.version_path,
-        })
-    }
-
-    pub async fn fabric(
-        self,
-        game_version: impl Into<String>,
-        loader_version: Option<impl Into<String>>,
-    ) -> anyhow::Result<InstanceBuilder<Inner, N, L, V>> {
-        let inner = Inner::fabric(game_version, loader_version).await?;
-        Ok(InstanceBuilder {
-            inner,
-            version: self.version,
-            libraries: self.libraries,
-            version_path: self.version_path,
-        })
-    }
-}
-
-impl<I, N, V> InstanceBuilder<I, N, Undefined, V> {
-    pub fn libraries(self, libraries: impl AsRef<Path>) -> InstanceBuilder<I, N, PathBuf, V> {
-        InstanceBuilder {
-            inner: self.inner,
-            version: self.version,
-            libraries: libraries.as_ref().to_path_buf(),
-            version_path: self.version_path,
-        }
-    }
-}
-
-impl<I, N, L> InstanceBuilder<I, N, L, Undefined> {
-    pub fn version_path(self, version_path: impl AsRef<Path>) -> InstanceBuilder<I, N, L, PathBuf> {
-        InstanceBuilder {
-            inner: self.inner,
-            version: self.version,
-            libraries: self.libraries,
-            version_path: version_path.as_ref().to_path_buf(),
-        }
-    }
-}
-
-impl<I, L, V> InstanceBuilder<I, Undefined, L, V> {
-    pub fn version(self, version: impl Into<String>) -> InstanceBuilder<I, String, L, V> {
-        InstanceBuilder {
-            inner: self.inner,
-            version: version.into(),
-            libraries: self.libraries,
-            version_path: self.version_path,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -287,38 +225,29 @@ mod tests {
     #[tokio::test]
     async fn build_test() {
         let _builder = InstanceBuilder::new()
-            .version("1.18.2")
-            .libraries("./minecraft/libraries")
-            .version_path("./minecraft/instances/1.18.2")
-            .vanilla("1.18.2")
-            .await
-            .unwrap()
+            .version("1.18.2".into())
+            .libraries("./minecraft/libraries".into())
+            .version_path("./minecraft/instances/1.18.2".into())
+            .instance(Inner::vanilla("1.18.2").await.unwrap())
+            .assets("./minecraft/assets".into())
+            .game("./minecraft".into())
+            .name("1.18.2-minecraft".into())
             .build();
     }
 
     #[tokio::test]
     async fn assets_test() {
         let builder = InstanceBuilder::new()
-            .version("1.18.2")
-            .libraries("./minecraft/libraries")
-            .version_path("./minecraft/instances/1.18.2")
-            .vanilla("1.18.2")
-            .await
-            .unwrap()
+            .version("1.18.2".into())
+            .libraries("./minecraft/libraries".into())
+            .version_path("./minecraft/instances/1.18.2".into())
+            .instance(Inner::vanilla("1.18.2").await.unwrap())
+            .assets("./minecraft/assets".into())
+            .game("./minecraft".into())
+            .name("1.18.2-minecraft".into())
             .build();
 
-        builder
-            .assets("1.18.2")
-            .await
-            .unwrap()
-            .indexes("./minecraft/assets/indexes")
-            .objects("./minecraft/assets/objects")
-            .build()
-            .await
-            .unwrap()
-            .download()
-            .await
-            .unwrap();
+        builder.assets().await.unwrap().download().await.unwrap();
     }
 
     #[tokio::test]
@@ -330,26 +259,16 @@ mod tests {
         tracing::subscriber::set_global_default(subscriber).unwrap();
 
         let builder = InstanceBuilder::new()
-            .version("1.18.2")
-            .libraries("./minecraft/libraries")
-            .version_path("./minecraft/instances/1.18.2")
-            .fabric("1.18.2", None::<String>)
-            .await
-            .unwrap()
+            .version("1.18.2".into())
+            .libraries("./minecraft/libraries".into())
+            .version_path("./minecraft/instances/1.18.2".into())
+            .instance(Inner::fabric("1.18.2", None::<String>).await.unwrap())
+            .assets("./minecraft/assets".into())
+            .game("./minecraft".into())
+            .name("1.18.2-minecraft".into())
             .build();
 
-        // builder
-        //     .assets("1.18.2")
-        //     .await
-        //     .unwrap()
-        //     .indexes("./minecraft/assets/indexes")
-        //     .objects("./minecraft/assets/objects")
-        //     .build()
-        //     .await
-        //     .unwrap()
-        //     .download()
-        //     .await
-        //     .unwrap();
+        // builder.assets().await.unwrap().download().await.unwrap();
 
         builder.download().await.unwrap();
     }

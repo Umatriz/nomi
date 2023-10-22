@@ -1,4 +1,4 @@
-use nomi_core::instance::InstanceBuilder;
+use nomi_core::instance::{Inner, InstanceBuilder};
 use tracing::Level;
 
 #[tokio::test]
@@ -10,23 +10,16 @@ async fn download_test() {
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let instance = InstanceBuilder::new()
-        .version("1.18.2")
-        .libraries("./minecraft/libraries")
-        .version_path("./minecraft/versions/1.18.2")
-        .vanilla("1.18.2")
-        .await
-        .unwrap()
+        .version("1.18.2".into())
+        .libraries("./minecraft/libraries".into())
+        .version_path("./minecraft/versions/1.18.2".into())
+        .instance(Inner::vanilla("1.18.2").await.unwrap())
+        .assets("./minecraft/assets".into())
+        .game("./minecraft".into())
+        .name("1.18.2-test".into())
         .build();
 
-    instance
-        .assets("1.18.2")
-        .await
-        .unwrap()
-        .indexes("./minecraft/assets/indexes")
-        .objects("./minecraft/assets/objects")
-        .build()
-        .await
-        .unwrap();
+    instance.assets().await.unwrap().download().await.unwrap();
 
     instance.download().await.unwrap();
 }

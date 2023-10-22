@@ -6,7 +6,6 @@
 [workspace]
 members = [
     "crates/nomi-core",
-    "crates/client/src-tauri",
     "xtask"
     ]
 resolver = "2"
