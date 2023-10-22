@@ -4,10 +4,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    instance::{
-        launch::{LaunchInstance, LaunchInstanceBuilder, LaunchSettingsBuilder},
-        profile::{self, read, Profile},
-    },
+    instance::launch::{LaunchInstance, LaunchInstanceBuilder, LaunchSettingsBuilder},
     repository::{java_runner::JavaRunner, username::Username},
 };
 

@@ -1,7 +1,6 @@
 pub mod assets;
 #[cfg(target_os = "windows")]
 pub mod jvm_dowload;
-pub mod utils;
 
 use std::path::Path;
 
@@ -9,8 +8,6 @@ use futures_util::stream::StreamExt;
 use reqwest::Client;
 use tokio::io::AsyncWriteExt;
 use tracing::{debug, error};
-
-pub const LAUNCHER_MANIFEST: &str = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
 
 pub(crate) async fn download_file<P: AsRef<Path>>(
     path: P,

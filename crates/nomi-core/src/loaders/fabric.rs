@@ -6,8 +6,9 @@ use tokio::{io::AsyncWriteExt, task::JoinSet};
 use tracing::info;
 
 use crate::{
-    downloads::{download_file, utils::get_launcher_manifest},
+    downloads::download_file,
     repository::{fabric_meta::FabricVersions, fabric_profile::FabricProfile},
+    utils::get_launcher_manifest,
     version::download::DownloadVersion,
 };
 

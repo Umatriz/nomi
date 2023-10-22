@@ -7,12 +7,13 @@ use crate::{
         profile::VersionProfilesConfig, read_config, user::Settings, variables::Variables,
         write_config,
     },
-    downloads::utils::get_launcher_manifest,
     repository::{
         launcher_manifest::{LauncherManifest, LauncherManifestVersion},
         manifest::Manifest,
     },
 };
+
+use super::get_launcher_manifest;
 
 pub static VARIABLES_STATE: OnceCell<Variables> = OnceCell::const_new();
 
