@@ -1,23 +1,19 @@
+use const_typed_builder::Builder;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::repository::username::Username;
+use crate::{
+    instance::launch::{LaunchInstance, LaunchInstanceBuilder, LaunchSettingsBuilder},
+    repository::{java_runner::JavaRunner, username::Username},
+};
 
-use super::version::VersionProfile;
-
-/// `Settings` its a global settings of the launcher
 #[derive(Serialize, Deserialize, Debug, Default)]
-pub struct Settings {
-    pub username: Username,
-    pub access_token: Option<String>,
-    pub java_bin: Option<PathBuf>,
-    pub uuid: Option<String>,
+pub struct VersionProfilesConfig {
     pub profiles: Vec<VersionProfile>,
 }
 
-impl Settings {
-    /// Expects a mutable reference to `Self`
+impl VersionProfilesConfig {
     /// creates new `VersionProfile` and pushes it to the `profiles` field
     pub fn add_profile(&mut self, profile: VersionProfile) {
         self.profiles.push(profile)
@@ -33,56 +29,62 @@ impl Settings {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Default, Builder)]
+pub struct VersionProfile {
+    pub id: i32,
+    pub is_downloaded: bool,
+    pub name: String,
+
+    pub version: String,
+    pub version_type: String,
+    pub version_jar_file: PathBuf,
+
+    pub assets: PathBuf,
+    pub game_dir: PathBuf,
+    pub libraries_dir: PathBuf,
+    pub manifest_file: PathBuf,
+    pub profile_file: Option<PathBuf>,
+    pub natives_dir: PathBuf,
+}
+
+impl VersionProfile {
+    pub fn into_launch(
+        self,
+        username: Username,
+        java_bin: JavaRunner<'static>,
+        access_token: Option<String>,
+        uuid: Option<String>,
+    ) -> LaunchInstance<'static> {
+        let settings = LaunchSettingsBuilder::new()
+            .game_dir(self.game_dir)
+            .assets(self.assets)
+            .libraries_dir(self.libraries_dir)
+            .manifest_file(self.manifest_file)
+            .natives_dir(self.natives_dir)
+            .version(self.version)
+            .version_jar_file(self.version_jar_file)
+            .version_type(self.version_type)
+            .username(username)
+            .access_token(access_token)
+            .java_bin(java_bin)
+            .uuid(uuid)
+            .build();
+        LaunchInstanceBuilder::new().settings(settings).build()
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
-    use crate::{
-        profiles::{read_config, version::VersionProfileBuilder, write_config},
-        repository::java_runner::JavaRunner,
-    };
+    use crate::configs::write_config;
 
     use super::*;
 
     #[tokio::test]
-    async fn launch_test() {
-        let data: Settings = read_config("./configs/Settings.toml").await.unwrap();
-
-        let f = data.profiles.into_iter().find(|x| x.id == 1).unwrap();
-        dbg!(&f);
-        let l = f.into_launch(
-            data.username,
-            data.java_bin
-                .map(JavaRunner::Path)
-                .unwrap_or(JavaRunner::STR),
-            data.access_token,
-            data.uuid,
-        );
-        l.launch().await.unwrap();
-    }
-
-    #[test]
-    fn path_test() {
-        let p1 = Path::new("E:/programming/code/nomi/crates/nomi-core");
-        dbg!(&p1);
-        let p2 = Path::new("minecraft");
-        dbg!(&p2);
-
-        let p3 = p1.join(p2);
-        dbg!(p3);
-    }
-
-    #[tokio::test]
     async fn write_test() {
-        let mut mock = Settings {
-            username: Username::new("test").unwrap(),
-            profiles: vec![],
-            access_token: Some("access_token".into()),
-            java_bin: Some("./java/bin/java.exe".into()),
-            uuid: Some("uuid".into()),
-        };
+        let mut mock = VersionProfilesConfig { profiles: vec![] };
         let profile = VersionProfileBuilder::new()
             .id(mock.create_id())
+            .name("Minecraft".into())
             .assets("./minecraft/assets".into())
             .game_dir("./minecraft".into())
             .is_downloaded(false)
@@ -96,6 +98,7 @@ mod tests {
         mock.add_profile(profile);
         let profile2 = VersionProfileBuilder::new()
             .id(mock.create_id())
+            .name("Minecraft".into())
             .assets("./minecraft/assets".into())
             .game_dir("./minecraft".into())
             .is_downloaded(false)
@@ -109,6 +112,7 @@ mod tests {
         mock.add_profile(profile2);
         let profile3 = VersionProfileBuilder::new()
             .id(mock.create_id())
+            .name("Minecraft".into())
             .assets("./minecraft/assets".into())
             .game_dir("./minecraft".into())
             .is_downloaded(false)
@@ -121,15 +125,8 @@ mod tests {
             .build();
         mock.add_profile(profile3);
 
-        write_config(&mock, "./configs/Settings.toml")
+        write_config(&mock, "./configs/Profiles.toml")
             .await
             .unwrap();
-    }
-
-    #[tokio::test]
-    async fn read_test() {
-        let data: Settings = read_config("./configs/Settings.toml").await.unwrap();
-
-        dbg!(data);
     }
 }

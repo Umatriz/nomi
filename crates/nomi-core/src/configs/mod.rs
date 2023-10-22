@@ -3,8 +3,9 @@ use std::path::Path;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::io::AsyncWriteExt;
 
+pub mod profile;
 pub mod user;
-pub mod version;
+pub mod variables;
 
 /// write data to a file
 pub async fn write_config<T: ?Sized>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>
