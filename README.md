@@ -18,6 +18,10 @@ Current goals:
 
 #### Expected 0.1.0 version release date - 27.10.2023
 
+### Contributing
+
+Check out the [contributing.md](./CONTRIBUTING.md)
+
 ## Requirements (outdated)
 
 - [Rust](https://www.rust-lang.org/) >= 1.70
@@ -30,6 +34,14 @@ cargo run
 ### FAQ
 
 NOT AN OFFICIAL MINECRAFT [PRODUCT/SERVICE/EVENT/etc.]. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT
+
+### Main developers
+
+\<developer name> (discord username)
+
+- Umatriz (@umatriz)
+- Somenn (@somenn)
+- OlshaMB (@olshamb)
 
 ---
 
