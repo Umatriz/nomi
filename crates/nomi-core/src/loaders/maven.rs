@@ -35,7 +35,7 @@ impl MavenData {
 mod tests {
     use std::env::current_dir;
 
-    use crate::downloads::download_file;
+    use crate::downloads::download_manager::DownloadManager;
 
     use super::*;
 
@@ -53,7 +53,7 @@ mod tests {
 
         let maven = MavenData::new(artifact);
 
-        download_file(
+        DownloadManager::download_file(
             current_dir().unwrap().join(maven.path),
             format!("https://maven.fabricmc.net/{}", maven.url),
         )

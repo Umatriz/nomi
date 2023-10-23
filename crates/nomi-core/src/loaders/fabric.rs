@@ -6,7 +6,7 @@ use tokio::{io::AsyncWriteExt, task::JoinSet};
 use tracing::info;
 
 use crate::{
-    downloads::download_file,
+    downloads::download_manager::DownloadManager,
     repository::{fabric_meta::FabricVersions, fabric_profile::FabricProfile},
     utils::get_launcher_manifest,
     version::download::DownloadVersion,
@@ -108,7 +108,7 @@ impl DownloadVersion for Fabric {
 
         self.profile.libraries.iter().for_each(|lib| {
             let maven = MavenData::new(&lib.name);
-            set.spawn(download_file(
+            set.spawn(DownloadManager::download_file(
                 dir.join(maven.path),
                 format!("{}{}", lib.url, maven.url),
             ));

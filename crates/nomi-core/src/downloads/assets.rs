@@ -9,7 +9,7 @@ use std::{
 use tokio::{io::AsyncWriteExt, task::JoinSet};
 use tracing::{info, trace};
 
-use super::download_file;
+use super::download_manager::DownloadManager;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Assets {
@@ -94,7 +94,7 @@ impl AssetsDownload {
                     v.hash
                 );
 
-                set.spawn(download_file(path.join(&v.hash), url));
+                set.spawn(DownloadManager::download_file(path.join(&v.hash), url));
             }
 
             let mut ok_assets = 0;

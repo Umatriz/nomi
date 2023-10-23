@@ -1,32 +1,23 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use thiserror::Error;
 use tracing::error;
 
-use super::download_file;
+use super::download_manager::DownloadManager;
 
 const PORTABLE_URL: &str = "https://download.oracle.com/java/17/latest/jdk-17_windows-x64_bin.zip";
 
 const JDK_17_0_7_PORTABLE_SHA256: &str =
     "98385c1fd4db7ad3fd7ca2f33a1fadae0b15486cfde699138d47002d7068084a";
 
-async fn check_hash(path: PathBuf, hash: &str) -> anyhow::Result<()> {
-    let sha = sha256::try_digest(path)?;
-
-    if sha != hash {
-        return Err(JavaInstallerError::HashDoesNotMatch.into());
-    };
-    Ok(())
-}
-
 pub async fn download_java(temporary_dir_path: &Path, java_dir_path: &Path) -> anyhow::Result<()> {
     let archive_filename = "jdk-17_windows-x64_bin.zip";
-    download_file(
+    DownloadManager::download_file(
         temporary_dir_path.join(archive_filename),
         PORTABLE_URL.to_string(),
     )
     .await?;
 
-    check_hash(
+    DownloadManager::check_sha256(
         temporary_dir_path.join(archive_filename),
         JDK_17_0_7_PORTABLE_SHA256,
     )
@@ -47,10 +38,8 @@ pub async fn download_java(temporary_dir_path: &Path, java_dir_path: &Path) -> a
 
 #[derive(Error, Debug)]
 enum JavaInstallerError {
-    #[error("Hash does not match")]
-    HashDoesNotMatch,
 
-    #[error("data store disconnected")]
+    #[error("Data store disconnected")]
     IoError(#[from] std::io::Error),
 
     #[error("Reqwest error")]

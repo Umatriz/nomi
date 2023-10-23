@@ -8,7 +8,7 @@ use tokio::{io::AsyncWriteExt, task::JoinSet};
 use tracing::{error, info};
 
 use crate::{
-    downloads::{assets, download_file},
+    downloads::{assets, download_manager::DownloadManager},
     repository::manifest::{Manifest, ManifestFile},
     utils::get_launcher_manifest,
     version::download::DownloadVersion,
@@ -79,7 +79,7 @@ impl DownloadVersion for Vanilla {
         let jar_name = format!("{}.jar", file_name.into());
         let path = dir.as_ref().join(jar_name);
 
-        download_file(&path, &self.manifest.downloads.client.url).await?;
+        DownloadManager::download_file(&path, &self.manifest.downloads.client.url).await?;
 
         info!("Client downloaded successfully");
 
@@ -96,7 +96,7 @@ impl DownloadVersion for Vanilla {
                     .clone()
                     .context("`download.path` must be Some")?;
                 let final_path = dir.as_ref().join(path);
-                set.spawn(download_file(final_path, download.url.clone()));
+                set.spawn(DownloadManager::download_file(final_path, download.url.clone()));
             }
 
             Ok(())
