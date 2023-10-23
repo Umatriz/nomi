@@ -1,3 +1,6 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SimpleArgs {
     pub game: Vec<String>,
     pub jvm: Vec<String>,

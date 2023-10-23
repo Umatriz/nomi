@@ -8,10 +8,9 @@ use tokio::{io::AsyncWriteExt, task::JoinSet};
 use tracing::{error, info};
 
 use crate::{
-    downloads::{assets, download_file},
+    downloads::{assets, download_file, download_version::DownloadVersion},
     repository::manifest::{Manifest, ManifestFile},
     utils::get_launcher_manifest,
-    version::download::DownloadVersion,
 };
 
 #[derive(Debug)]

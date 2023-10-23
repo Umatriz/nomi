@@ -95,8 +95,6 @@ impl ManifestState {
 mod tests {
     use tracing::Level;
 
-    use crate::configs::profile::VersionProfileBuilder;
-
     use super::*;
 
     #[tokio::test]
@@ -141,40 +139,5 @@ mod tests {
             .await
             .unwrap();
         dbg!(p);
-    }
-
-    #[tokio::test]
-    #[ignore = "Panics with `TryLockError` when runs with `profiles_init_test`"]
-    async fn profiles_mut_test() {
-        let mut binding = PROFILES_STATE.try_lock().unwrap();
-        let p = binding
-            .get_or_try_init(profiles_state_try_init)
-            .await
-            .unwrap();
-        dbg!(p);
-
-        let r = binding.get_mut().unwrap();
-        let profile = VersionProfileBuilder::new()
-            .id(0)
-            .name("Minecraft".into())
-            .assets("./minecraft/assets".into())
-            .game_dir("./minecraft".into())
-            .is_downloaded(false)
-            .libraries_dir("./minecraft/libraries".into())
-            .manifest_file("./minecraft/versions/1.20/1.20.json".into())
-            .natives_dir("./minecraft/versions/1.20/natives".into())
-            .version("1.20".into())
-            .version_jar_file("./minecraft/versions/1.20/1.20.jar".into())
-            .version_type("release".into())
-            .build();
-        r.add_profile(profile);
-
-        let p = binding
-            .get_or_try_init(profiles_state_try_init)
-            .await
-            .unwrap();
-        dbg!(p);
-
-        write_config(p, "./.nomi/Profiles.toml").await.unwrap();
     }
 }

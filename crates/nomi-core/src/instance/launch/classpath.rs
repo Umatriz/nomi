@@ -15,7 +15,7 @@ pub fn classpath(
     jar_file: PathBuf,
     libraries_path: PathBuf,
     libraries: Vec<ManifestLibrary>,
-    extra_libraries: Option<Vec<SimpleLib>>,
+    extra_libraries: Option<&Vec<SimpleLib>>,
 ) -> Result<String> {
     let mut classpath = jar_file.to_string_lossy().to_string();
 
@@ -127,7 +127,7 @@ mod tests {
             PathBuf::from("test.jar"),
             PathBuf::from("test_libs"),
             fake_manifest.libraries,
-            Some(vec![simple_lib]),
+            Some(&vec![simple_lib]),
         )
         .unwrap();
 

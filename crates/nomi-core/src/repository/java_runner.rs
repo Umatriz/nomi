@@ -3,25 +3,23 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
-pub enum JavaRunner<'a> {
-    Str(&'a str),
+pub enum JavaRunner {
+    String(String),
     Path(PathBuf),
 }
 
-impl<'a> JavaRunner<'a> {
-    pub const STR: JavaRunner<'static> = JavaRunner::Str("java");
-
-    pub fn path(p: PathBuf) -> JavaRunner<'a> {
+impl JavaRunner {
+    pub fn path(p: PathBuf) -> JavaRunner {
         JavaRunner::Path(p)
     }
 
-    pub fn str(s: &str) -> JavaRunner<'_> {
-        JavaRunner::Str(s)
+    pub fn str(s: &str) -> JavaRunner {
+        JavaRunner::String(s.to_string())
     }
 }
 
-impl<'a> Default for JavaRunner<'a> {
-    fn default() -> JavaRunner<'a> {
-        JavaRunner::Str("java")
+impl Default for JavaRunner {
+    fn default() -> JavaRunner {
+        JavaRunner::String("java".to_string())
     }
 }

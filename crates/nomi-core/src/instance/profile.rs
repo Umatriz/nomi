@@ -1,16 +1,8 @@
 use std::path::Path;
 
-use serde::de::DeserializeOwned;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::repository::{simple_args::SimpleArgs, simple_lib::SimpleLib};
-
-/// Trait that must be implemented for every loader profile
-pub trait Profile {
-    fn name(&self) -> String;
-    fn main_class(&self) -> String;
-    fn arguments(&self) -> SimpleArgs;
-    fn libraries(&self) -> Vec<SimpleLib>;
-}
 
 /// Read from json function
 pub async fn read<T>(path: impl AsRef<Path>) -> anyhow::Result<T>
@@ -19,4 +11,12 @@ where
 {
     let s = tokio::fs::read_to_string(path).await?;
     Ok(serde_json::from_str::<T>(&s)?)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LoaderProfile {
+    pub name: String,
+    pub main_class: String,
+    pub args: SimpleArgs,
+    pub libraries: Vec<SimpleLib>,
 }

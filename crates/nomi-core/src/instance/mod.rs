@@ -6,11 +6,9 @@ pub mod launch;
 pub mod profile;
 
 use crate::{
-    configs::profile::{VersionProfile, VersionProfileBuilder, VersionProfilesConfig},
-    downloads::assets::AssetsDownload,
+    downloads::{assets::AssetsDownload, download_version::DownloadVersion},
     loaders::{fabric::Fabric, vanilla::Vanilla},
     utils::state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
-    version::download::DownloadVersion,
 };
 
 use self::launch::{LaunchInstance, LaunchInstanceBuilder, LaunchSettings};
@@ -83,43 +81,43 @@ impl Instance {
             .await
     }
 
-    pub fn launch_instance(&self, settings: LaunchSettings) -> LaunchInstance {
+    pub fn launch_instance(self, settings: LaunchSettings) -> LaunchInstance {
         let builder = LaunchInstanceBuilder::new().settings(settings);
-        match &self.instance {
+        match self.instance {
             Inner::Vanilla(_) => builder.build(),
-            Inner::Fabric(inner) => builder.profile(&inner.profile).build(),
+            Inner::Fabric(inner) => builder.profile(inner.profile.into()).build(),
         }
     }
 
-    pub fn into_profile(
-        &self,
-        profiles: &VersionProfilesConfig,
-        version_type: String,
-        is_downloaded: bool,
-    ) -> VersionProfile {
-        let builder = VersionProfileBuilder::new()
-            .id(profiles.create_id())
-            .name(self.name.clone())
-            .assets(self.assets.clone())
-            .game_dir(self.game.clone())
-            .is_downloaded(is_downloaded)
-            .libraries_dir(self.libraries.clone())
-            .manifest_file(self.version_path.join(format!("{}.json", self.version)))
-            .natives_dir(self.version_path.join("natives"))
-            .version(self.version.clone())
-            .version_jar_file(self.version_path.join(format!("{}.jar", self.version)))
-            .version_type(version_type);
+    // pub fn into_profile(
+    //     &self,
+    //     profiles: &VersionProfilesConfig,
+    //     version_type: String,
+    //     is_downloaded: bool,
+    // ) -> VersionProfile {
+    //     let builder = VersionProfileBuilder::new()
+    //         .id(profiles.create_id())
+    //         .name(self.name.clone())
+    //         .assets(self.assets.clone())
+    //         .game_dir(self.game.clone())
+    //         .is_downloaded(is_downloaded)
+    //         .libraries_dir(self.libraries.clone())
+    //         .manifest_file(self.version_path.join(format!("{}.json", self.version)))
+    //         .natives_dir(self.version_path.join("natives"))
+    //         .version(self.version.clone())
+    //         .version_jar_file(self.version_path.join(format!("{}.jar", self.version)))
+    //         .version_type(version_type);
 
-        match &self.instance {
-            Inner::Fabric(fabric) => builder
-                .profile_file(Some(
-                    self.version_path
-                        .join(format!("{}.json", fabric.profile.id)),
-                ))
-                .build(),
-            Inner::Vanilla(_) => builder.build(),
-        }
-    }
+    //     match &self.instance {
+    //         Inner::Fabric(fabric) => builder
+    //             .profile_file(Some(
+    //                 self.version_path
+    //                     .join(format!("{}.json", fabric.profile.id)),
+    //             ))
+    //             .build(),
+    //         Inner::Vanilla(_) => builder.build(),
+    //     }
+    // }
 }
 
 pub struct AssetsInstance {

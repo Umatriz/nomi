@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 use const_typed_builder::Builder;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::process::Command;
 
@@ -14,7 +15,7 @@ use rules::is_all_rules_satisfied;
 
 use self::classpath::classpath;
 
-use super::{profile::Profile, Undefined};
+use super::{profile::LoaderProfile, Undefined};
 
 pub mod classpath;
 pub mod rules;
@@ -37,7 +38,7 @@ pub enum LaunchError {
     VersionFileNotFound,
 }
 
-#[derive(Default, Builder, PartialEq, Debug)]
+#[derive(Default, Builder, PartialEq, Debug, Serialize, Deserialize)]
 pub struct LaunchSettings {
     pub access_token: Option<String>,
     pub username: Username,
@@ -45,7 +46,7 @@ pub struct LaunchSettings {
 
     pub assets: PathBuf,
     pub game_dir: PathBuf,
-    pub java_bin: JavaRunner<'static>,
+    pub java_bin: JavaRunner,
     pub libraries_dir: PathBuf,
     pub manifest_file: PathBuf,
     pub natives_dir: PathBuf,
@@ -71,12 +72,13 @@ pub fn java_bin() -> Option<PathBuf> {
     java_bin
 }
 
-pub struct LaunchInstance<'a> {
+#[derive(Serialize, Deserialize, Debug, Default)]
+pub struct LaunchInstance {
     settings: LaunchSettings,
-    profile: Option<&'a dyn Profile>,
+    profile: Option<LoaderProfile>,
 }
 
-impl LaunchInstance<'_> {
+impl LaunchInstance {
     fn build_args(self) -> anyhow::Result<Vec<String>> {
         let assets_dir = self.settings.assets.clone();
         let game_dir = self.settings.game_dir.clone();
@@ -104,9 +106,8 @@ impl LaunchInstance<'_> {
 
         let mut args: Vec<String> = vec![];
 
-        if let Some(prof) = self.profile {
-            let arguments = prof.arguments();
-            arguments.jvm.iter().for_each(|a| {
+        if let Some(ref prof) = self.profile {
+            prof.args.jvm.iter().for_each(|a| {
                 dbg!(&a);
                 args.push(a.to_owned());
             })
@@ -135,10 +136,10 @@ impl LaunchInstance<'_> {
             }
         }
 
-        let main_class = if let Some(prof) = self.profile {
-            prof.main_class()
+        let main_class = if let Some(ref prof) = self.profile {
+            &prof.main_class
         } else {
-            manifest.main_class
+            &manifest.main_class
         };
 
         args.push(main_class.to_owned());
@@ -152,15 +153,15 @@ impl LaunchInstance<'_> {
             }
         }
 
-        if let Some(prof) = self.profile {
-            let arguments = prof.arguments();
-            arguments.game.iter().for_each(|a| {
+        if let Some(ref prof) = self.profile {
+            prof.args.game.iter().for_each(|a| {
                 dbg!(&a);
                 args.push(a.to_owned());
             })
         }
 
-        let extra_libraries = self.profile.map(|prof| prof.libraries());
+        let binding = self.profile.map(|prof| prof.libraries);
+        let extra_libraries = binding.as_ref();
         let classpath = classpath(
             self.settings.version_jar_file.clone(),
             self.settings.libraries_dir.clone(),
@@ -226,19 +227,19 @@ impl LaunchInstance<'_> {
 }
 
 #[derive(Default)]
-pub struct LaunchInstanceBuilder<'a, S> {
+pub struct LaunchInstanceBuilder<S> {
     settings: S,
-    profile: Option<&'a dyn Profile>,
+    profile: Option<LoaderProfile>,
 }
 
-impl LaunchInstanceBuilder<'_, Undefined> {
+impl LaunchInstanceBuilder<Undefined> {
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl<'a> LaunchInstanceBuilder<'a, Undefined> {
-    pub fn settings(self, settings: LaunchSettings) -> LaunchInstanceBuilder<'a, LaunchSettings> {
+impl LaunchInstanceBuilder<Undefined> {
+    pub fn settings(self, settings: LaunchSettings) -> LaunchInstanceBuilder<LaunchSettings> {
         LaunchInstanceBuilder {
             settings,
             profile: self.profile,
@@ -246,8 +247,8 @@ impl<'a> LaunchInstanceBuilder<'a, Undefined> {
     }
 }
 
-impl<'a, S> LaunchInstanceBuilder<'a, S> {
-    pub fn profile<P: Profile>(self, profile: &'a P) -> LaunchInstanceBuilder<'a, S> {
+impl<S> LaunchInstanceBuilder<S> {
+    pub fn profile(self, profile: LoaderProfile) -> LaunchInstanceBuilder<S> {
         LaunchInstanceBuilder {
             settings: self.settings,
             profile: Some(profile),
@@ -255,8 +256,8 @@ impl<'a, S> LaunchInstanceBuilder<'a, S> {
     }
 }
 
-impl<'a> LaunchInstanceBuilder<'a, LaunchSettings> {
-    pub fn build(self) -> LaunchInstance<'a> {
+impl LaunchInstanceBuilder<LaunchSettings> {
+    pub fn build(self) -> LaunchInstance {
         LaunchInstance {
             settings: self.settings,
             profile: self.profile,
@@ -307,7 +308,7 @@ mod tests {
 
         let builder = LaunchInstanceBuilder::new()
             .settings(settings)
-            .profile(&fabric)
+            .profile(fabric.into())
             .build();
 
         builder.launch().await.unwrap();
