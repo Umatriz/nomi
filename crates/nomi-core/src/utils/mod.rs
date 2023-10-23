@@ -2,10 +2,11 @@ use reqwest::Client;
 use serde::de::DeserializeOwned;
 
 use crate::repository::launcher_manifest::LauncherManifest;
+use crate::configs::consts::LAUNCHER_MANIFEST;
 
 pub mod state;
+pub mod download_util;
 
-pub const LAUNCHER_MANIFEST: &str = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
 
 pub async fn get<T: DeserializeOwned>(url: impl Into<String>) -> anyhow::Result<T> {
     Ok(reqwest::get(url.into()).await?.json::<T>().await?)

@@ -6,6 +6,7 @@ use tokio::io::AsyncWriteExt;
 pub mod profile;
 pub mod user;
 pub mod variables;
+pub mod consts;
 
 /// write data to a file
 pub async fn write_config<T: ?Sized>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>

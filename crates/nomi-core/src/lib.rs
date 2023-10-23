@@ -1,5 +1,5 @@
 pub mod configs;
-pub mod downloads;
+pub mod download;
 pub mod instance;
 pub mod loaders;
 pub mod repository;

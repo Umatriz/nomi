@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use std::env;
 
 use crate::repository::manifest::Rules;
+pub use crate::configs::consts::CLASSPATH_SEPARATOR;
 
 pub fn is_rule_satisfied(rule: &Rules) -> Result<bool> {
     if rule.os.is_some() {

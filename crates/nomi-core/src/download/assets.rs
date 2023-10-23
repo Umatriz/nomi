@@ -4,12 +4,12 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    path::{Path, PathBuf},
+    path::Path,
 };
 use tokio::{io::AsyncWriteExt, task::JoinSet};
-use tracing::{info, trace};
+use tracing::info;
 
-use super::download_manager::DownloadManager;
+use crate::utils::download_util::{download_file, create_dir};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Assets {
@@ -51,16 +51,6 @@ impl AssetsDownload {
         Ok(data)
     }
 
-    async fn create_dir(&self, main_dir: &Path, asset_dir_name: &str) -> Result<PathBuf> {
-        let path = main_dir.join(asset_dir_name);
-
-        tokio::fs::create_dir_all(&path).await?;
-
-        trace!("Dir {} created successfully", path.to_string_lossy());
-
-        Ok(path)
-    }
-
     pub async fn get_assets_json(&self, assets_dir: &Path) -> Result<()> {
         let filen = format!("{}.json", self.id);
         let path = assets_dir.join(filen);
@@ -87,14 +77,14 @@ impl AssetsDownload {
 
             let mut set = JoinSet::new();
             for (_k, v) in assets {
-                let path = self.create_dir(dir, &v.hash[0..2]).await?;
+                let path = create_dir(dir, &v.hash[0..2]).await?;
                 let url = format!(
                     "https://resources.download.minecraft.net/{}/{}",
                     &v.hash[0..2],
                     v.hash
                 );
 
-                set.spawn(DownloadManager::download_file(path.join(&v.hash), url));
+                set.spawn(download_file(path.join(&v.hash), url));
             }
 
             let mut ok_assets = 0;

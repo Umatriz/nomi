@@ -19,12 +19,6 @@ use super::{profile::Profile, Undefined};
 pub mod classpath;
 pub mod rules;
 
-#[cfg(windows)]
-const CLASSPATH_SEPARATOR: &str = ";";
-
-#[cfg(not(windows))]
-const CLASSPATH_SEPARATOR: &str = ":";
-
 #[derive(Error, Debug)]
 pub enum LaunchError {
     #[error("The game directory doesn't exist.")]

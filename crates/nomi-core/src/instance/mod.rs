@@ -7,7 +7,7 @@ pub mod profile;
 
 use crate::{
     configs::profile::{VersionProfile, VersionProfileBuilder, VersionProfilesConfig},
-    downloads::assets::AssetsDownload,
+    download::assets::AssetsDownload,
     loaders::{fabric::Fabric, vanilla::Vanilla},
     utils::state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
     version::download::DownloadVersion,

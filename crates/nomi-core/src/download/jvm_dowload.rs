@@ -2,22 +2,18 @@ use std::path::Path;
 use thiserror::Error;
 use tracing::error;
 
-use super::download_manager::DownloadManager;
-
-const PORTABLE_URL: &str = "https://download.oracle.com/java/17/latest/jdk-17_windows-x64_bin.zip";
-
-const JDK_17_0_7_PORTABLE_SHA256: &str =
-    "98385c1fd4db7ad3fd7ca2f33a1fadae0b15486cfde699138d47002d7068084a";
+use crate::utils::download_util::{download_file, check_sha256};
+use crate::configs::consts::{PORTABLE_URL, JDK_17_0_7_PORTABLE_SHA256};
 
 pub async fn download_java(temporary_dir_path: &Path, java_dir_path: &Path) -> anyhow::Result<()> {
     let archive_filename = "jdk-17_windows-x64_bin.zip";
-    DownloadManager::download_file(
+    download_file(
         temporary_dir_path.join(archive_filename),
         PORTABLE_URL.to_string(),
     )
     .await?;
 
-    DownloadManager::check_sha256(
+    check_sha256(
         temporary_dir_path.join(archive_filename),
         JDK_17_0_7_PORTABLE_SHA256,
     )
