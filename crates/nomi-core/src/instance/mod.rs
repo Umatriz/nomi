@@ -60,6 +60,10 @@ impl Instance {
                 inner.download(&self.version_path, &self.version).await?;
                 inner.download_libraries(&self.libraries).await?;
                 inner.create_json(&self.version_path).await?;
+
+                let vanilla = Vanilla::new(&self.version).await?;
+                vanilla.create_json(&self.version_path).await?;
+                vanilla.download_libraries(&self.libraries).await?;
             }
         }
 
@@ -88,36 +92,6 @@ impl Instance {
             Inner::Fabric(inner) => builder.profile(inner.profile.into()).build(),
         }
     }
-
-    // pub fn into_profile(
-    //     &self,
-    //     profiles: &VersionProfilesConfig,
-    //     version_type: String,
-    //     is_downloaded: bool,
-    // ) -> VersionProfile {
-    //     let builder = VersionProfileBuilder::new()
-    //         .id(profiles.create_id())
-    //         .name(self.name.clone())
-    //         .assets(self.assets.clone())
-    //         .game_dir(self.game.clone())
-    //         .is_downloaded(is_downloaded)
-    //         .libraries_dir(self.libraries.clone())
-    //         .manifest_file(self.version_path.join(format!("{}.json", self.version)))
-    //         .natives_dir(self.version_path.join("natives"))
-    //         .version(self.version.clone())
-    //         .version_jar_file(self.version_path.join(format!("{}.jar", self.version)))
-    //         .version_type(version_type);
-
-    //     match &self.instance {
-    //         Inner::Fabric(fabric) => builder
-    //             .profile_file(Some(
-    //                 self.version_path
-    //                     .join(format!("{}.json", fabric.profile.id)),
-    //             ))
-    //             .build(),
-    //         Inner::Vanilla(_) => builder.build(),
-    //     }
-    // }
 }
 
 pub struct AssetsInstance {

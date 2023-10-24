@@ -8,7 +8,7 @@ pub mod user;
 pub mod variables;
 
 /// write data to a file
-pub async fn write_config<T: ?Sized>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>
+pub async fn write_toml_config<T: ?Sized>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>
 where
     T: Serialize,
 {
@@ -28,7 +28,7 @@ where
 }
 
 /// read data from file
-pub async fn read_config<T: ?Sized>(path: impl AsRef<Path>) -> anyhow::Result<T>
+pub async fn read_json_config<T: ?Sized>(path: impl AsRef<Path>) -> anyhow::Result<T>
 where
     T: DeserializeOwned,
 {

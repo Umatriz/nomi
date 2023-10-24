@@ -17,7 +17,7 @@ pub struct Settings {
 mod tests {
     use std::path::Path;
 
-    use crate::configs::{read_config, write_config};
+    use crate::configs::{read_json_config, write_toml_config};
 
     use super::*;
 
@@ -41,12 +41,12 @@ mod tests {
             uuid: Some("uuid".into()),
         };
 
-        write_config(&mock, "./.nomi/User.toml").await.unwrap();
+        write_toml_config(&mock, "./.nomi/User.toml").await.unwrap();
     }
 
     #[tokio::test]
     async fn read_test() {
-        let data: Settings = read_config("./configs/User.toml").await.unwrap();
+        let data: Settings = read_json_config("./configs/User.toml").await.unwrap();
 
         dbg!(data);
     }

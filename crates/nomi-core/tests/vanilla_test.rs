@@ -1,5 +1,5 @@
 use nomi_core::{
-    instance::{launch::LaunchSettingsBuilder, InstanceBuilder},
+    instance::launch::LaunchSettings,
     repository::{java_runner::JavaRunner, username::Username},
 };
 
@@ -33,33 +33,22 @@ async fn vanilla_test() {
     // // assets.download().await.unwrap();
     // // builder.download().await.unwrap();
 
-    // let mc_dir = std::env::current_dir().unwrap().join("minecraft");
-    // let settings = LaunchSettingsBuilder::new()
-    //     .access_token(None)
-    //     .assets(mc_dir.join("assets"))
-    //     .game_dir(mc_dir.clone())
-    //     .java_bin(JavaRunner::Path("./java/jdk-17.0.8/bin/java.exe".into()))
-    //     .libraries_dir(mc_dir.clone().join("libraries"))
-    //     .manifest_file(
-    //         mc_dir
-    //             .clone()
-    //             .join("instances")
-    //             .join("1.20")
-    //             .join("1.20.json"),
-    //     )
-    //     .natives_dir(
-    //         mc_dir
-    //             .clone()
-    //             .join("instances")
-    //             .join("1.20")
-    //             .join("natives"),
-    //     )
-    //     .username(Username::new("ItWorks").unwrap())
-    //     .uuid(None)
-    //     .version("1.20".to_string())
-    //     .version_jar_file(mc_dir.join("instances").join("1.20").join("1.20.jar"))
-    //     .version_type("release".to_string())
-    //     .build();
+    let mc_dir = std::env::current_dir().unwrap().join("minecraft");
+
+    let settings = LaunchSettings {
+        access_token: None,
+        username: Username::new("ItWorks").unwrap(),
+        uuid: None,
+        assets: mc_dir.join("assets"),
+        game_dir: mc_dir.clone(),
+        java_bin: JavaRunner::default(),
+        libraries_dir: mc_dir.clone().join("libraries"),
+        manifest_file: mc_dir.clone().join("versions/1.20/1.19.4.json"),
+        natives_dir: mc_dir.clone().join("versions/1.20/natives"),
+        version_jar_file: mc_dir.join("versions/1.20/1.20.jar"),
+        version: "1.20".to_string(),
+        version_type: "release".to_string(),
+    };
 
     // let l = builder.launch_instance(settings);
     // l.launch().await.unwrap();

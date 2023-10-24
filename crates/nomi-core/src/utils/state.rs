@@ -1,11 +1,12 @@
 use anyhow::Context;
+use reqwest::Client;
 use thiserror::Error;
 use tokio::sync::{Mutex, OnceCell};
 
 use crate::{
     configs::{
-        profile::VersionProfilesConfig, read_config, user::Settings, variables::Variables,
-        write_config,
+        profile::VersionProfilesConfig, read_json_config, user::Settings, variables::Variables,
+        write_toml_config,
     },
     repository::{
         launcher_manifest::{LauncherManifest, LauncherManifestVersion},
@@ -21,10 +22,10 @@ pub async fn variables_state_try_init() -> anyhow::Result<Variables> {
     let current = std::env::current_dir()?;
     let path = current.join("./.nomi/Variables.toml");
     match path.exists() {
-        true => Ok(read_config(path).await?),
+        true => Ok(read_json_config(path).await?),
         false => {
             let data = Variables { root: current };
-            write_config(&data, path).await?;
+            write_toml_config(&data, path).await?;
             Ok(data)
         }
     }
@@ -37,7 +38,7 @@ pub async fn profiles_state_try_init() -> anyhow::Result<VersionProfilesConfig> 
     let current = std::env::current_dir()?;
     let path = current.join("./.nomi/Profiles.toml");
     match path.exists() {
-        true => Ok(read_config(path).await?),
+        true => Ok(read_json_config(path).await?),
         false => Ok(VersionProfilesConfig { profiles: vec![] }),
     }
 }
@@ -48,7 +49,7 @@ pub async fn settings_state_try_init() -> anyhow::Result<Settings> {
     let current = std::env::current_dir()?;
     let path = current.join("./.nomi/Settings.toml");
     match path.exists() {
-        true => read_config(path).await,
+        true => read_json_config(path).await,
         false => Err(SettingsStateError::NotFound.into()),
     }
 }
@@ -88,6 +89,18 @@ impl ManifestState {
             .url;
 
         super::get(url).await
+    }
+
+    pub async fn get_version_manifest_content(
+        &self,
+        version: impl Into<String>,
+    ) -> anyhow::Result<String> {
+        let url = &self
+            .find_version(version)
+            .context("cannot find such version")?
+            .url;
+
+        Ok(Client::new().get(url).send().await?.text().await?)
     }
 }
 

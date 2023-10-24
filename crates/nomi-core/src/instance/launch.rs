@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 
 use anyhow::Context;
-use const_typed_builder::Builder;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::process::Command;
@@ -38,10 +37,13 @@ pub enum LaunchError {
     VersionFileNotFound,
 }
 
-#[derive(Default, Builder, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Default, PartialEq, Debug)]
 pub struct LaunchSettings {
+    #[serde(skip_serializing)]
     pub access_token: Option<String>,
+    #[serde(skip_serializing)]
     pub username: Username,
+    #[serde(skip_serializing)]
     pub uuid: Option<String>,
 
     pub assets: PathBuf,
@@ -267,44 +269,33 @@ impl LaunchInstanceBuilder<LaunchSettings> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{instance::profile::read, repository::fabric_profile::FabricProfile};
+    use crate::{instance::profile::read_json, repository::fabric_profile::FabricProfile};
 
     use super::*;
 
     #[tokio::test]
     async fn it_works() {
         let mc_dir = std::env::current_dir().unwrap().join("minecraft");
-        let settings = LaunchSettingsBuilder::new()
-            .access_token(None)
-            .assets(mc_dir.join("assets"))
-            .game_dir(mc_dir.clone())
-            .java_bin(JavaRunner::Path("./java/jdk-17.0.8/bin/java.exe".into()))
-            .libraries_dir(mc_dir.clone().join("libraries"))
-            .manifest_file(
-                mc_dir
-                    .clone()
-                    .join("instances")
-                    .join("1.18.2")
-                    .join("1.18.2.json"),
-            )
-            .natives_dir(
-                mc_dir
-                    .clone()
-                    .join("instances")
-                    .join("1.18.2")
-                    .join("natives"),
-            )
-            .username(Username::new("ItWorks").unwrap())
-            .uuid(None)
-            .version("1.18.2".to_string())
-            .version_jar_file(mc_dir.join("instances").join("1.18.2").join("1.18.2.jar"))
-            .version_type("release".to_string())
-            .build();
+        let settings = LaunchSettings {
+            access_token: None,
+            username: Username::new("ItWorks").unwrap(),
+            uuid: None,
+            assets: mc_dir.join("assets"),
+            game_dir: mc_dir.clone(),
+            java_bin: JavaRunner::default(),
+            libraries_dir: mc_dir.clone().join("libraries"),
+            manifest_file: mc_dir.clone().join("instances/1.18.2/1.18.2.json"),
+            natives_dir: mc_dir.clone().join("instances/1.18.2/natives"),
+            version_jar_file: mc_dir.join("instances/1.18.2/1.18.2.jar"),
+            version: "1.18.2".to_string(),
+            version_type: "release".to_string(),
+        };
 
-        let fabric =
-            read::<FabricProfile>("./minecraft/instances/1.18.2/fabric-loader-0.14.23-1.18.2.json")
-                .await
-                .unwrap();
+        let fabric = read_json::<FabricProfile>(
+            "./minecraft/instances/1.18.2/fabric-loader-0.14.23-1.18.2.json",
+        )
+        .await
+        .unwrap();
 
         let builder = LaunchInstanceBuilder::new()
             .settings(settings)

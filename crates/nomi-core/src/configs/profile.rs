@@ -1,7 +1,7 @@
 use const_typed_builder::Builder;
 use serde::{Deserialize, Serialize};
 
-use crate::{instance::launch::LaunchInstance, repository::fabric_profile::FabricProfile};
+use crate::instance::launch::LaunchInstance;
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct VersionProfilesConfig {
@@ -39,15 +39,8 @@ pub struct VersionProfile {
     pub instance: LaunchInstance,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub enum VersionLoaderProfile {
-    Fabric(Box<FabricProfile>),
-    #[default]
-    Vanilla,
-}
-
 impl VersionProfile {
-    pub async fn into_launch(self) -> anyhow::Result<i32> {
+    pub async fn launch(self) -> anyhow::Result<i32> {
         self.instance.launch().await
     }
 }
@@ -55,8 +48,8 @@ impl VersionProfile {
 #[cfg(test)]
 mod tests {
     use crate::{
-        configs::write_config,
-        instance::{launch::LaunchSettingsBuilder, Inner, InstanceBuilder},
+        configs::write_toml_config,
+        instance::{launch::LaunchSettings, Inner, InstanceBuilder},
         repository::{java_runner::JavaRunner, username::Username},
     };
 
@@ -78,26 +71,20 @@ mod tests {
             .build();
 
         let mc_dir = std::env::current_dir().unwrap().join("minecraft");
-        let settings = LaunchSettingsBuilder::new()
-            .access_token(None)
-            .assets(mc_dir.join("assets"))
-            .game_dir(mc_dir.clone())
-            .java_bin(JavaRunner::Path("./java/jdk-17.0.8/bin/java.exe".into()))
-            .libraries_dir(mc_dir.clone().join("libraries"))
-            .manifest_file(
-                mc_dir
-                    .clone()
-                    .join("versions")
-                    .join("1.20")
-                    .join("1.20.json"),
-            )
-            .natives_dir(mc_dir.clone().join("versions").join("1.20").join("natives"))
-            .username(Username::new("ItWorks").unwrap())
-            .uuid(None)
-            .version("1.20".to_string())
-            .version_jar_file(mc_dir.join("versions").join("1.20").join("1.20.jar"))
-            .version_type("release".to_string())
-            .build();
+        let settings = LaunchSettings {
+            access_token: None,
+            username: Username::new("ItWorks").unwrap(),
+            uuid: None,
+            assets: mc_dir.join("assets"),
+            game_dir: mc_dir.clone(),
+            java_bin: JavaRunner::default(),
+            libraries_dir: mc_dir.clone().join("libraries"),
+            manifest_file: mc_dir.clone().join("versions/1.18.2/1.18.2.json"),
+            natives_dir: mc_dir.clone().join("versions/1.18.2/natives"),
+            version_jar_file: mc_dir.join("versions/1.18.2/1.18.2.jar"),
+            version: "1.18.2".to_string(),
+            version_type: "release".to_string(),
+        };
 
         let l = builder.launch_instance(settings);
 
@@ -110,10 +97,8 @@ mod tests {
 
         mock.add_profile(profile);
 
-        write_config(&mock, "./configs/Profiles.toml")
+        write_toml_config(&mock, "./configs/Profiles.toml")
             .await
             .unwrap();
     }
 }
-
-pub struct VersionProfileV2 {}
