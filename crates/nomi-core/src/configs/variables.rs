@@ -15,7 +15,7 @@ impl Variables {
 
 #[cfg(test)]
 mod tests {
-    use crate::configs::read_json_config;
+    use crate::configs::read_toml_config;
     use crate::configs::write_toml_config;
 
     use super::*;
@@ -33,7 +33,7 @@ mod tests {
 
     #[tokio::test]
     async fn read_test() {
-        let v = read_json_config::<Variables>("./configs/Variables.toml")
+        let v = read_toml_config::<Variables>("./configs/Variables.toml")
             .await
             .unwrap();
 

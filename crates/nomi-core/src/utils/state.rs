@@ -5,7 +5,7 @@ use tokio::sync::{Mutex, OnceCell};
 
 use crate::{
     configs::{
-        profile::VersionProfilesConfig, read_json_config, user::Settings, variables::Variables,
+        profile::VersionProfilesConfig, read_toml_config, user::Settings, variables::Variables,
         write_toml_config,
     },
     repository::{
@@ -22,7 +22,7 @@ pub async fn variables_state_try_init() -> anyhow::Result<Variables> {
     let current = std::env::current_dir()?;
     let path = current.join("./.nomi/Variables.toml");
     match path.exists() {
-        true => Ok(read_json_config(path).await?),
+        true => Ok(read_toml_config(path).await?),
         false => {
             let data = Variables { root: current };
             write_toml_config(&data, path).await?;
@@ -38,7 +38,7 @@ pub async fn profiles_state_try_init() -> anyhow::Result<VersionProfilesConfig> 
     let current = std::env::current_dir()?;
     let path = current.join("./.nomi/Profiles.toml");
     match path.exists() {
-        true => Ok(read_json_config(path).await?),
+        true => Ok(read_toml_config(path).await?),
         false => Ok(VersionProfilesConfig { profiles: vec![] }),
     }
 }
@@ -49,7 +49,7 @@ pub async fn settings_state_try_init() -> anyhow::Result<Settings> {
     let current = std::env::current_dir()?;
     let path = current.join("./.nomi/Settings.toml");
     match path.exists() {
-        true => read_json_config(path).await,
+        true => read_toml_config(path).await,
         false => Err(SettingsStateError::NotFound.into()),
     }
 }

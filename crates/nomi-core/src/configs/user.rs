@@ -17,7 +17,7 @@ pub struct Settings {
 mod tests {
     use std::path::Path;
 
-    use crate::configs::{read_json_config, write_toml_config};
+    use crate::configs::{read_toml_config, write_toml_config};
 
     use super::*;
 
@@ -46,7 +46,7 @@ mod tests {
 
     #[tokio::test]
     async fn read_test() {
-        let data: Settings = read_json_config("./configs/User.toml").await.unwrap();
+        let data: Settings = read_toml_config("./configs/User.toml").await.unwrap();
 
         dbg!(data);
     }

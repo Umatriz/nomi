@@ -28,7 +28,7 @@ where
 }
 
 /// read data from file
-pub async fn read_json_config<T: ?Sized>(path: impl AsRef<Path>) -> anyhow::Result<T>
+pub async fn read_toml_config<T: ?Sized>(path: impl AsRef<Path>) -> anyhow::Result<T>
 where
     T: DeserializeOwned,
 {
