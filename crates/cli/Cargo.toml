@@ -14,3 +14,4 @@ tracing-subscriber.workspace = true
 clap = {version = "4.4.6", features = ["derive"]}
 
 nomi-core = { path = "../nomi-core" }
+thiserror = "1.0.50"

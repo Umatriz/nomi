@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(verbatim_doc_comment)]
@@ -27,7 +27,17 @@ pub enum Command {
     },
 
     Launch {
-        profile_id: String,
+        profile_id: i32,
+    },
+
+    Register {
+        username: String,
+        #[arg(long, short)]
+        access_token: Option<String>,
+        #[arg(long, short)]
+        java_bin: Option<PathBuf>,
+        #[arg(long, short)]
+        uuid: Option<String>,
     },
 
     List,

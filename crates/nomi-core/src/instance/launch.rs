@@ -39,16 +39,16 @@ pub enum LaunchError {
 
 #[derive(Serialize, Deserialize, Default, PartialEq, Debug)]
 pub struct LaunchSettings {
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     pub access_token: Option<String>,
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     pub username: Username,
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     pub uuid: Option<String>,
 
     pub assets: PathBuf,
-    pub game_dir: PathBuf,
     pub java_bin: JavaRunner,
+    pub game_dir: PathBuf,
     pub libraries_dir: PathBuf,
     pub manifest_file: PathBuf,
     pub natives_dir: PathBuf,
@@ -81,6 +81,18 @@ pub struct LaunchInstance {
 }
 
 impl LaunchInstance {
+    pub fn set_username(&mut self, username: Username) {
+        self.settings.username = username
+    }
+
+    pub fn set_access_token(&mut self, access_token: Option<String>) {
+        self.settings.access_token = access_token
+    }
+
+    pub fn set_uuid(&mut self, uuid: Option<String>) {
+        self.settings.uuid = uuid
+    }
+
     fn build_args(self) -> anyhow::Result<Vec<String>> {
         let assets_dir = self.settings.assets.clone();
         let game_dir = self.settings.game_dir.clone();

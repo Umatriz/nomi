@@ -3,16 +3,19 @@ use std::path::{Path, PathBuf};
 use nomi_core::{
     configs::{
         profile::{VersionProfileBuilder, VersionProfilesConfig},
-        read_toml_config, write_toml_config,
+        read_toml_config,
+        user::Settings,
+        write_toml_config,
     },
-    instance::{
-        launch::{LaunchInstanceBuilder, LaunchSettings},
-        Inner, InstanceBuilder,
-    },
+    instance::{launch::LaunchSettings, Inner, InstanceBuilder},
     repository::{java_runner::JavaRunner, username::Username},
 };
+use tracing::warn;
 
-use crate::args::{Cli, Loader};
+use crate::{
+    args::{Cli, Loader},
+    error::Error,
+};
 
 pub async fn process_args(args: &Cli) -> anyhow::Result<()> {
     use crate::args::Command::*;
@@ -29,11 +32,33 @@ pub async fn process_args(args: &Cli) -> anyhow::Result<()> {
         Cli {
             game_dir,
             command: Launch { profile_id },
-        } => todo!(),
+        } => {
+            let _ = launch(game_dir, profile_id).await?;
+            Ok(())
+        }
+        Cli {
+            game_dir,
+            command:
+                Register {
+                    username,
+                    access_token,
+                    java_bin,
+                    uuid,
+                },
+        } => {
+            register(
+                game_dir,
+                username,
+                access_token.as_ref(),
+                java_bin.as_ref(),
+                uuid.as_ref(),
+            )
+            .await
+        }
         Cli {
             game_dir,
             command: List,
-        } => todo!(),
+        } => list(game_dir).await,
     }
 }
 
@@ -43,6 +68,13 @@ pub async fn download(
     game_version: &String,
     loader: Option<&Loader>,
 ) -> anyhow::Result<()> {
+    let dir = match dir.is_absolute() {
+        true => dir.to_path_buf(),
+        false => {
+            warn!("`GAME_DIR` is not absolute. Adding to the current dir");
+            std::env::current_dir()?.join(dir)
+        }
+    };
     let mc_dir = &dir.join("minecraft");
     let builder = InstanceBuilder::new()
         .name(name.to_string())
@@ -103,6 +135,86 @@ pub async fn download(
     profiles.add_profile(profile);
 
     write_toml_config(&profiles, confgis.join("Profiles.toml")).await?;
+
+    Ok(())
+}
+
+pub async fn launch(dir: &Path, profile_id: &i32) -> anyhow::Result<i32> {
+    if !dir.join(".nomi/configs/User.toml").exists()
+        || !dir.join(".nomi/configs/Profiles.toml").exists()
+    {
+        return Err(Error::General(
+            "`User.toml` and `Profiles.toml` not found\nRun `register` and `download` before"
+                .into(),
+        )
+        .into());
+    }
+
+    let profiles_cfg: VersionProfilesConfig =
+        read_toml_config(dir.join(".nomi/configs/Profiles.toml")).await?;
+
+    let user_cfg: Settings = read_toml_config(dir.join(".nomi/configs/User.toml")).await?;
+
+    let p = profiles_cfg
+        .profiles
+        .into_iter()
+        .find(|p| &p.id == profile_id);
+
+    let Some(mut profile) = p else {
+        return Err(
+            Error::General("No such profile\nRun `list` to see installed versions".into()).into(),
+        );
+    };
+
+    profile.instance.set_username(user_cfg.username);
+    profile.instance.set_access_token(user_cfg.access_token);
+    profile.instance.set_uuid(user_cfg.uuid);
+
+    profile.launch().await
+}
+
+pub async fn register(
+    dir: &Path,
+    username: &str,
+    access_token: Option<&String>,
+    java_bin: Option<&PathBuf>,
+    uuid: Option<&String>,
+) -> anyhow::Result<()> {
+    let dir = match dir.is_absolute() {
+        true => dir.to_path_buf(),
+        false => {
+            warn!("`GAME_DIR` is not absolute. Adding to the current dir");
+            std::env::current_dir()?.join(dir)
+        }
+    };
+
+    let settings = Settings {
+        username: Username::new(username)?,
+        access_token: access_token.map(String::from),
+        java_bin: java_bin.map(|p| p.to_path_buf()),
+        uuid: uuid.map(String::from),
+    };
+
+    write_toml_config(&settings, dir.join(".nomi/configs/User.toml")).await?;
+
+    Ok(())
+}
+
+pub async fn list(dir: &Path) -> anyhow::Result<()> {
+    let dir = match dir.is_absolute() {
+        true => dir.to_path_buf(),
+        false => {
+            warn!("`GAME_DIR` is not absolute. Adding to the current dir");
+            std::env::current_dir()?.join(dir)
+        }
+    };
+
+    let prof: VersionProfilesConfig =
+        read_toml_config(dir.join(".nomi/configs/Profiles.toml")).await?;
+
+    prof.profiles.iter().for_each(|p| {
+        println!("{}: {}", p.name, p.id);
+    });
 
     Ok(())
 }
