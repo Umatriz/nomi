@@ -19,17 +19,19 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
+    /// Download version
     Download {
+        /// Profile name
         name: String,
+        /// Game version
         version: String,
+        /// Loader
         #[command(subcommand)]
         loader: Option<Loader>,
     },
-
-    Launch {
-        profile_id: i32,
-    },
-
+    /// Launch game from profile
+    Launch { profile_id: i32 },
+    /// Create config with username
     Register {
         username: String,
         #[arg(long, short)]
@@ -39,7 +41,7 @@ pub enum Command {
         #[arg(long, short)]
         uuid: Option<String>,
     },
-
+    /// Show list of existing profiles
     List,
 }
 

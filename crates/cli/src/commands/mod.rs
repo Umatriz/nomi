@@ -209,6 +209,16 @@ pub async fn list(dir: &Path) -> anyhow::Result<()> {
         }
     };
 
+    if !dir.join(".nomi/configs/User.toml").exists()
+        || !dir.join(".nomi/configs/Profiles.toml").exists()
+    {
+        return Err(Error::General(
+            "`User.toml` and `Profiles.toml` not found\nRun `register` and `download` before"
+                .into(),
+        )
+        .into());
+    }
+
     let prof: VersionProfilesConfig =
         read_toml_config(dir.join(".nomi/configs/Profiles.toml")).await?;
 

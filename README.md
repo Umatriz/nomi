@@ -40,7 +40,6 @@ NOT AN OFFICIAL MINECRAFT [PRODUCT/SERVICE/EVENT/etc.]. NOT APPROVED BY OR ASSOC
 \<developer name> (discord username)
 
 - Umatriz (@umatriz)
-- Somenn (@somenn)
 - OlshaMB (@olshamb)
 
 ---

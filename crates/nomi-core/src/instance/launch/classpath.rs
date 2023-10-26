@@ -21,29 +21,26 @@ pub fn classpath(
 
     for lib in libraries.iter() {
         if should_use_library(lib)? {
-            let artifact = lib
-                .downloads
-                .artifact
-                .as_ref()
-                .context("artifact must be Some()")?;
-            let lib_path = artifact.path.clone().context("LibPath must be Some()")?;
+            if let Some(artifact) = lib.downloads.artifact.as_ref() {
+                let lib_path = artifact.path.clone().context("LibPath must be Some()")?;
 
-            let replaced_lib_path = if cfg!(target_os = "windows") {
-                lib_path.replace('/', "\\")
-            } else {
-                lib_path
-            };
+                let replaced_lib_path = if cfg!(target_os = "windows") {
+                    lib_path.replace('/', "\\")
+                } else {
+                    lib_path
+                };
 
-            let final_lib_path = Path::new(&libraries_path).join(replaced_lib_path);
+                let final_lib_path = Path::new(&libraries_path).join(replaced_lib_path);
 
-            classpath.push_str(
-                format!(
-                    "{}{}",
-                    CLASSPATH_SEPARATOR,
-                    final_lib_path.to_string_lossy()
-                )
-                .as_str(),
-            );
+                classpath.push_str(
+                    format!(
+                        "{}{}",
+                        CLASSPATH_SEPARATOR,
+                        final_lib_path.to_string_lossy()
+                    )
+                    .as_str(),
+                );
+            }
 
             if let Some(natives) = lib.downloads.classifiers.as_ref() {
                 let native_option = match std::env::consts::OS {

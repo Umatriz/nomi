@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Manifest {
+    #[serde(alias = "minecraftArguments")]
     pub arguments: Arguments,
     pub asset_index: ManifestAssetIndex,
     pub assets: String,
@@ -22,9 +23,13 @@ pub struct Manifest {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Arguments {
-    pub game: Vec<JvmArgument>,
-    pub jvm: Vec<JvmArgument>,
+#[serde(untagged)]
+pub enum Arguments {
+    New {
+        game: Vec<JvmArgument>,
+        jvm: Vec<JvmArgument>,
+    },
+    Old(String),
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -120,4 +125,17 @@ pub fn read_manifest_from_file<P: AsRef<Path>>(path: &P) -> anyhow::Result<Manif
     let file = std::fs::File::open(path)?;
 
     Ok(serde_json::from_reader::<_, Manifest>(file)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::utils::get;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn old_version_test() {
+        let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/832d95b9f40699d4961394dcf6cf549e65f15dc5/1.12.2.json").await.unwrap();
+        println!("{:#?}", manifest)
+    }
 }

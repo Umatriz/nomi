@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{ffi::OsStr, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -9,6 +9,13 @@ pub enum JavaRunner {
 }
 
 impl JavaRunner {
+    pub fn get(&self) -> &dyn AsRef<OsStr> {
+        match self {
+            JavaRunner::String(s) => s,
+            JavaRunner::Path(p) => p,
+        }
+    }
+
     pub fn path(p: PathBuf) -> JavaRunner {
         JavaRunner::Path(p)
     }

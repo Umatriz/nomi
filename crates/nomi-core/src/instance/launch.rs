@@ -7,7 +7,7 @@ use tokio::process::Command;
 
 use crate::repository::{
     java_runner::JavaRunner,
-    manifest::{read_manifest_from_file, JvmArgument},
+    manifest::{read_manifest_from_file, Arguments, JvmArgument},
     username::Username,
 };
 use rules::is_all_rules_satisfied;
@@ -120,34 +120,57 @@ impl LaunchInstance {
 
         let mut args: Vec<String> = vec![];
 
-        if let Some(ref prof) = self.profile {
+        if let Some(prof) = self.profile.as_ref() {
             prof.args.jvm.iter().for_each(|a| {
                 dbg!(&a);
                 args.push(a.to_owned());
             })
         }
 
-        for arg in manifest.arguments.jvm {
-            match arg {
-                JvmArgument::String(value) => {
-                    args.push(value);
-                }
-                JvmArgument::Struct { value, rules, .. } => {
-                    if !is_all_rules_satisfied(&rules)? {
-                        continue;
-                    }
+        let extra_libraries = self.profile.as_ref().map(|p| &p.libraries);
+        let classpath = classpath(
+            self.settings.version_jar_file.clone(),
+            self.settings.libraries_dir.clone(),
+            manifest.libraries,
+            extra_libraries,
+        )?;
 
-                    if let Some(value) = value.as_str() {
+        if let Arguments::New { ref jvm, .. } = manifest.arguments {
+            for arg in jvm {
+                match arg {
+                    JvmArgument::String(value) => {
                         args.push(value.to_string());
-                    } else if let Some(value_arr) = value.as_array() {
-                        for value in value_arr {
-                            if let Some(value) = value.as_str() {
-                                args.push(value.to_string());
+                    }
+                    JvmArgument::Struct { value, rules, .. } => {
+                        if !is_all_rules_satisfied(rules)? {
+                            continue;
+                        }
+
+                        if let Some(value) = value.as_str() {
+                            args.push(value.to_string());
+                        } else if let Some(value_arr) = value.as_array() {
+                            for value in value_arr {
+                                if let Some(value) = value.as_str() {
+                                    args.push(value.to_string());
+                                }
                             }
                         }
                     }
                 }
             }
+        }
+
+        if let Arguments::Old(_) = manifest.arguments {
+            // args.push("-Xms1024M".into());
+            // args.push("-Xmx1024M".into());
+            // args.push("-Xss1M".into());
+            // args.push("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump".into());
+            // args.push("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump".into());
+            args.push("-Djava.library.path=${natives_directory}".into());
+            // args.push("-Dminecraft.launcher.brand=${launcher_name}".into());
+            // args.push("-Dminecraft.launcher.version=${launcher_version}".into());
+            args.push("-cp ${classpath}".into());
+            // args.push("-jar E:\\programming\\code\\nomi\\crates\\cli\\minecraft\\minecraft\\versions\\1.12.2\\1.12.2.jar".into())
         }
 
         let main_class = if let Some(ref prof) = self.profile {
@@ -158,13 +181,18 @@ impl LaunchInstance {
 
         args.push(main_class.to_owned());
 
-        for arg in manifest.arguments.game {
-            match arg {
-                JvmArgument::String(value) => {
-                    args.push(value);
+        match manifest.arguments {
+            Arguments::New { game, .. } => {
+                for arg in game {
+                    match arg {
+                        JvmArgument::String(value) => {
+                            args.push(value);
+                        }
+                        _ => break,
+                    }
                 }
-                _ => break,
             }
+            Arguments::Old(arguments) => args.push(arguments),
         }
 
         if let Some(ref prof) = self.profile {
@@ -173,15 +201,6 @@ impl LaunchInstance {
                 args.push(a.to_owned());
             })
         }
-
-        let binding = self.profile.map(|prof| prof.libraries);
-        let extra_libraries = binding.as_ref();
-        let classpath = classpath(
-            self.settings.version_jar_file.clone(),
-            self.settings.libraries_dir.clone(),
-            manifest.libraries,
-            extra_libraries,
-        )?;
 
         args = args
             .iter()
@@ -222,10 +241,11 @@ impl LaunchInstance {
 
     pub async fn launch(self) -> anyhow::Result<i32> {
         let game_dir = self.settings.game_dir.clone();
+        let java = self.settings.java_bin.clone();
         let args = self.build_args()?;
 
-        let mut process = Command::new("java")
-            .args(args)
+        let mut process = Command::new(java.get())
+            .args(dbg!(args))
             .current_dir(game_dir)
             .spawn()
             .context("command failed to start")?;
