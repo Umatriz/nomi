@@ -129,7 +129,10 @@ impl LaunchInstance {
 
         let extra_libraries = self.profile.as_ref().map(|p| &p.libraries);
         let classpath = classpath(
-            self.settings.version_jar_file.clone(),
+            match manifest.arguments {
+                Arguments::New { .. } => Some(self.settings.version_jar_file.clone()),
+                Arguments::Old(_) => None,
+            },
             self.settings.libraries_dir.clone(),
             manifest.libraries,
             extra_libraries,
@@ -169,6 +172,10 @@ impl LaunchInstance {
             args.push("-Djava.library.path=${natives_directory}".into());
             // args.push("-Dminecraft.launcher.brand=${launcher_name}".into());
             // args.push("-Dminecraft.launcher.version=${launcher_version}".into());
+            args.push(format!(
+                "-Dminecraft.client.jar={}",
+                &self.settings.version_jar_file.display()
+            ));
             args.push("-cp ${classpath}".into());
             // args.push("-jar E:\\programming\\code\\nomi\\crates\\cli\\minecraft\\minecraft\\versions\\1.12.2\\1.12.2.jar".into())
         }

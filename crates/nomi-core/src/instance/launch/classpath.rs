@@ -12,12 +12,15 @@ pub fn should_use_library(lib: &ManifestLibrary) -> Result<bool> {
 }
 
 pub fn classpath(
-    jar_file: PathBuf,
+    jar_file: Option<PathBuf>,
     libraries_path: PathBuf,
     libraries: Vec<ManifestLibrary>,
     extra_libraries: Option<&Vec<SimpleLib>>,
 ) -> Result<String> {
-    let mut classpath = jar_file.to_string_lossy().to_string();
+    let mut classpath = match jar_file {
+        Some(p) => p.to_string_lossy().to_string(),
+        None => String::new(),
+    };
 
     for lib in libraries.iter() {
         if should_use_library(lib)? {
@@ -101,7 +104,7 @@ mod tests {
         let fake_manifest: Manifest = reqwest::get("https://piston-meta.mojang.com/v1/packages/334b33fcba3c9be4b7514624c965256535bd7eba/1.18.2.json").await.unwrap().json().await.unwrap();
 
         let classpath = classpath(
-            PathBuf::from("test.jar"),
+            Some(PathBuf::from("test.jar")),
             PathBuf::from("test_libs"),
             fake_manifest.libraries,
             None,
@@ -121,7 +124,7 @@ mod tests {
         let simple_lib = SimpleLib::from(maven);
 
         let classpath = classpath(
-            PathBuf::from("test.jar"),
+            Some(PathBuf::from("test.jar")),
             PathBuf::from("test_libs"),
             fake_manifest.libraries,
             Some(&vec![simple_lib]),
