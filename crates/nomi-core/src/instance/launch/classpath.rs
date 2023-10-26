@@ -17,10 +17,11 @@ pub fn classpath(
     libraries: Vec<ManifestLibrary>,
     extra_libraries: Option<&Vec<SimpleLib>>,
 ) -> Result<String> {
-    let mut classpath = match jar_file {
-        Some(p) => p.to_string_lossy().to_string(),
-        None => String::new(),
-    };
+    let mut classpath = vec![];
+
+    if let Some(path) = jar_file {
+        classpath.push(path)
+    }
 
     for lib in libraries.iter() {
         if should_use_library(lib)? {
@@ -35,14 +36,7 @@ pub fn classpath(
 
                 let final_lib_path = Path::new(&libraries_path).join(replaced_lib_path);
 
-                classpath.push_str(
-                    format!(
-                        "{}{}",
-                        CLASSPATH_SEPARATOR,
-                        final_lib_path.to_string_lossy()
-                    )
-                    .as_str(),
-                );
+                classpath.push(final_lib_path);
             }
 
             if let Some(natives) = lib.downloads.classifiers.as_ref() {
@@ -62,16 +56,9 @@ pub fn classpath(
                         lib_path
                     };
 
-                    let final_lib_path = &libraries_path.join(replaced_lib_path);
+                    let final_lib_path = libraries_path.join(replaced_lib_path);
 
-                    classpath.push_str(
-                        format!(
-                            "{}{}",
-                            CLASSPATH_SEPARATOR,
-                            final_lib_path.to_string_lossy()
-                        )
-                        .as_str(),
-                    );
+                    classpath.push(final_lib_path);
                 }
             }
         }
@@ -79,18 +66,15 @@ pub fn classpath(
 
     if let Some(extra_libs) = extra_libraries {
         extra_libs.iter().for_each(|lib| {
-            classpath.push_str(
-                format!(
-                    "{}{}",
-                    CLASSPATH_SEPARATOR,
-                    &libraries_path.join(&lib.jar).to_string_lossy()
-                )
-                .as_str(),
-            );
+            classpath.push(libraries_path.join(&lib.jar));
         })
     }
+    let classpath_iter = classpath.iter().map(|p| p.display().to_string());
 
-    Ok(classpath)
+    let final_classpath =
+        itertools::intersperse(classpath_iter, CLASSPATH_SEPARATOR.to_string()).collect::<String>();
+
+    Ok(final_classpath)
 }
 
 #[cfg(test)]
