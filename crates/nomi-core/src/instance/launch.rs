@@ -93,7 +93,7 @@ impl LaunchInstance {
         self.settings.uuid = uuid
     }
 
-    fn build_args(self) -> anyhow::Result<Vec<String>> {
+    fn build_args(self) -> anyhow::Result<(Vec<String>, String)> {
         let assets_dir = self.settings.assets.clone();
         let game_dir = self.settings.game_dir.clone();
         let java_bin = self.settings.java_bin.clone();
@@ -176,7 +176,7 @@ impl LaunchInstance {
                 "-Dminecraft.client.jar={}",
                 &self.settings.version_jar_file.display()
             ));
-            args.push("-cp ${classpath}".into());
+            // args.push("-cp ${classpath}".into());
             // args.push("-jar E:\\programming\\code\\nomi\\crates\\cli\\minecraft\\minecraft\\versions\\1.12.2\\1.12.2.jar".into())
         }
 
@@ -243,15 +243,16 @@ impl LaunchInstance {
             })
             .collect();
 
-        Ok(args)
+        Ok((args, classpath))
     }
 
     pub async fn launch(self) -> anyhow::Result<i32> {
         let game_dir = self.settings.game_dir.clone();
         let java = self.settings.java_bin.clone();
-        let args = self.build_args()?;
+        let (args, classpath) = self.build_args()?;
 
         let mut process = Command::new(java.get())
+            .env("CLASSPATH", classpath)
             .args(dbg!(args))
             .current_dir(game_dir)
             .spawn()
