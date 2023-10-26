@@ -129,10 +129,7 @@ impl LaunchInstance {
 
         let extra_libraries = self.profile.as_ref().map(|p| &p.libraries);
         let classpath = classpath(
-            match manifest.arguments {
-                Arguments::New { .. } => Some(self.settings.version_jar_file.clone()),
-                Arguments::Old(_) => None,
-            },
+            Some(self.settings.version_jar_file.clone()),
             self.settings.libraries_dir.clone(),
             manifest.libraries,
             extra_libraries,
@@ -176,7 +173,7 @@ impl LaunchInstance {
                 "-Dminecraft.client.jar={}",
                 &self.settings.version_jar_file.display()
             ));
-            // args.push("-cp ${classpath}".into());
+            // args.push("-cp \"${classpath}\"".into());
             // args.push("-jar E:\\programming\\code\\nomi\\crates\\cli\\minecraft\\minecraft\\versions\\1.12.2\\1.12.2.jar".into())
         }
 
@@ -251,12 +248,14 @@ impl LaunchInstance {
         let java = self.settings.java_bin.clone();
         let (args, classpath) = self.build_args()?;
 
-        let mut process = Command::new(java.get())
-            .env("CLASSPATH", classpath)
+        let mut process = dbg!(Command::new(java.get())
+            .env("CLASSPATH", dbg!(classpath))
+            .arg("-Xms2048M")
+            .arg("-Xmx2048M")
             .args(dbg!(args))
-            .current_dir(game_dir)
-            .spawn()
-            .context("command failed to start")?;
+            .current_dir(game_dir))
+        .spawn()
+        .context("command failed to start")?;
 
         let status = process
             .wait()

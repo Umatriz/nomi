@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
+use tracing::{error, info, warn};
 
 use super::{rules::is_all_rules_satisfied, CLASSPATH_SEPARATOR};
 use crate::repository::{manifest::ManifestLibrary, simple_lib::SimpleLib};
@@ -37,9 +38,12 @@ pub fn classpath(
                 let final_lib_path = Path::new(&libraries_path).join(replaced_lib_path);
 
                 classpath.push(final_lib_path);
+            } else {
+                warn!("{:#?}", lib)
             }
 
             if let Some(natives) = lib.downloads.classifiers.as_ref() {
+                info!("{:#?}", natives);
                 let native_option = match std::env::consts::OS {
                     "linux" => natives.natives_linux.as_ref(),
                     "windows" => natives.natives_windows.as_ref(),
@@ -85,7 +89,7 @@ mod tests {
 
     #[tokio::test]
     async fn it_works() {
-        let fake_manifest: Manifest = reqwest::get("https://piston-meta.mojang.com/v1/packages/334b33fcba3c9be4b7514624c965256535bd7eba/1.18.2.json").await.unwrap().json().await.unwrap();
+        let fake_manifest: Manifest = reqwest::get("https://piston-meta.mojang.com/v1/packages/832d95b9f40699d4961394dcf6cf549e65f15dc5/1.12.2.json").await.unwrap().json().await.unwrap();
 
         let classpath = classpath(
             Some(PathBuf::from("test.jar")),

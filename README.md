@@ -1,7 +1,5 @@
 # Nomi
 
----
-
 [![Discord](https://img.shields.io/discord/1115256451850584215?logo=discord&label=Discord%20Server)](https://discord.gg/qRD5XEJKc4) ![GitHub](https://img.shields.io/github/license/Umatriz/nomi)
 
 [Discord](https://discord.gg/qRD5XEJKc4)
