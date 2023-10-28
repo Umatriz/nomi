@@ -320,12 +320,12 @@ impl LaunchInstance {
 
     fn replace_args(
         &self,
-        x: &String,
-        assets_dir: &PathBuf,
-        game_dir: &PathBuf,
-        natives_dir: &PathBuf,
-        assets_index: &String,
-        classpath: &String,
+        x: &str,
+        assets_dir: &Path,
+        game_dir: &Path,
+        natives_dir: &Path,
+        assets_index: &str,
+        classpath: &str,
     ) -> String {
         x.replace("${assets_root}", assets_dir.to_str().unwrap())
             .replace("${game_directory}", game_dir.to_str().unwrap())
@@ -360,11 +360,10 @@ impl LaunchInstance {
         let game_dir = self.settings.game_dir.clone();
         let java = self.settings.java_bin.clone();
         let native_dir = self.settings.natives_dir.clone();
-        let (args, classpath) = self.build_args()?;
+        let (args, _) = self.build_args()?;
 
         let mut command = Command::new(java.get());
         command
-            // .env("CLASSPATH", dbg!(classpath))
             .arg("-Xms2048M")
             .arg("-Xmx2048M")
             .args(dbg!(args))
