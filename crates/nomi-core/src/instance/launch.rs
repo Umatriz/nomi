@@ -5,6 +5,7 @@ use std::{
 };
 
 use anyhow::Context;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::process::Command;
@@ -189,7 +190,7 @@ impl LaunchInstance {
         Ok(())
     }
 
-    fn build_args(self) -> anyhow::Result<(Vec<String>, String, Option<String>)> {
+    fn build_args(self) -> anyhow::Result<(Vec<String>, String)> {
         let assets_dir = self.settings.assets.clone();
         let game_dir = self.settings.game_dir.clone();
         let java_bin = self.settings.java_bin.clone();
@@ -253,19 +254,18 @@ impl LaunchInstance {
         }
 
         if let Arguments::Old(_) = manifest.arguments {
-            // args.push("-Xms1024M".into());
-            // args.push("-Xmx1024M".into());
-            // args.push("-Xss1M".into());
-            // args.push("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump".into());
-            // args.push("-XX:HeapDumpPath=MojangTricksIntelDriversForPerformance_javaw.exe_minecraft.exe.heapdump".into());
-            args.push("-Djava.library.path=${natives_directory}".into());
+            args.push(format!(
+                "-Djava.library.path={}",
+                &self.settings.natives_dir.display()
+            ));
             // args.push("-Dminecraft.launcher.brand=${launcher_name}".into());
             // args.push("-Dminecraft.launcher.version=${launcher_version}".into());
             args.push(format!(
                 "-Dminecraft.client.jar={}",
                 &self.settings.version_jar_file.display()
             ));
-            // args.push("-cp ${classpath}".to_string());
+            args.push("-cp".to_string());
+            args.push("${classpath}".to_string());
             // args.push("-jar E:\\programming\\code\\nomi\\crates\\cli\\minecraft\\minecraft\\versions\\1.12.2\\1.12.2.jar".into())
         }
 
@@ -277,7 +277,7 @@ impl LaunchInstance {
 
         args.push(main_class.to_owned());
 
-        let mut old_args = match manifest.arguments {
+        match manifest.arguments {
             Arguments::New { game, .. } => {
                 for arg in game {
                     match arg {
@@ -287,9 +287,11 @@ impl LaunchInstance {
                         _ => break,
                     }
                 }
-                None
             }
-            Arguments::Old(arguments) => Some(arguments),
+            Arguments::Old(arguments) => {
+                let mut splited = arguments.split_whitespace().map(String::from).collect_vec();
+                args.append(&mut splited);
+            }
         };
 
         if let Some(ref prof) = self.profile {
@@ -299,33 +301,22 @@ impl LaunchInstance {
             })
         }
 
-        if let Some(old) = old_args {
-            old_args = Some(self.replace_args(
-                &old,
-                &assets_dir,
-                &game_dir,
-                &natives_dir,
-                assets_index,
-                &classpath,
-            ))
-        } else {
-            args = args
-                .iter()
-                .map(|x| {
-                    // TODO: remove unwraps here
-                    self.replace_args(
-                        x,
-                        &assets_dir,
-                        &game_dir,
-                        &natives_dir,
-                        assets_index,
-                        &classpath,
-                    )
-                })
-                .collect();
-        }
+        args = args
+            .iter()
+            .map(|x| {
+                // TODO: remove unwraps here
+                self.replace_args(
+                    x,
+                    &assets_dir,
+                    &game_dir,
+                    &natives_dir,
+                    assets_index,
+                    &classpath,
+                )
+            })
+            .collect();
 
-        Ok((args, classpath, old_args))
+        Ok((args, classpath))
     }
 
     fn replace_args(
@@ -370,18 +361,16 @@ impl LaunchInstance {
         let game_dir = self.settings.game_dir.clone();
         let java = self.settings.java_bin.clone();
         let native_dir = self.settings.natives_dir.clone();
-        let (args, classpath, old_args) = self.build_args()?;
+        let (args, classpath) = self.build_args()?;
 
         let mut command = Command::new(java.get());
         command
-            .env("CLASSPATH", classpath)
+            // .env("CLASSPATH", dbg!(classpath))
             .arg("-Xms2048M")
             .arg("-Xmx2048M")
             .args(dbg!(args))
             .current_dir(game_dir);
-        if let Some(a) = old_args {
-            command.arg(a);
-        }
+        println!("{:?}", command);
         let mut process = command.spawn().context("command failed to start")?;
 
         let status = process
