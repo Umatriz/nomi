@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 use super::{rules::is_all_rules_satisfied, CLASSPATH_SEPARATOR};
 use crate::repository::{manifest::ManifestLibrary, simple_lib::SimpleLib};
@@ -13,16 +13,15 @@ pub fn should_use_library(lib: &ManifestLibrary) -> Result<bool> {
 }
 
 pub fn classpath(
-    jar_file: Option<PathBuf>,
+    jar_file: PathBuf,
     libraries_path: PathBuf,
     libraries: Vec<ManifestLibrary>,
     extra_libraries: Option<&Vec<SimpleLib>>,
-) -> Result<String> {
+) -> Result<(String, Vec<PathBuf>)> {
     let mut classpath = vec![];
+    let mut native_libs = vec![];
 
-    if let Some(path) = jar_file {
-        classpath.push(path)
-    }
+    classpath.push(jar_file);
 
     for lib in libraries.iter() {
         if should_use_library(lib)? {
@@ -62,6 +61,7 @@ pub fn classpath(
 
                     let final_lib_path = libraries_path.join(replaced_lib_path);
 
+                    native_libs.push(final_lib_path.clone());
                     classpath.push(final_lib_path);
                 }
             }
@@ -78,7 +78,7 @@ pub fn classpath(
     let final_classpath =
         itertools::intersperse(classpath_iter, CLASSPATH_SEPARATOR.to_string()).collect::<String>();
 
-    Ok(final_classpath)
+    Ok((final_classpath, native_libs))
 }
 
 #[cfg(test)]
@@ -92,14 +92,14 @@ mod tests {
         let fake_manifest: Manifest = reqwest::get("https://piston-meta.mojang.com/v1/packages/832d95b9f40699d4961394dcf6cf549e65f15dc5/1.12.2.json").await.unwrap().json().await.unwrap();
 
         let classpath = classpath(
-            Some(PathBuf::from("test.jar")),
+            PathBuf::from("test.jar"),
             PathBuf::from("test_libs"),
             fake_manifest.libraries,
             None,
         )
         .unwrap();
 
-        println!("{}", classpath);
+        println!("{:#?}", classpath);
     }
 
     #[tokio::test]
@@ -112,13 +112,13 @@ mod tests {
         let simple_lib = SimpleLib::from(maven);
 
         let classpath = classpath(
-            Some(PathBuf::from("test.jar")),
+            PathBuf::from("test.jar"),
             PathBuf::from("test_libs"),
             fake_manifest.libraries,
             Some(&vec![simple_lib]),
         )
         .unwrap();
 
-        println!("{}", classpath);
+        println!("{:#?}", classpath);
     }
 }

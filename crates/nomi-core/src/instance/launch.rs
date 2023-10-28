@@ -1,18 +1,24 @@
-use std::path::PathBuf;
+use std::{
+    cell::RefCell,
+    fs::{File, OpenOptions},
+    io,
+    path::{Path, PathBuf},
+};
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::process::Command;
+use tracing::{info, warn};
 
 use crate::repository::{
     java_runner::JavaRunner,
-    manifest::{read_manifest_from_file, Arguments, JvmArgument},
+    manifest::{read_manifest_from_file, Arguments, JvmArgument, ManifestLibrary},
     username::Username,
 };
 use rules::is_all_rules_satisfied;
 
-use self::classpath::classpath;
+use self::classpath::{classpath, should_use_library};
 
 use super::{profile::LoaderProfile, Undefined};
 
@@ -93,6 +99,100 @@ impl LaunchInstance {
         self.settings.uuid = uuid
     }
 
+    fn classpath(&self, libraries: Vec<ManifestLibrary>) -> anyhow::Result<(String, Vec<PathBuf>)> {
+        let mut classpath = vec![];
+        let mut native_libs = vec![];
+
+        classpath.push(self.settings.version_jar_file.clone());
+
+        for lib in libraries.iter() {
+            if should_use_library(lib)? {
+                if let Some(artifact) = lib.downloads.artifact.as_ref() {
+                    let lib_path = artifact.path.clone().context("LibPath must be Some()")?;
+
+                    let replaced_lib_path = if cfg!(target_os = "windows") {
+                        lib_path.replace('/', "\\")
+                    } else {
+                        lib_path
+                    };
+
+                    let final_lib_path =
+                        Path::new(&self.settings.libraries_dir).join(replaced_lib_path);
+
+                    classpath.push(final_lib_path);
+                } else {
+                    warn!("{:#?}", lib)
+                }
+
+                if let Some(natives) = lib.downloads.classifiers.as_ref() {
+                    info!("{:#?}", natives);
+                    let native_option = match std::env::consts::OS {
+                        "linux" => natives.natives_linux.as_ref(),
+                        "windows" => natives.natives_windows.as_ref(),
+                        "macos" => natives.natives_macos.as_ref(),
+                        _ => unreachable!(),
+                    };
+
+                    if let Some(native_lib) = native_option {
+                        let lib_path = native_lib.path.clone().context("LibPath must be Some()")?;
+
+                        let replaced_lib_path = if cfg!(target_os = "windows") {
+                            lib_path.replace('/', "\\")
+                        } else {
+                            lib_path
+                        };
+
+                        let final_lib_path = self.settings.libraries_dir.join(replaced_lib_path);
+
+                        native_libs.push(final_lib_path.clone());
+                        classpath.push(final_lib_path);
+                    }
+                }
+            }
+        }
+
+        if let Some(extra_libs) = self.profile.as_ref().map(|p| &p.libraries) {
+            extra_libs.iter().for_each(|lib| {
+                classpath.push(self.settings.libraries_dir.join(&lib.jar));
+            })
+        }
+        let classpath_iter = classpath.iter().map(|p| p.display().to_string());
+
+        let final_classpath =
+            itertools::intersperse(classpath_iter, CLASSPATH_SEPARATOR.to_string())
+                .collect::<String>();
+
+        Ok((final_classpath, native_libs))
+    }
+
+    fn process_natives(&self, natives: Vec<PathBuf>) -> anyhow::Result<()> {
+        for lib in natives {
+            let reader = OpenOptions::new().read(true).open(lib)?;
+            std::fs::create_dir_all(&self.settings.natives_dir)?;
+
+            let mut archive = zip::ZipArchive::new(reader)?;
+
+            let mut names = vec![];
+            archive
+                .file_names()
+                .map(String::from)
+                .for_each(|el| names.push(el));
+
+            names
+                .into_iter()
+                .filter(|l| l.ends_with(".dll") || l.ends_with(".so") || l.ends_with(".dylib"))
+                .try_for_each(|lib| {
+                    let mut file = archive.by_name(&lib)?;
+                    let mut out = File::create(self.settings.natives_dir.join(lib))?;
+                    io::copy(&mut file, &mut out)?;
+
+                    Ok::<_, anyhow::Error>(())
+                })?;
+        }
+
+        Ok(())
+    }
+
     fn build_args(self) -> anyhow::Result<(Vec<String>, String)> {
         let assets_dir = self.settings.assets.clone();
         let game_dir = self.settings.game_dir.clone();
@@ -127,13 +227,9 @@ impl LaunchInstance {
             })
         }
 
-        let extra_libraries = self.profile.as_ref().map(|p| &p.libraries);
-        let classpath = classpath(
-            Some(self.settings.version_jar_file.clone()),
-            self.settings.libraries_dir.clone(),
-            manifest.libraries,
-            extra_libraries,
-        )?;
+        let (classpath, native_libs) = self.classpath(manifest.libraries)?;
+
+        self.process_natives(native_libs)?;
 
         if let Arguments::New { ref jvm, .. } = manifest.arguments {
             for arg in jvm {
