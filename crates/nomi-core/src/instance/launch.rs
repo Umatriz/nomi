@@ -258,15 +258,14 @@ impl LaunchInstance {
                 "-Djava.library.path={}",
                 &self.settings.natives_dir.display()
             ));
-            // args.push("-Dminecraft.launcher.brand=${launcher_name}".into());
-            // args.push("-Dminecraft.launcher.version=${launcher_version}".into());
+            args.push("-Dminecraft.launcher.brand=${launcher_name}".into());
+            args.push("-Dminecraft.launcher.version=${launcher_version}".into());
             args.push(format!(
                 "-Dminecraft.client.jar={}",
                 &self.settings.version_jar_file.display()
             ));
             args.push("-cp".to_string());
             args.push("${classpath}".to_string());
-            // args.push("-jar E:\\programming\\code\\nomi\\crates\\cli\\minecraft\\minecraft\\versions\\1.12.2\\1.12.2.jar".into())
         }
 
         let main_class = if let Some(ref prof) = self.profile {
