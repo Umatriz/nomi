@@ -1,5 +1,4 @@
 use std::{
-    cell::RefCell,
     fs::{File, OpenOptions},
     io,
     path::{Path, PathBuf},
@@ -18,7 +17,7 @@ use crate::repository::{
 };
 use rules::is_all_rules_satisfied;
 
-use self::classpath::{classpath, should_use_library};
+use self::classpath::should_use_library;
 
 use super::{profile::LoaderProfile, Undefined};
 
@@ -120,12 +119,9 @@ impl LaunchInstance {
                         Path::new(&self.settings.libraries_dir).join(replaced_lib_path);
 
                     classpath.push(final_lib_path);
-                } else {
-                    warn!("{:#?}", lib)
                 }
 
                 if let Some(natives) = lib.downloads.classifiers.as_ref() {
-                    info!("{:#?}", natives);
                     let native_option = match std::env::consts::OS {
                         "linux" => natives.natives_linux.as_ref(),
                         "windows" => natives.natives_windows.as_ref(),
@@ -193,7 +189,7 @@ impl LaunchInstance {
         Ok(())
     }
 
-    fn build_args(self) -> anyhow::Result<(Vec<String>, String)> {
+    fn build_args(self) -> anyhow::Result<(Vec<String>, String, Option<String>)> {
         let assets_dir = self.settings.assets.clone();
         let game_dir = self.settings.game_dir.clone();
         let java_bin = self.settings.java_bin.clone();
@@ -269,7 +265,7 @@ impl LaunchInstance {
                 "-Dminecraft.client.jar={}",
                 &self.settings.version_jar_file.display()
             ));
-            // args.push("-cp \"${classpath}\"".into());
+            // args.push("-cp ${classpath}".to_string());
             // args.push("-jar E:\\programming\\code\\nomi\\crates\\cli\\minecraft\\minecraft\\versions\\1.12.2\\1.12.2.jar".into())
         }
 
@@ -281,7 +277,7 @@ impl LaunchInstance {
 
         args.push(main_class.to_owned());
 
-        match manifest.arguments {
+        let mut old_args = match manifest.arguments {
             Arguments::New { game, .. } => {
                 for arg in game {
                     match arg {
@@ -291,9 +287,10 @@ impl LaunchInstance {
                         _ => break,
                     }
                 }
+                None
             }
-            Arguments::Old(arguments) => args.push(arguments),
-        }
+            Arguments::Old(arguments) => Some(arguments),
+        };
 
         if let Some(ref prof) = self.profile {
             prof.args.game.iter().for_each(|a| {
@@ -302,62 +299,98 @@ impl LaunchInstance {
             })
         }
 
-        args = args
-            .iter()
-            .map(|x| {
-                // TODO: remove unwraps here
-                x.replace("${assets_root}", assets_dir.to_str().unwrap())
-                    .replace("${game_directory}", game_dir.to_str().unwrap())
-                    .replace("${natives_directory}", natives_dir.to_str().unwrap())
-                    .replace("${launcher_name}", "nomi")
-                    .replace("${launcher_version}", "0.0.1")
-                    .replace(
-                        "${auth_access_token}",
-                        self.settings
-                            .access_token
-                            .clone()
-                            .unwrap_or("null".to_string())
-                            .as_str(),
+        if let Some(old) = old_args {
+            old_args = Some(self.replace_args(
+                &old,
+                &assets_dir,
+                &game_dir,
+                &natives_dir,
+                assets_index,
+                &classpath,
+            ))
+        } else {
+            args = args
+                .iter()
+                .map(|x| {
+                    // TODO: remove unwraps here
+                    self.replace_args(
+                        x,
+                        &assets_dir,
+                        &game_dir,
+                        &natives_dir,
+                        assets_index,
+                        &classpath,
                     )
-                    .replace("${auth_player_name}", self.settings.username.get())
-                    .replace(
-                        "${auth_uuid}",
-                        self.settings
-                            .uuid
-                            .clone()
-                            .unwrap_or("null".to_string())
-                            .as_str(),
-                    )
-                    .replace("${version_type}", &self.settings.version_type)
-                    .replace("${version_name}", &self.settings.version)
-                    .replace("${assets_index_name}", assets_index)
-                    .replace("${user_properties}", "{}")
-                    .replace("${classpath}", &classpath)
-            })
-            .collect();
+                })
+                .collect();
+        }
 
-        Ok((args, classpath))
+        Ok((args, classpath, old_args))
+    }
+
+    fn replace_args(
+        &self,
+        x: &String,
+        assets_dir: &PathBuf,
+        game_dir: &PathBuf,
+        natives_dir: &PathBuf,
+        assets_index: &String,
+        classpath: &String,
+    ) -> String {
+        x.replace("${assets_root}", assets_dir.to_str().unwrap())
+            .replace("${game_directory}", game_dir.to_str().unwrap())
+            .replace("${natives_directory}", natives_dir.to_str().unwrap())
+            .replace("${launcher_name}", "nomi")
+            .replace("${launcher_version}", "0.0.1")
+            .replace(
+                "${auth_access_token}",
+                self.settings
+                    .access_token
+                    .clone()
+                    .unwrap_or("null".to_string())
+                    .as_str(),
+            )
+            .replace("${auth_player_name}", self.settings.username.get())
+            .replace(
+                "${auth_uuid}",
+                self.settings
+                    .uuid
+                    .clone()
+                    .unwrap_or("null".to_string())
+                    .as_str(),
+            )
+            .replace("${version_type}", &self.settings.version_type)
+            .replace("${version_name}", &self.settings.version)
+            .replace("${assets_index_name}", assets_index)
+            .replace("${user_properties}", "{}")
+            .replace("${classpath}", classpath)
     }
 
     pub async fn launch(self) -> anyhow::Result<i32> {
         let game_dir = self.settings.game_dir.clone();
         let java = self.settings.java_bin.clone();
-        let (args, classpath) = self.build_args()?;
+        let native_dir = self.settings.natives_dir.clone();
+        let (args, classpath, old_args) = self.build_args()?;
 
-        let mut process = dbg!(Command::new(java.get())
-            .env("CLASSPATH", dbg!(classpath))
+        let mut command = Command::new(java.get());
+        command
+            .env("CLASSPATH", classpath)
             .arg("-Xms2048M")
             .arg("-Xmx2048M")
             .args(dbg!(args))
-            .current_dir(game_dir))
-        .spawn()
-        .context("command failed to start")?;
+            .current_dir(game_dir);
+        if let Some(a) = old_args {
+            command.arg(a);
+        }
+        let mut process = command.spawn().context("command failed to start")?;
 
         let status = process
             .wait()
             .await?
             .code()
             .context("can't get minecraft exit code")?;
+
+        tokio::fs::remove_dir_all(native_dir).await?;
 
         Ok(status)
     }
