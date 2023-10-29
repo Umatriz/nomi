@@ -98,9 +98,9 @@ pub async fn download(
 
     instance.download().await?;
 
-    if !instance.assets.exists() {
-        instance.assets().await?.download().await?;
-    }
+    // if !instance.assets.exists() {
+    instance.assets().await?.download().await?;
+    // }
 
     let confgis = dir.join(".nomi/configs");
 
@@ -125,7 +125,10 @@ pub async fn download(
         version_type: "release".into(),
     };
 
-    let launch_instance = instance.launch_instance(settings);
+    let launch_instance = instance.launch_instance(
+        settings,
+        Some(vec!["-Xms2G".to_string(), "-Xmx4G".to_string()]),
+    );
     let profile = VersionProfileBuilder::new()
         .id(profiles.create_id())
         .instance(launch_instance)
@@ -165,6 +168,10 @@ pub async fn launch(dir: &Path, profile_id: &i32) -> anyhow::Result<i32> {
             Error::General("No such profile\nRun `list` to see installed versions".into()).into(),
         );
     };
+
+    /*
+       TODO: `jvm_args` don't works
+    */
 
     profile.instance.set_username(user_cfg.username);
     profile.instance.set_access_token(user_cfg.access_token);

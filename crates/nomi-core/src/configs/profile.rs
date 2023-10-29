@@ -25,9 +25,9 @@ impl VersionProfilesConfig {
 }
 
 /*
-    // TODO: add `profile` field that contains an enum of supported profiles
-    // TODO: cleanup names issues in `instance::profile` and `configs::profile`
-    TODO: fix `into_launch`
+// TODO: add `profile` field that contains an enum of supported profiles
+// TODO: cleanup names issues in `instance::profile` and `configs::profile`
+// TODO: fix `into_launch`
 */
 
 #[derive(Serialize, Deserialize, Debug, Default, Builder)]
@@ -86,7 +86,7 @@ mod tests {
             version_type: "release".to_string(),
         };
 
-        let l = builder.launch_instance(settings);
+        let l = builder.launch_instance(settings, None);
 
         let profile = VersionProfileBuilder::new()
             .id(mock.create_id())

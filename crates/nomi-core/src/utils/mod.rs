@@ -40,3 +40,7 @@ pub async fn write_into_file(data: &[u8], path: impl AsRef<Path>) -> anyhow::Res
 
     Ok(())
 }
+
+pub fn path_to_string(p: impl AsRef<Path>) -> String {
+    p.as_ref().to_string_lossy().to_string()
+}

@@ -45,6 +45,6 @@ async fn vanilla_test() {
         version_type: "release".to_string(),
     };
 
-    let l = builder.launch_instance(settings);
+    let l = builder.launch_instance(settings, None);
     l.launch().await.unwrap();
 }

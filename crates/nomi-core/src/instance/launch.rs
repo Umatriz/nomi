@@ -9,20 +9,23 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::process::Command;
-use tracing::{info, warn};
 
-use crate::repository::{
-    java_runner::JavaRunner,
-    manifest::{read_manifest_from_file, Arguments, JvmArgument, ManifestLibrary},
-    username::Username,
+use crate::{
+    instance::launch::macros::replace,
+    repository::{
+        java_runner::JavaRunner,
+        manifest::{Arguments, JvmArgument, Manifest, ManifestLibrary},
+        username::Username,
+    },
+    utils::path_to_string,
 };
 use rules::is_all_rules_satisfied;
 
-use self::classpath::should_use_library;
+use super::{
+    profile::{read_json, LoaderProfile},
+    Undefined,
+};
 
-use super::{profile::LoaderProfile, Undefined};
-
-pub mod classpath;
 pub mod rules;
 
 #[cfg(windows)]
@@ -31,13 +34,16 @@ const CLASSPATH_SEPARATOR: &str = ";";
 #[cfg(not(windows))]
 const CLASSPATH_SEPARATOR: &str = ":";
 
+const LAUNCHER_NAME: &str = "nomi";
+const LAUNCHER_VERSION: &str = "0.1.0";
+
 #[derive(Error, Debug)]
 pub enum LaunchError {
     #[error("The game directory doesn't exist.")]
-    GameDirNotExist,
+    GameDirNotFound,
 
     #[error("The java bin doesn't exist.")]
-    JavaBinNotExist,
+    JavaBinNotFound,
 
     #[error("The version file (.json) doesn't exist.")]
     VersionFileNotFound,
@@ -80,9 +86,17 @@ pub fn java_bin() -> Option<PathBuf> {
     java_bin
 }
 
+pub fn should_use_library(lib: &ManifestLibrary) -> anyhow::Result<bool> {
+    match lib.rules.as_ref() {
+        Some(rules) => Ok(is_all_rules_satisfied(rules)?),
+        None => Ok(true),
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct LaunchInstance {
     settings: LaunchSettings,
+    jvm_args: Option<Vec<String>>,
     profile: Option<LoaderProfile>,
 }
 
@@ -190,30 +204,22 @@ impl LaunchInstance {
         Ok(())
     }
 
-    fn build_args(self) -> anyhow::Result<(Vec<String>, String)> {
-        let assets_dir = self.settings.assets.clone();
-        let game_dir = self.settings.game_dir.clone();
-        let java_bin = self.settings.java_bin.clone();
-        let json_file = self.settings.manifest_file.clone();
-        let natives_dir = self.settings.natives_dir.clone();
-
-        if !game_dir.is_dir() {
-            return Err(LaunchError::GameDirNotExist.into());
+    async fn build_args(&self) -> anyhow::Result<(Vec<String>, String)> {
+        if !self.settings.game_dir.is_dir() {
+            return Err(LaunchError::GameDirNotFound.into());
         }
 
-        if let JavaRunner::Path(p) = java_bin {
+        if let JavaRunner::Path(p) = &self.settings.java_bin {
             if !p.is_file() {
-                return Err(LaunchError::JavaBinNotExist.into());
+                return Err(LaunchError::JavaBinNotFound.into());
             }
         }
 
-        if !json_file.is_file() {
+        if !self.settings.manifest_file.is_file() {
             return Err(LaunchError::VersionFileNotFound.into());
         }
 
-        let manifest = read_manifest_from_file(&json_file)?;
-
-        let assets_index = &manifest.asset_index.id;
+        let manifest = read_json::<Manifest>(&self.settings.manifest_file).await?;
 
         let mut args: Vec<String> = vec![];
 
@@ -228,50 +234,50 @@ impl LaunchInstance {
 
         self.process_natives(native_libs)?;
 
-        if let Arguments::New { ref jvm, .. } = manifest.arguments {
-            for arg in jvm {
-                match arg {
-                    JvmArgument::String(value) => {
-                        args.push(value.to_string());
-                    }
-                    JvmArgument::Struct { value, rules, .. } => {
-                        if !is_all_rules_satisfied(rules)? {
-                            continue;
-                        }
-
-                        if let Some(value) = value.as_str() {
+        match manifest.arguments {
+            Arguments::New { ref jvm, .. } => {
+                for arg in jvm {
+                    match arg {
+                        JvmArgument::String(value) => {
                             args.push(value.to_string());
-                        } else if let Some(value_arr) = value.as_array() {
-                            for value in value_arr {
-                                if let Some(value) = value.as_str() {
-                                    args.push(value.to_string());
+                        }
+                        JvmArgument::Struct { value, rules, .. } => {
+                            if !is_all_rules_satisfied(rules)? {
+                                continue;
+                            }
+
+                            if let Some(value) = value.as_str() {
+                                args.push(value.to_string());
+                            } else if let Some(value_arr) = value.as_array() {
+                                for value in value_arr {
+                                    if let Some(value) = value.as_str() {
+                                        args.push(value.to_string());
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+            Arguments::Old(_) => {
+                args.push(format!(
+                    "-Djava.library.path={}",
+                    &self.settings.natives_dir.display()
+                ));
+                args.push("-Dminecraft.launcher.brand=${launcher_name}".into());
+                args.push("-Dminecraft.launcher.version=${launcher_version}".into());
+                args.push(format!(
+                    "-Dminecraft.client.jar={}",
+                    &self.settings.version_jar_file.display()
+                ));
+                args.push("-cp".to_string());
+                args.push("${classpath}".to_string());
+            }
         }
 
-        if let Arguments::Old(_) = manifest.arguments {
-            args.push(format!(
-                "-Djava.library.path={}",
-                &self.settings.natives_dir.display()
-            ));
-            args.push("-Dminecraft.launcher.brand=${launcher_name}".into());
-            args.push("-Dminecraft.launcher.version=${launcher_version}".into());
-            args.push(format!(
-                "-Dminecraft.client.jar={}",
-                &self.settings.version_jar_file.display()
-            ));
-            args.push("-cp".to_string());
-            args.push("${classpath}".to_string());
-        }
-
-        let main_class = if let Some(ref prof) = self.profile {
-            &prof.main_class
-        } else {
-            &manifest.main_class
+        let main_class = match self.profile {
+            Some(ref prof) => &prof.main_class,
+            None => &manifest.main_class,
         };
 
         args.push(main_class.to_owned());
@@ -288,8 +294,8 @@ impl LaunchInstance {
                 }
             }
             Arguments::Old(arguments) => {
-                let mut splited = arguments.split_whitespace().map(String::from).collect_vec();
-                args.append(&mut splited);
+                let mut split = arguments.split_whitespace().map(String::from).collect_vec();
+                args.append(&mut split);
             }
         };
 
@@ -303,13 +309,12 @@ impl LaunchInstance {
         args = args
             .iter()
             .map(|x| {
-                // TODO: remove unwraps here
                 self.replace_args(
                     x,
-                    &assets_dir,
-                    &game_dir,
-                    &natives_dir,
-                    assets_index,
+                    &self.settings.assets,
+                    &self.settings.game_dir,
+                    &self.settings.natives_dir,
+                    &manifest.asset_index.id,
                     &classpath,
                 )
             })
@@ -327,48 +332,42 @@ impl LaunchInstance {
         assets_index: &str,
         classpath: &str,
     ) -> String {
-        x.replace("${assets_root}", assets_dir.to_str().unwrap())
-            .replace("${game_directory}", game_dir.to_str().unwrap())
-            .replace("${natives_directory}", natives_dir.to_str().unwrap())
-            .replace("${launcher_name}", "nomi")
-            .replace("${launcher_version}", "0.0.1")
-            .replace(
-                "${auth_access_token}",
-                self.settings
-                    .access_token
-                    .clone()
-                    .unwrap_or("null".to_string())
-                    .as_str(),
-            )
-            .replace("${auth_player_name}", self.settings.username.get())
-            .replace(
-                "${auth_uuid}",
-                self.settings
-                    .uuid
-                    .clone()
-                    .unwrap_or("null".to_string())
-                    .as_str(),
-            )
-            .replace("${version_type}", &self.settings.version_type)
-            .replace("${version_name}", &self.settings.version)
-            .replace("${assets_index_name}", assets_index)
-            .replace("${user_properties}", "{}")
-            .replace("${classpath}", classpath)
+        replace!(x,
+            "${assets_root}" => &path_to_string(assets_dir),
+            "${game_directory}" => &path_to_string(game_dir),
+            "${natives_directory}" => &path_to_string(natives_dir),
+            "${launcher_name}" => LAUNCHER_NAME,
+            "${launcher_version}" => LAUNCHER_VERSION,
+            "${auth_access_token}" => self.settings
+                .access_token
+                .clone()
+                .unwrap_or("null".to_string())
+                .as_str(),
+            "${auth_player_name}" => self.settings.username.get(),
+            "${auth_uuid}" => self.settings
+                .uuid
+                .clone()
+                .unwrap_or("null".to_string())
+                .as_str(),
+            "${version_type}" => &self.settings.version_type,
+            "${version_name}" => &self.settings.version,
+            "${assets_index_name}" => assets_index,
+            "${user_properties}" => "{}",
+            "${classpath}" => classpath
+        )
     }
 
-    pub async fn launch(self) -> anyhow::Result<i32> {
-        let game_dir = self.settings.game_dir.clone();
-        let java = self.settings.java_bin.clone();
-        let native_dir = self.settings.natives_dir.clone();
-        let (args, _) = self.build_args()?;
+    pub async fn launch(&self) -> anyhow::Result<i32> {
+        let (args, _) = self.build_args().await?;
 
-        let mut command = Command::new(java.get());
-        command
-            .arg("-Xms2048M")
-            .arg("-Xmx2048M")
-            .args(dbg!(args))
-            .current_dir(game_dir);
-        println!("{:?}", command);
+        let mut command = Command::new(self.settings.java_bin.get());
+        if let Some(jvm) = self.jvm_args.as_ref() {
+            command.args(jvm);
+        }
+        command.args(args).current_dir(&self.settings.game_dir);
+
+        println!("{:#?}", command);
+
         let mut process = command.spawn().context("command failed to start")?;
 
         let status = process
@@ -377,15 +376,31 @@ impl LaunchInstance {
             .code()
             .context("can't get minecraft exit code")?;
 
-        tokio::fs::remove_dir_all(native_dir).await?;
+        tokio::fs::remove_dir_all(&self.settings.natives_dir).await?;
 
         Ok(status)
     }
 }
 
+pub mod macros {
+    macro_rules! replace {
+        (
+            $initial:ident,
+            $($name:literal => $value:expr),+
+        ) => {
+            $initial
+            $(
+               .replace($name, $value)
+            )+
+        };
+    }
+    pub(crate) use replace;
+}
+
 #[derive(Default)]
 pub struct LaunchInstanceBuilder<S> {
     settings: S,
+    jvm_args: Option<Vec<String>>,
     profile: Option<LoaderProfile>,
 }
 
@@ -399,6 +414,7 @@ impl LaunchInstanceBuilder<Undefined> {
     pub fn settings(self, settings: LaunchSettings) -> LaunchInstanceBuilder<LaunchSettings> {
         LaunchInstanceBuilder {
             settings,
+            jvm_args: self.jvm_args,
             profile: self.profile,
         }
     }
@@ -408,7 +424,18 @@ impl<S> LaunchInstanceBuilder<S> {
     pub fn profile(self, profile: LoaderProfile) -> LaunchInstanceBuilder<S> {
         LaunchInstanceBuilder {
             settings: self.settings,
+            jvm_args: self.jvm_args,
             profile: Some(profile),
+        }
+    }
+}
+
+impl<S> LaunchInstanceBuilder<S> {
+    pub fn jvm_args(self, jvm_args: Vec<String>) -> LaunchInstanceBuilder<S> {
+        LaunchInstanceBuilder {
+            settings: self.settings,
+            jvm_args: Some(jvm_args),
+            profile: self.profile,
         }
     }
 }
@@ -417,6 +444,7 @@ impl LaunchInstanceBuilder<LaunchSettings> {
     pub fn build(self) -> LaunchInstance {
         LaunchInstance {
             settings: self.settings,
+            jvm_args: self.jvm_args,
             profile: self.profile,
         }
     }

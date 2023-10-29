@@ -85,8 +85,16 @@ impl Instance {
             .await
     }
 
-    pub fn launch_instance(self, settings: LaunchSettings) -> LaunchInstance {
+    pub fn launch_instance(
+        self,
+        settings: LaunchSettings,
+        jvm_args: Option<Vec<String>>,
+    ) -> LaunchInstance {
         let builder = LaunchInstanceBuilder::new().settings(settings);
+        let builder = match jvm_args {
+            Some(jvm) => builder.jvm_args(jvm),
+            None => builder,
+        };
         match self.instance {
             Inner::Vanilla(_) => builder.build(),
             Inner::Fabric(inner) => builder.profile(inner.profile.into()).build(),

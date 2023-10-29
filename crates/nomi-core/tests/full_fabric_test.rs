@@ -40,7 +40,7 @@ async fn full_fabric_test() {
         version_type: "release".to_string(),
     };
 
-    let launch = instance.launch_instance(settings);
+    let launch = instance.launch_instance(settings, None);
 
     let mock = VersionProfilesConfig { profiles: vec![] };
     let profile = VersionProfileBuilder::new()

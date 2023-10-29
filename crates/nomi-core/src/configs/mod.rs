@@ -37,7 +37,7 @@ where
     let s = tokio::fs::read_to_string(&path).await?;
     let body: T = toml::from_str(&s)?;
 
-    tracing::info!("Config {} created successfully", path.to_string_lossy());
+    tracing::info!("Config {} read successfully", path.to_string_lossy());
 
     Ok(body)
 }

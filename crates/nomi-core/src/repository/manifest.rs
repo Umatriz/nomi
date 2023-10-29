@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -119,12 +117,6 @@ pub struct ManifestClassifiers {
     pub natives_macos: Option<ManifestFile>,
     pub natives_windows: Option<ManifestFile>,
     pub natives_linux: Option<ManifestFile>,
-}
-
-pub fn read_manifest_from_file<P: AsRef<Path>>(path: &P) -> anyhow::Result<Manifest> {
-    let file = std::fs::File::open(path)?;
-
-    Ok(serde_json::from_reader::<_, Manifest>(file)?)
 }
 
 #[cfg(test)]
