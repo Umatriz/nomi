@@ -16,7 +16,7 @@ pub struct Assets {
     pub objects: HashMap<String, AssetInformation>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AssetInformation {
     pub hash: String,
     pub size: i64,
@@ -78,15 +78,24 @@ impl AssetsDownload {
     }
 
     pub async fn download_assets_chunked(&self, dir: &Path) -> anyhow::Result<()> {
-        let assets_chunks = self.assets.objects.iter().chunks(100);
+        let assets_chunks = self
+            .assets
+            .objects
+            .iter()
+            .collect_vec()
+            .chunks(100)
+            .map(|c| c.iter().cloned().collect())
+            .collect::<Vec<HashMap<_, _>>>();
+
+        // let assets_chunks = self.assets.objects.iter().chunks(100);
 
         // TODO: Implement retry pull for missing assets
 
         for asset in &assets_chunks {
-            let assets: Vec<_> = asset.collect();
+            // let assets: Vec<_> = asset.collect();
 
             let mut set = JoinSet::new();
-            for (_k, v) in assets {
+            for v in asset.values() {
                 let path = self.create_dir(dir, &v.hash[0..2]).await?;
                 let url = format!(
                     "https://resources.download.minecraft.net/{}/{}",

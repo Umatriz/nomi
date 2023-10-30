@@ -49,7 +49,7 @@ pub enum LaunchError {
     VersionFileNotFound,
 }
 
-#[derive(Serialize, Deserialize, Default, PartialEq, Debug)]
+#[derive(Serialize, Deserialize, Default, PartialEq, Debug, Clone)]
 pub struct LaunchSettings {
     #[serde(skip)]
     pub access_token: Option<String>,
@@ -93,7 +93,7 @@ pub fn should_use_library(lib: &ManifestLibrary) -> anyhow::Result<bool> {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct LaunchInstance {
     settings: LaunchSettings,
     jvm_args: Option<Vec<String>>,
@@ -347,7 +347,7 @@ impl LaunchInstance {
             "${auth_uuid}" => self.settings
                 .uuid
                 .clone()
-                .unwrap_or("null".to_string())
+                .unwrap_or(uuid::Uuid::new_v4().to_string())
                 .as_str(),
             "${version_type}" => &self.settings.version_type,
             "${version_name}" => &self.settings.version,
@@ -376,7 +376,7 @@ impl LaunchInstance {
             .code()
             .context("can't get minecraft exit code")?;
 
-        tokio::fs::remove_dir_all(&self.settings.natives_dir).await?;
+        // tokio::fs::remove_dir_all(&self.settings.natives_dir).await?;
 
         Ok(status)
     }

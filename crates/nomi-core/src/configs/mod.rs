@@ -41,3 +41,17 @@ where
 
     Ok(body)
 }
+
+pub fn read_toml_config_sync<T: ?Sized>(path: impl AsRef<Path>) -> anyhow::Result<T>
+where
+    T: DeserializeOwned,
+{
+    let path = path.as_ref();
+
+    let s = std::fs::read_to_string(path)?;
+    let body: T = toml::from_str(&s)?;
+
+    tracing::info!("Config {} read successfully", path.to_string_lossy());
+
+    Ok(body)
+}

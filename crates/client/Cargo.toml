@@ -1,0 +1,20 @@
+[package]
+name = "client"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+nomi-core = { path = "../nomi-core"}
+
+eframe = "0.23.0"
+pollster = "0.3.0"
+toml = "0.8.0"

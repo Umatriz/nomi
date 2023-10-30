@@ -30,7 +30,7 @@ impl VersionProfilesConfig {
 // TODO: fix `into_launch`
 */
 
-#[derive(Serialize, Deserialize, Debug, Default, Builder)]
+#[derive(Serialize, Deserialize, Debug, Default, Builder, Clone)]
 pub struct VersionProfile {
     pub id: i32,
     pub is_downloaded: bool,
@@ -40,7 +40,7 @@ pub struct VersionProfile {
 }
 
 impl VersionProfile {
-    pub async fn launch(self) -> anyhow::Result<i32> {
+    pub async fn launch(&self) -> anyhow::Result<i32> {
         self.instance.launch().await
     }
 }

@@ -1,18 +1,18 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct LauncherManifest {
     pub latest: LauncherManifestLatest,
     pub versions: Vec<LauncherManifestVersion>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct LauncherManifestLatest {
     pub release: String,
     pub snapshot: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default, Clone)]
 pub struct LauncherManifestVersion {
     pub id: String,
     #[serde(rename = "type")]

@@ -33,7 +33,7 @@ where
     Ok(())
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct LoaderProfile {
     pub name: String,
     pub main_class: String,

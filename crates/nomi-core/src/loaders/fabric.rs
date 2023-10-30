@@ -72,20 +72,8 @@ impl Fabric {
             game_version,
         })
     }
-}
 
-impl From<FabricProfile> for Fabric {
-    fn from(value: FabricProfile) -> Self {
-        Self {
-            game_version: value.inherits_from.clone(),
-            profile: value,
-        }
-    }
-}
-
-#[async_trait(?Send)]
-impl DownloadVersion for Fabric {
-    async fn download(
+    pub async fn download(
         &self,
         dir: impl AsRef<Path>,
         file_name: impl Into<String>,
@@ -101,7 +89,7 @@ impl DownloadVersion for Fabric {
         Ok(())
     }
 
-    async fn download_libraries(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
+    pub async fn download_libraries(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
         let dir = dir.as_ref();
         let mut set = JoinSet::new();
 
@@ -120,7 +108,7 @@ impl DownloadVersion for Fabric {
         Ok(())
     }
 
-    async fn create_json(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
+    pub async fn create_json(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
         let file_name = format!("{}.json", self.profile.id);
         let path = dir.as_ref().join(file_name);
 
@@ -140,6 +128,15 @@ impl DownloadVersion for Fabric {
         );
 
         Ok(())
+    }
+}
+
+impl From<FabricProfile> for Fabric {
+    fn from(value: FabricProfile) -> Self {
+        Self {
+            game_version: value.inherits_from.clone(),
+            profile: value,
+        }
     }
 }
 

@@ -22,3 +22,5 @@ temp/
 dead-crates/
 
 logo.txt
+CRASH_REPORT.txt
+.nomi/

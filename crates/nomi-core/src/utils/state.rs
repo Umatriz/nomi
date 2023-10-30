@@ -68,7 +68,7 @@ pub async fn launcher_manifest_state_try_init() -> anyhow::Result<ManifestState>
     })
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct ManifestState {
     pub launcher: LauncherManifest,
 }

@@ -7,6 +7,7 @@
 members = [
     "crates/nomi-core",
     "crates/cli",
+    "crates/client",
     "xtask"
     ]
 resolver = "2"

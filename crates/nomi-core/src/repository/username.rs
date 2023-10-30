@@ -2,7 +2,7 @@ use regex::Regex;
 use serde::{de::Visitor, Deserialize, Serialize};
 use thiserror::Error;
 
-#[derive(Serialize, Debug, PartialEq)]
+#[derive(Serialize, Debug, PartialEq, Clone)]
 pub struct Username(String);
 
 impl Default for Username {

@@ -40,37 +40,7 @@ impl Vanilla {
         Ok(Self { manifest })
     }
 
-    pub async fn download_version(
-        &self,
-        dir: impl AsRef<Path>,
-        file_name: impl Into<String>,
-    ) -> anyhow::Result<()> {
-        self.download(&dir, file_name).await?;
-
-        let asset = assets::AssetsDownload::new(
-            self.manifest.asset_index.url.clone(),
-            self.manifest.asset_index.id.clone(),
-        )
-        .await?;
-
-        asset.download_assets_chunked(dir.as_ref()).await?;
-        info!("Assets downloaded successfully");
-
-        asset.get_assets_json(dir.as_ref()).await?;
-        info!("Assets json created successfully");
-
-        self.create_json(dir.as_ref().join("versions").join(&self.manifest.id))
-            .await?;
-        self.download_libraries(dir.as_ref()).await?;
-        info!("Libraries downloaded successfully");
-
-        Ok(())
-    }
-}
-
-#[async_trait(?Send)]
-impl DownloadVersion for Vanilla {
-    async fn download(
+    pub async fn download(
         &self,
         dir: impl AsRef<Path>,
         file_name: impl Into<String>,
@@ -85,7 +55,7 @@ impl DownloadVersion for Vanilla {
         Ok(())
     }
 
-    async fn download_libraries(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
+    pub async fn download_libraries(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
         let mut set = JoinSet::new();
 
         let mut download_lib = |file: Option<&ManifestFile>| -> anyhow::Result<()> {
@@ -127,7 +97,7 @@ impl DownloadVersion for Vanilla {
         Ok(())
     }
 
-    async fn create_json(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
+    pub async fn create_json(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
         let file_name = format!("{}.json", self.manifest.id);
         let path = dir.as_ref().join(file_name);
 
