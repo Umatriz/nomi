@@ -1,8 +1,7 @@
 use eframe::{
-    egui::{self, Ui, WidgetText},
+    egui::{self, Ui},
     epaint::Vec2,
 };
-use egui_dock::{DockArea, DockState, NodeIndex, Style, TabViewer};
 use nomi_core::{
     configs::{
         profile::{VersionProfile, VersionProfileBuilder, VersionProfilesConfig},
@@ -55,57 +54,44 @@ fn main() {
 }
 
 struct AppTabs {
+    current: Page,
+    windows: Vec<(bool, AppWindow<egui::Response>)>,
     context: AppContext,
-    dock_state: DockState<String>,
+}
+
+#[derive(PartialEq)]
+pub enum Page {
+    Main,
+    Profiles,
+}
+
+pub struct AppWindow<R> {
+    name: &'static str,
+    content: Box<dyn Fn(&mut Ui) -> R>,
+}
+
+impl<R> AppWindow<R> {
+    pub fn new(name: &'static str, content: impl Fn(&mut Ui) -> R + 'static) -> Self {
+        Self {
+            name,
+            content: Box::new(content),
+        }
+    }
+
+    pub fn show(&self, ctx: &egui::Context, open: &mut bool) {
+        egui::Window::new(self.name)
+            .open(open)
+            .show(ctx, |ui| (self.content)(ui));
+    }
 }
 
 impl AppTabs {
     pub fn new() -> Self {
-        // Create a `DockState` with an initial tab "tab1" in the main `Surface`'s root node.
-        let tabs = ["Main"].map(str::to_string).into_iter().collect();
-        let dock_state = DockState::new(tabs);
         Self {
             context: AppContext::new().crash(),
-            dock_state,
-        }
-    }
 
-    fn ui(&mut self, ctx: &egui::Context) {
-        // Here we just display the `DockState` using a `DockArea`.
-        // This is where egui handles rendering and all the integrations.
-        //
-        // We can specify a custom `Style` for the `DockArea`, or just inherit
-        // all of it from egui.
-        DockArea::new(&mut self.dock_state)
-            .style(Style::from_egui(ctx.style().as_ref()))
-            .show(ctx, &mut AppTabViewer::new(&mut self.context));
-    }
-}
-
-struct AppTabViewer<'a> {
-    context: &'a mut AppContext,
-}
-
-impl<'a> AppTabViewer<'a> {
-    pub fn new(context: &'a mut AppContext) -> Self {
-        Self { context }
-    }
-}
-
-impl TabViewer for AppTabViewer<'_> {
-    // This associated type is used to attach some data to each tab.
-    type Tab = String;
-
-    // Returns the current `tab`'s title.
-    fn title(&mut self, tab: &mut Self::Tab) -> WidgetText {
-        tab.as_str().into()
-    }
-
-    // Defines the contents of a given `tab`.
-    fn ui(&mut self, ui: &mut Ui, tab: &mut Self::Tab) {
-        match tab.as_str() {
-            "Main" => self.context.show_main(ui),
-            _ => unreachable!(),
+            windows: Default::default(),
+            current: Page::Main,
         }
     }
 }
@@ -364,7 +350,23 @@ impl Display for Loader {
 
 impl eframe::App for AppTabs {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        self.ui(ctx)
+        egui::TopBottomPanel::top("top_nav_bar").show(ctx, |ui| {
+            // if ui.button("Settings").clicked() {
+            //     self.windows
+            //         .push((true, AppWindow::new("Settings", |ui| ui.label("Test"))));
+            // }
+            ui.horizontal(|ui| {
+                ui.selectable_value(&mut self.current, Page::Main, "Main");
+                ui.selectable_value(&mut self.current, Page::Profiles, "Profiles");
+            });
+        });
+
+        egui::CentralPanel::default().show(ctx, |ui| match self.current {
+            Page::Main => self.context.show_main(ui),
+            Page::Profiles => {
+                ui.label("Profiles");
+            }
+        });
     }
 }
 
