@@ -2,6 +2,8 @@ use std::{ffi::OsStr, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::utils::path_to_string;
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub enum JavaRunner {
     String(String),
@@ -13,6 +15,13 @@ impl JavaRunner {
         match self {
             JavaRunner::String(s) => s,
             JavaRunner::Path(p) => p,
+        }
+    }
+
+    pub fn get_string(&self) -> String {
+        match self {
+            JavaRunner::String(s) => s.to_string(),
+            JavaRunner::Path(p) => path_to_string(p),
         }
     }
 

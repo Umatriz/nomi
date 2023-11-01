@@ -7,18 +7,20 @@ use nomi_core::{
         profile::{VersionProfile, VersionProfileBuilder, VersionProfilesConfig},
         read_toml_config, read_toml_config_sync,
         user::Settings,
-        write_toml_config,
+        write_toml_config, write_toml_config_sync,
     },
     instance::{launch::LaunchSettings, Inner, InstanceBuilder},
     repository::{
         java_runner::JavaRunner, launcher_manifest::LauncherManifestVersion, username::Username,
     },
-    utils::state::{launcher_manifest_state_try_init, ManifestState, LAUNCHER_MANIFEST_STATE},
+    utils::state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
 };
+use rfd::AsyncFileDialog;
 use std::{
     fmt::Display,
     future::Future,
     io::Write,
+    path::PathBuf,
     sync::mpsc::{Receiver, Sender},
 };
 use utils::Crash;
@@ -55,14 +57,14 @@ fn main() {
 
 struct AppTabs {
     current: Page,
-    windows: Vec<(bool, AppWindow<egui::Response>)>,
+    profile_window: bool,
+    settings_window: bool,
     context: AppContext,
 }
 
 #[derive(PartialEq)]
 pub enum Page {
     Main,
-    Profiles,
 }
 
 pub struct AppWindow<R> {
@@ -90,8 +92,9 @@ impl AppTabs {
         Self {
             context: AppContext::new().crash(),
 
-            windows: Default::default(),
             current: Page::Main,
+            profile_window: Default::default(),
+            settings_window: Default::default(),
         }
     }
 }
@@ -103,18 +106,27 @@ pub struct AppContext {
 
     profiles: VersionProfilesConfig,
     settings: Settings,
-    version_manifest: Option<&'static ManifestState>,
+    // version_manifest: Option<&'static ManifestState>,
     release_versions: Option<Vec<&'static LauncherManifestVersion>>,
 
-    username_buf: String,
     profile_name_buf: String,
     selected_version_buf: usize,
     loader_buf: Loader,
+
+    settings_username: Username,
+    settings_username_buf: String,
+    settings_uuid: String,
+    settings_java_buf: JavaRunner,
+    settings_java_buf_content: PathBuf,
+    settings_java_buf_tx: Sender<JavaRunner>,
+    settings_java_buf_rx: Receiver<JavaRunner>,
+    settings_block_save_button: bool,
 }
 
 impl AppContext {
     pub fn new() -> anyhow::Result<Self> {
         let (tx, rx) = std::sync::mpsc::channel();
+        let (settings_java_buf_tx, settings_java_buf_rx) = std::sync::mpsc::channel();
         let profiles =
             read_toml_config_sync::<VersionProfilesConfig>("./.nomi/configs/Profiles.toml");
         let settings_res = read_toml_config_sync::<Settings>("./.nomi/configs/User.toml");
@@ -124,6 +136,7 @@ impl AppContext {
             LAUNCHER_MANIFEST_STATE.get_or_try_init(launcher_manifest_state_try_init),
         );
 
+        let java_bin = settings.java_bin.clone().unwrap_or_default();
         Ok(Self {
             release_versions: match state {
                 Ok(data) => Some(
@@ -135,33 +148,164 @@ impl AppContext {
                 ),
                 Err(_) => None,
             },
-            version_manifest: match state {
-                Ok(data) => Some(data),
-                Err(_) => None,
-            },
+            // version_manifest: match state {
+            //     Ok(data) => Some(data),
+            //     Err(_) => None,
+            // },
             tx,
             rx,
             tasks: Default::default(),
             profiles: profiles.unwrap_or_default(),
-            username_buf: settings.username.get().to_string(),
+            settings_username_buf: settings.username.get().to_string(),
+            settings_java_buf_content: match &java_bin {
+                JavaRunner::String(_) => PathBuf::new(),
+                JavaRunner::Path(path) => path.to_path_buf(),
+            },
+            settings_java_buf: java_bin,
             settings,
             profile_name_buf: Default::default(),
             selected_version_buf: Default::default(),
             loader_buf: Loader::Vanilla,
+            settings_java_buf_tx,
+            settings_java_buf_rx,
+            settings_uuid: "4350312f-04d5-4ee0-90b8-f883967593a0".to_string(),
+            settings_block_save_button: false,
+            settings_username: Default::default(),
         })
     }
 
     pub fn show_main(&mut self, ui: &mut Ui) {
-        // if let Some(err) = self.error.as_ref() {
-        //     ui.label(err);
-        // }
         if let Ok(data) = self.rx.try_recv() {
             self.profiles.add_profile(data);
         }
 
-        ui.label("Username:");
-        ui.text_edit_singleline(&mut self.username_buf);
+        if !self.tasks.is_empty() {
+            for (handle, name) in &self.tasks {
+                if !handle.is_finished() {
+                    ui.horizontal(|ui| {
+                        ui.spinner();
+                        ui.label(format!("Task {} is running", name))
+                    });
+                }
+            }
+        }
 
+        egui::ScrollArea::new([false, true]).show(ui, |ui| {
+            ui.vertical(|ui| {
+                for profile in self.profiles.profiles.clone() {
+                    ui.horizontal(|ui| {
+                        ui.label(profile.name.to_string());
+                        ui.label(format!("Id: {}", profile.id));
+                        if ui.button("Launch").clicked() {
+                            let (tx, _rx) = std::sync::mpsc::channel();
+                            let username = self.settings_username_buf.clone();
+                            let access_token = self.settings.access_token.clone();
+                            let uuid = self.settings.uuid.clone();
+                            spawn_tokio_future(tx, async move {
+                                let mut prof = profile;
+                                prof.instance.set_username(Username::new(username).unwrap());
+                                prof.instance.set_access_token(access_token);
+                                prof.instance.set_uuid(uuid);
+                                prof.launch()
+                                    .await
+                                    .map_err(|err| {
+                                        let mut file = std::fs::File::create("./CRASH_REPORT.txt")
+                                            .expect("Cannot create CRASH_REPORT.txt");
+                                        file.write_all(
+                                            "Nomi paniced with following error: ".as_bytes(),
+                                        )
+                                        .unwrap();
+                                        file.write_all(format!("{:#?}", &err).as_bytes()).unwrap();
+                                        err
+                                    })
+                                    .unwrap();
+                            });
+                        }
+                    });
+                }
+            });
+        });
+    }
+
+    pub fn show_settings(&mut self, ui: &mut Ui) {
+        if let Ok(data) = self.settings_java_buf_rx.try_recv() {
+            self.settings_java_buf_content = data.get().into();
+            self.settings_java_buf = data;
+        }
+        ui.collapsing("User", |ui| {
+            ui.label(
+                egui::RichText::new("This category will be replaced with Microsoft Auth")
+                    .font(egui::FontId::proportional(20.0)),
+            );
+            ui.label("Username");
+            ui.text_edit_singleline(&mut self.settings_username_buf);
+            match Username::new(self.settings_username_buf.clone()) {
+                Err(err) => {
+                    ui.label(format!("{}", err));
+                    self.settings_block_save_button = true;
+                }
+                Ok(data) => {
+                    self.settings_username = data;
+                    self.settings_block_save_button = false;
+                }
+            }
+            ui.label("uuid");
+            ui.text_edit_singleline(&mut self.settings_uuid)
+                .on_hover_text("By default is just a random uuid (hardcoded).");
+        });
+        ui.collapsing("Java", |ui| {
+            ui.horizontal(|ui| {
+                ui.radio_value(
+                    &mut self.settings_java_buf,
+                    JavaRunner::Path(self.settings_java_buf_content.clone()),
+                    "Path",
+                ).on_hover_text("Set path directly to your java bin file.");
+                ui.radio_value(
+                    &mut self.settings_java_buf,
+                    JavaRunner::default(),
+                    "Command",
+                )
+                .on_hover_text("All command will be execute using `java` command. You must have java in your PATH.");
+            });
+            if let JavaRunner::Path(_) = self.settings_java_buf {
+                ui.label(self.settings_java_buf.get_string());
+                if ui.button("Select java").clicked() {
+                    spawn_future(self.settings_java_buf_tx.clone(), async {
+                        let file = AsyncFileDialog::new()
+                            .add_filter("bin", &["exe"])
+                            .set_directory("/")
+                            .pick_file()
+                            .await;
+
+                        let Some(binding) = file else {
+                            return JavaRunner::default();
+                        };
+                        let path = binding.path();
+
+                        JavaRunner::path(path.to_path_buf())
+                    });
+                };
+            }
+        });
+        match self.settings_block_save_button {
+            true => {
+                ui.add_enabled(false, egui::Button::new("Save"));
+            }
+            false => {
+                if ui.button("Save").clicked() {
+                    let settings = Settings {
+                        username: Username::new(self.settings_username_buf.clone()).crash(),
+                        access_token: None,
+                        java_bin: Some(self.settings_java_buf.clone()),
+                        uuid: Some(self.settings_uuid.clone()),
+                    };
+                    let _ = write_toml_config_sync(&settings, "./.nomi/configs/User.toml");
+                }
+            }
+        }
+    }
+
+    pub fn show_profiles(&mut self, ui: &mut Ui) {
         if let Some(profiles) = &self.release_versions {
             ui.label("Create new profile");
             ui.label("Profile name:");
@@ -215,42 +359,6 @@ impl AppContext {
                 }
             }
         }
-
-        egui::ScrollArea::new([false, true]).show(ui, |ui| {
-            ui.vertical(|ui| {
-                for profile in self.profiles.profiles.clone() {
-                    ui.horizontal(|ui| {
-                        ui.label(profile.name.to_string());
-                        ui.label(format!("Id: {}", profile.id));
-                        if ui.button("Launch").clicked() {
-                            let (tx, _rx) = std::sync::mpsc::channel();
-                            let username = self.username_buf.clone();
-                            let access_token = self.settings.access_token.clone();
-                            let uuid = self.settings.uuid.clone();
-                            spawn_tokio_future(tx, async move {
-                                let mut prof = profile;
-                                prof.instance.set_username(Username::new(username).unwrap());
-                                prof.instance.set_access_token(access_token);
-                                prof.instance.set_uuid(uuid);
-                                prof.launch()
-                                    .await
-                                    .map_err(|err| {
-                                        let mut file = std::fs::File::create("./CRASH_REPORT.txt")
-                                            .expect("Cannot create CRASH_REPORT.txt");
-                                        file.write_all(
-                                            "Nomi paniced with following error: ".as_bytes(),
-                                        )
-                                        .unwrap();
-                                        file.write_all(format!("{:#?}", &err).as_bytes()).unwrap();
-                                        err
-                                    })
-                                    .unwrap();
-                            });
-                        }
-                    });
-                }
-            });
-        });
     }
 
     pub fn spawn_download(
@@ -350,22 +458,34 @@ impl Display for Loader {
 
 impl eframe::App for AppTabs {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.set_pixels_per_point(1.2);
         egui::TopBottomPanel::top("top_nav_bar").show(ctx, |ui| {
-            // if ui.button("Settings").clicked() {
-            //     self.windows
-            //         .push((true, AppWindow::new("Settings", |ui| ui.label("Test"))));
-            // }
-            ui.horizontal(|ui| {
-                ui.selectable_value(&mut self.current, Page::Main, "Main");
-                ui.selectable_value(&mut self.current, Page::Profiles, "Profiles");
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                // ui.selectable_value(&mut self.current, Page::Main, "Main");
+                ui.toggle_value(&mut self.settings_window, "Settings");
+
+                // ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.toggle_value(&mut self.profile_window, "Profile");
+                // });
             });
         });
 
+        egui::Window::new("Profile")
+            .open(&mut self.profile_window)
+            .resizable(false)
+            .show(ctx, |ui| {
+                self.context.show_profiles(ui);
+            });
+
+        egui::Window::new("Settings")
+            .open(&mut self.settings_window)
+            .resizable(false)
+            .show(ctx, |ui| {
+                self.context.show_settings(ui);
+            });
+
         egui::CentralPanel::default().show(ctx, |ui| match self.current {
             Page::Main => self.context.show_main(ui),
-            Page::Profiles => {
-                ui.label("Profiles");
-            }
         });
     }
 }
@@ -381,7 +501,7 @@ where
     })
 }
 
-fn spawn_future<T, Fut>(tx: Sender<T>, ctx: egui::Context, fut: Fut) -> std::thread::JoinHandle<()>
+fn spawn_future<T, Fut>(tx: Sender<T>, fut: Fut) -> std::thread::JoinHandle<()>
 where
     T: 'static + Send,
     Fut: Future<Output = T> + Send + 'static,
@@ -389,6 +509,5 @@ where
     std::thread::spawn(move || {
         let data = pollster::block_on(fut);
         let _ = tx.send(data);
-        ctx.request_repaint();
     })
 }

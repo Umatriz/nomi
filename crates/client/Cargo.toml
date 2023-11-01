@@ -18,3 +18,4 @@ nomi-core = { path = "../nomi-core"}
 eframe = "0.23.0"
 pollster = "0.3.0"
 toml = "0.8.0"
+rfd = "0.12.1"

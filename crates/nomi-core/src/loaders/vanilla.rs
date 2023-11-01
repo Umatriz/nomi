@@ -1,14 +1,13 @@
 use std::path::Path;
 
 use anyhow::Context;
-use async_trait::async_trait;
 use reqwest::Client;
 use tokio::{io::AsyncWriteExt, task::JoinSet};
 
 use tracing::{error, info};
 
 use crate::{
-    downloads::{assets, download_file, download_version::DownloadVersion},
+    downloads::download_file,
     repository::manifest::{Manifest, ManifestFile},
     utils::get_launcher_manifest,
 };

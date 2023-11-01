@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::{io::Write, path::Path};
 
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::io::AsyncWriteExt;
@@ -54,4 +54,23 @@ where
     tracing::info!("Config {} read successfully", path.to_string_lossy());
 
     Ok(body)
+}
+
+pub fn write_toml_config_sync<T: ?Sized>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>
+where
+    T: Serialize,
+{
+    let path = path.as_ref();
+    if let Some(dir) = path.parent() {
+        std::fs::create_dir_all(dir)?;
+    }
+    let mut file = std::fs::File::create(path)?;
+
+    let body = toml::to_string_pretty(data)?;
+
+    file.write_all(body.as_bytes())?;
+
+    tracing::info!("Config {} created successfully", path.to_string_lossy());
+
+    Ok(())
 }

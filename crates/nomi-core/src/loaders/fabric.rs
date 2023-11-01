@@ -1,12 +1,11 @@
 use std::path::Path;
 
-use async_trait::async_trait;
 use reqwest::Client;
 use tokio::{io::AsyncWriteExt, task::JoinSet};
 use tracing::info;
 
 use crate::{
-    downloads::{download_file, download_version::DownloadVersion},
+    downloads::download_file,
     repository::{fabric_meta::FabricVersions, fabric_profile::FabricProfile},
     utils::get_launcher_manifest,
 };

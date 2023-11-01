@@ -198,7 +198,7 @@ pub async fn register(
     let settings = Settings {
         username: Username::new(username)?,
         access_token: access_token.map(String::from),
-        java_bin: java_bin.map(|p| p.to_path_buf()),
+        java_bin: java_bin.map(|p| JavaRunner::path(p.clone())),
         uuid: uuid.map(String::from),
     };
 

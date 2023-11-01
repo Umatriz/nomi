@@ -1,5 +1,4 @@
 use nomi_core::{
-    configs::profile::VersionProfilesConfig,
     instance::{launch::LaunchSettings, Inner, InstanceBuilder},
     repository::{java_runner::JavaRunner, username::Username},
 };
@@ -23,9 +22,9 @@ async fn vanilla_test() {
         .name("1.20-fabric-test".into())
         .build();
 
-    let assets = builder.assets().await.unwrap();
+    let _assets = builder.assets().await.unwrap();
 
-    // assets.download().await.unwrap();
+    // _assets.download().await.unwrap();
     // builder.download().await.unwrap();
 
     let mc_dir = std::env::current_dir().unwrap().join("minecraft");

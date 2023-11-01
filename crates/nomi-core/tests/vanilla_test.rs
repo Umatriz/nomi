@@ -35,7 +35,7 @@ async fn vanilla_test() {
 
     let mc_dir = std::env::current_dir().unwrap().join("minecraft");
 
-    let settings = LaunchSettings {
+    let _settings = LaunchSettings {
         access_token: None,
         username: Username::new("ItWorks").unwrap(),
         uuid: None,

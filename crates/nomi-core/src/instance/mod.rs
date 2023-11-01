@@ -6,7 +6,7 @@ pub mod launch;
 pub mod profile;
 
 use crate::{
-    downloads::{assets::AssetsDownload, download_version::DownloadVersion},
+    downloads::assets::AssetsDownload,
     loaders::{fabric::Fabric, vanilla::Vanilla},
     utils::state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
 };
