@@ -95,7 +95,7 @@ pub fn should_use_library(lib: &ManifestLibrary) -> anyhow::Result<bool> {
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct LaunchInstance {
-    settings: LaunchSettings,
+    pub settings: LaunchSettings,
     jvm_args: Option<Vec<String>>,
     profile: Option<LoaderProfile>,
 }

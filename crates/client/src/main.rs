@@ -191,11 +191,14 @@ impl AppContext {
         }
 
         egui::ScrollArea::new([false, true]).show(ui, |ui| {
-            ui.vertical(|ui| {
-                for profile in self.profiles.profiles.clone() {
-                    ui.horizontal(|ui| {
+            egui::Grid::new("profiles_grid")
+                .num_columns(3)
+                .spacing([40.0, 4.0])
+                .striped(true)
+                .show(ui, |ui| {
+                    for profile in self.profiles.profiles.clone() {
                         ui.label(profile.name.to_string());
-                        ui.label(format!("Id: {}", profile.id));
+                        ui.label(&profile.instance.settings.version);
                         if ui.button("Launch").clicked() {
                             let (tx, _rx) = std::sync::mpsc::channel();
                             let username = self.settings_username_buf.clone();
@@ -221,9 +224,9 @@ impl AppContext {
                                     .unwrap();
                             });
                         }
-                    });
-                }
-            });
+                        ui.end_row();
+                    }
+                });
         });
     }
 
