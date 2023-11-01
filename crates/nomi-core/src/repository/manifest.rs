@@ -75,7 +75,7 @@ pub struct ManifestAssetIndex {
 pub struct ManifestDownloads {
     pub client: ManifestFile,
     pub client_mappings: Option<ManifestFile>,
-    pub server: ManifestFile,
+    pub server: Option<ManifestFile>,
     pub server_mappings: Option<ManifestFile>,
 }
 

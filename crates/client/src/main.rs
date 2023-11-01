@@ -23,12 +23,33 @@ use std::{
     path::PathBuf,
     sync::mpsc::{Receiver, Sender},
 };
+use tracing::Level;
+use tracing_subscriber::{
+    fmt::{writer::MakeWriterExt, Layer},
+    prelude::__tracing_subscriber_SubscriberExt,
+    Registry,
+};
 use utils::Crash;
 
 pub mod utils;
 
 fn main() {
-    let subscriber = tracing_subscriber::fmt().compact().finish();
+    let appender = tracing_appender::rolling::hourly("./.nomi/logs", "nomi.log");
+    let (non_blocking, _guard) = tracing_appender::non_blocking(appender);
+
+    let mut file_sub = Layer::new()
+        .with_writer(non_blocking.with_max_level(Level::INFO))
+        .compact();
+    file_sub.set_ansi(false);
+
+    let subscriber = Registry::default()
+        .with(
+            Layer::new()
+                .with_writer(std::io::stdout.with_max_level(Level::INFO))
+                .pretty(),
+        )
+        .with(file_sub);
+
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let runtime = tokio::runtime::Runtime::new().expect("Unable to create Runtime");

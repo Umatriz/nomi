@@ -334,6 +334,7 @@ impl LaunchInstance {
     ) -> String {
         replace!(x,
             "${assets_root}" => &path_to_string(assets_dir),
+            "${game_assets}" => &path_to_string(assets_dir),
             "${game_directory}" => &path_to_string(game_dir),
             "${natives_directory}" => &path_to_string(natives_dir),
             "${launcher_name}" => LAUNCHER_NAME,
@@ -343,6 +344,7 @@ impl LaunchInstance {
                 .clone()
                 .unwrap_or("null".to_string())
                 .as_str(),
+            "${auth_session}" => "null",
             "${auth_player_name}" => self.settings.username.get(),
             "${auth_uuid}" => self.settings
                 .uuid
