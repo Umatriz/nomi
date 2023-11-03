@@ -1,6 +1,5 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
-use anyhow::Context;
 use reqwest::Client;
 use tokio::{io::AsyncWriteExt, task::JoinSet};
 
@@ -55,23 +54,32 @@ impl Vanilla {
     }
 
     pub async fn download_libraries(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
+        let construct_path =
+            |file_opt: Option<&ManifestFile>| -> Option<(String, Option<PathBuf>)> {
+                file_opt.map(|file| {
+                    (
+                        file.url.clone(),
+                        file.path.as_ref().map(|path| dir.as_ref().join(path)),
+                    )
+                })
+            };
+
         let mut set = JoinSet::new();
 
-        let mut download_lib = |file: Option<&ManifestFile>| -> anyhow::Result<()> {
-            if let Some(download) = file {
-                let path = download
-                    .path
-                    .clone()
-                    .context("`download.path` must be Some")?;
-                let final_path = dir.as_ref().join(path);
-                set.spawn(download_file(final_path, download.url.clone()));
-            }
-
-            Ok(())
+        let mut download_lib = |data: Option<(String, Option<PathBuf>)>| -> Option<()> {
+            data.and_then(|(url, path_opt)| {
+                path_opt.map(|path| {
+                    if !path.exists() {
+                        set.spawn(download_file(path, url));
+                    } else {
+                        info!("Library {} already exists", path.display())
+                    }
+                })
+            })
         };
 
         for lib in self.manifest.libraries.iter() {
-            download_lib(lib.downloads.artifact.as_ref())?;
+            download_lib(construct_path(lib.downloads.artifact.as_ref()));
 
             if let Some(natives) = lib.downloads.classifiers.as_ref() {
                 let native_option = match std::env::consts::OS {
@@ -81,12 +89,12 @@ impl Vanilla {
                     _ => unreachable!(),
                 };
 
-                download_lib(native_option)?;
+                download_lib(construct_path(native_option));
             }
         }
 
         while let Some(res) = set.join_next().await {
-            let result = res.unwrap();
+            let result = res?;
             if result.is_err() {
                 let str = "MISSING LIBRARY";
                 error!("{}", str)

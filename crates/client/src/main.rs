@@ -42,13 +42,12 @@ fn main() {
         .compact();
     file_sub.set_ansi(false);
 
-    let subscriber = Registry::default()
-        .with(
-            Layer::new()
-                .with_writer(std::io::stdout.with_max_level(Level::INFO))
-                .pretty(),
-        )
-        .with(file_sub);
+    let mut stdout_sub = Layer::new()
+        .with_writer(std::io::stdout.with_max_level(Level::INFO))
+        .pretty();
+    stdout_sub.set_ansi(false);
+
+    let subscriber = Registry::default().with(stdout_sub).with(file_sub);
 
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
@@ -278,6 +277,7 @@ impl AppContext {
                 .on_hover_text("By default is just a random uuid (hardcoded).");
         });
         ui.collapsing("Java", |ui| {
+            ui.label(egui::RichText::new("For legacy versions such 1.0, 1.2 etc you should specify java 8 binary").font(egui::FontId::proportional(16.0)));
             ui.horizontal(|ui| {
                 ui.radio_value(
                     &mut self.settings_java_buf,

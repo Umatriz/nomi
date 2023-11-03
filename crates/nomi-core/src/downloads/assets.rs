@@ -7,7 +7,7 @@ use std::{
     path::{Path, PathBuf},
 };
 use tokio::{io::AsyncWriteExt, task::JoinSet};
-use tracing::{info, trace};
+use tracing::{error, info, trace};
 
 use super::download_file;
 
@@ -91,19 +91,26 @@ impl AssetsDownload {
 
         // TODO: Implement retry pull for missing assets
 
+        let mut retry = JoinSet::new();
         for asset in &assets_chunks {
             // let assets: Vec<_> = asset.collect();
 
             let mut set = JoinSet::new();
             for v in asset.values() {
                 let path = self.create_dir(dir, &v.hash[0..2]).await?;
+                let asset_path = path.join(&v.hash);
+
+                if asset_path.exists() {
+                    continue;
+                }
+
                 let url = format!(
                     "https://resources.download.minecraft.net/{}/{}",
                     &v.hash[0..2],
                     v.hash
                 );
 
-                set.spawn(download_file(path.join(&v.hash), url));
+                set.spawn(download_file(asset_path, url));
             }
 
             let mut ok_assets = 0;
@@ -111,8 +118,14 @@ impl AssetsDownload {
 
             while let Some(res) = set.join_next().await {
                 // FIXME
-                let result = res.unwrap();
-                if let Err(_err) = result {
+                let result = res?;
+                if let Err(err) = result {
+                    match err {
+                        crate::downloads::DownloadError::Error { url, path, error } => {
+                            error!("Downloading error: {}", error);
+                            retry.spawn(download_file(path, url));
+                        }
+                    }
                     err_assets += 1;
                 } else {
                     ok_assets += 1;
@@ -123,6 +136,10 @@ impl AssetsDownload {
                 "Chunk downloaded: OK - {}; MISSING - {}",
                 ok_assets, err_assets
             );
+        }
+
+        while let Some(res) = retry.join_next().await {
+            res??
         }
 
         Ok(())

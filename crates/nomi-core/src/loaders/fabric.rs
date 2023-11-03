@@ -94,10 +94,10 @@ impl Fabric {
 
         self.profile.libraries.iter().for_each(|lib| {
             let maven = MavenData::new(&lib.name);
-            set.spawn(download_file(
-                dir.join(maven.path),
-                format!("{}{}", lib.url, maven.url),
-            ));
+            let path = dir.join(maven.path);
+            if !path.exists() {
+                set.spawn(download_file(path, format!("{}{}", lib.url, maven.url)));
+            }
         });
 
         while let Some(res) = set.join_next().await {
