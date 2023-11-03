@@ -33,7 +33,7 @@ jobs:
           id: compile
           uses: rust-build/rust-build.action@v1.4.3
           with:
-            SRC_DIR: './crates/client'
+            SRC_DIR: 'crates/client'
             RUSTTARGET: ${{ matrix.target }}
             ARCHIVE_TYPES: ${{ matrix.archive }}
             TOOLCHAIN_VERSION: stable
