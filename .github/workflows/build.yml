@@ -1,0 +1,50 @@
+name: Build
+
+on: workflow_dispatch
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-gnu
+            archive: zip
+    steps:
+        - name: Checkout
+          uses: actions/checkout@master
+
+        - name: Read Cargo TOML
+          uses: SebRollen/toml-action@v1.0.2
+          id: read_toml
+          with:
+            file: './crates/client/Cargo.toml'
+            field: 'package.version'
+
+        - name: Compile Rust
+          id: compile
+          uses: rust-build/rust-build.action@v1.4.3
+          with:
+            SRC_DIR: './crates/client'
+            RUSTTARGET: ${{ matrix.target }}
+            ARCHIVE_TYPES: ${{ matrix.archive }}
+            TOOLCHAIN_VERSION: stable
+            UPLOAD_MODE: none
+
+        - name: Push Tag
+          id: tag_version
+          uses: mathieudutour/github-tag-action@v6.1
+          with:
+            github_token: ${{ secrets.GITHUB_TOKEN }}
+            custom_tag: ${{ steps.read_toml.outputs.value }}
+
+        - name: Create Release
+          uses: ncipollo/release-action@v1
+          with:
+            tag: ${{ steps.tag_version.outputs.new_tag }}
+            name: Release ${{ steps.tag_version.outputs.new_tag }}
+            artifacts: ${{ steps.compile.outputs.BUILT_ARCHIVE }}

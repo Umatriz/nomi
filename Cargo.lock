@@ -735,7 +735,7 @@ dependencies = [
 
 [[package]]
 name = "client"
-version = "0.1.0"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "eframe",
