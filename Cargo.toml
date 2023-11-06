@@ -2,11 +2,9 @@
 # tokio = { version = "1.28.2", features = ["full"] }
 # thiserror = "1.0.40"
 # anyhow = "1.0"
-
 [workspace]
 members = [
     "crates/nomi-core",
-    "crates/cli",
     "crates/client",
     ]
 resolver = "2"

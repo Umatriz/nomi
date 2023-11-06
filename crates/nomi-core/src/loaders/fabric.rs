@@ -7,7 +7,7 @@ use tracing::info;
 use crate::{
     downloads::download_file,
     repository::{fabric_meta::FabricVersions, fabric_profile::FabricProfile},
-    utils::get_launcher_manifest,
+    utils::state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
 };
 
 use super::{maven::MavenData, vanilla::Vanilla};
@@ -26,8 +26,11 @@ impl Fabric {
         let game_version = game_version.into();
 
         let client = Client::new();
-        let launcher_manifest = get_launcher_manifest().await?;
+        let launcher_manifest = LAUNCHER_MANIFEST_STATE
+            .get_or_try_init(launcher_manifest_state_try_init)
+            .await?;
         if !launcher_manifest
+            .launcher
             .versions
             .iter()
             .any(|v| v.id == game_version)

@@ -2,6 +2,7 @@
 name = "nomi-core"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/Umatriz/nomi"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -14,7 +15,7 @@ serde_json.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 
-reqwest = { version = "0.11.18", features = ["json", "blocking", "stream"] }
+reqwest = { version = "0.11.18", default-features = false, features = ["json", "blocking", "stream", "rustls-tls"] }
 futures-util = "0.3.28"
 thiserror = "1.0.48"
 toml = "0.8.0"

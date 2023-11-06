@@ -1,6 +1,3 @@
 [alias]
 xtask = "run --manifest-path ./xtask/Cargo.toml --"
 x = "xtask"
-
-[build]
-target-dir = "dist/target"
