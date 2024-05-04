@@ -1,7 +1,9 @@
 use eframe::{
-    egui::{self, Ui},
+    egui::{self, ScrollArea, Ui, ViewportBuilder},
     epaint::Vec2,
+    glow::LEFT,
 };
+use egui_tracing::EventCollector;
 use nomi_core::{
     configs::{
         profile::{VersionProfile, VersionProfileBuilder, VersionProfilesConfig},
@@ -23,7 +25,7 @@ use std::{
     path::PathBuf,
     sync::mpsc::{Receiver, Sender},
 };
-use tracing::Level;
+use tracing::{info, Level};
 use tracing_subscriber::{
     fmt::{writer::MakeWriterExt, Layer},
     prelude::__tracing_subscriber_SubscriberExt,
@@ -34,6 +36,8 @@ use utils::Crash;
 pub mod utils;
 
 fn main() {
+    let collector = egui_tracing::EventCollector::default().with_level(Level::INFO);
+
     let appender = tracing_appender::rolling::hourly("./.nomi/logs", "nomi.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(appender);
 
@@ -47,7 +51,10 @@ fn main() {
         .pretty();
     stdout_sub.set_ansi(false);
 
-    let subscriber = Registry::default().with(stdout_sub).with(file_sub);
+    let subscriber = tracing_subscriber::registry()
+        .with(collector.clone())
+        .with(stdout_sub)
+        .with(file_sub);
 
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
@@ -66,10 +73,10 @@ fn main() {
     let _ = eframe::run_native(
         "Nomi",
         eframe::NativeOptions {
-            initial_window_size: Some(Vec2::new(1280.0, 720.0)),
+            viewport: ViewportBuilder::default().with_inner_size(Vec2::new(1280.0, 720.0)),
             ..Default::default()
         },
-        Box::new(|_cc| Box::new(AppTabs::new())),
+        Box::new(|_cc| Box::new(AppTabs::new(collector))),
     );
 
     println!("T");
@@ -79,6 +86,7 @@ struct AppTabs {
     current: Page,
     profile_window: bool,
     settings_window: bool,
+    logs_window: bool,
     context: AppContext,
 }
 
@@ -108,18 +116,22 @@ impl<R> AppWindow<R> {
 }
 
 impl AppTabs {
-    pub fn new() -> Self {
+    pub fn new(collector: EventCollector) -> Self {
         Self {
-            context: AppContext::new().crash(),
+            context: AppContext::new(collector).crash(),
 
             current: Page::Main,
+
             profile_window: Default::default(),
             settings_window: Default::default(),
+            logs_window: Default::default(),
         }
     }
 }
 
 pub struct AppContext {
+    collector: EventCollector,
+
     tx: Sender<VersionProfile>,
     rx: Receiver<VersionProfile>,
     tasks: Vec<(tokio::task::JoinHandle<()>, String)>,
@@ -144,7 +156,7 @@ pub struct AppContext {
 }
 
 impl AppContext {
-    pub fn new() -> anyhow::Result<Self> {
+    pub fn new(collector: EventCollector) -> anyhow::Result<Self> {
         let (tx, rx) = std::sync::mpsc::channel();
         let (settings_java_buf_tx, settings_java_buf_rx) = std::sync::mpsc::channel();
         let profiles =
@@ -158,6 +170,7 @@ impl AppContext {
 
         let java_bin = settings.java_bin.clone().unwrap_or_default();
         Ok(Self {
+            collector,
             release_versions: match state {
                 Ok(data) => Some(
                     data.launcher
@@ -385,6 +398,10 @@ impl AppContext {
         }
     }
 
+    pub fn show_logs(&mut self, ui: &mut Ui) {
+        ui.add(egui_tracing::Logs::new(self.collector.clone()));
+    }
+
     pub fn spawn_download(
         tx: Sender<VersionProfile>,
         name: String,
@@ -486,10 +503,12 @@ impl eframe::App for AppTabs {
         egui::TopBottomPanel::top("top_nav_bar").show(ctx, |ui| {
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 // ui.selectable_value(&mut self.current, Page::Main, "Main");
-                ui.toggle_value(&mut self.settings_window, "Settings");
+                ui.toggle_value(&mut self.profile_window, "Profile");
 
                 // ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.toggle_value(&mut self.profile_window, "Profile");
+                ui.toggle_value(&mut self.settings_window, "Settings");
+
+                ui.toggle_value(&mut self.logs_window, "Logs");
                 // });
             });
         });
@@ -506,6 +525,15 @@ impl eframe::App for AppTabs {
             .resizable(false)
             .show(ctx, |ui| {
                 self.context.show_settings(ui);
+            });
+
+        egui::Window::new("Logs")
+            .open(&mut self.logs_window)
+            .resizable(true)
+            .show(ctx, |ui| {
+                ScrollArea::horizontal().show(ui, |ui| {
+                    ui.add(egui_tracing::Logs::new(self.context.collector.clone()));
+                });
             });
 
         egui::CentralPanel::default().show(ctx, |ui| match self.current {
