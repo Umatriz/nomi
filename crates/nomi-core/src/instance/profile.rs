@@ -1,11 +1,12 @@
 use std::path::Path;
 
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use tokio::io::AsyncWriteExt;
 
-use crate::repository::{simple_args::SimpleArgs, simple_lib::SimpleLib};
+use crate::{
+    repository::{simple_args::SimpleArgs, simple_lib::SimpleLib},
+    utils::write_into_file,
+};
 
-/// Read from json
 pub async fn read_json<T>(path: impl AsRef<Path>) -> anyhow::Result<T>
 where
     T: DeserializeOwned + ?Sized,
@@ -19,14 +20,9 @@ where
     T: Serialize,
 {
     let path = path.as_ref();
-    if let Some(dir) = path.parent() {
-        tokio::fs::create_dir_all(dir).await?;
-    }
-    let mut file = tokio::fs::File::create(&path).await?;
-
     let body = serde_json::to_string_pretty(data)?;
 
-    file.write_all(body.as_bytes()).await?;
+    write_into_file(body.as_bytes(), path).await?;
 
     tracing::info!("Config {} created successfully", path.to_string_lossy());
 

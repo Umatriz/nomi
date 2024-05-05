@@ -53,22 +53,9 @@ impl Fabric {
             .json()
             .await?;
 
-        // let profile_version = if let Some(loader) = loader_version {
-        //     let loader = loader.into();
-        //     if let Some(loader) = versions.iter().find(|i| i.loader.version == loader) {
-        //         loader
-        //     } else {
-        //         &versions[0]
-        //     }
-        // } else {
-        //     &versions[0]
-        // };
-
         let profile_version = loader_version
-            .and_then(|loader| {
-                let loader = loader.into();
-                versions.iter().find(|i| i.loader.version == loader)
-            })
+            .map(|s| s.into())
+            .and_then(|loader| versions.iter().find(|i| i.loader.version == loader))
             .unwrap_or_else(|| &versions[0]);
 
         let profile: FabricProfile = client

@@ -7,7 +7,6 @@ pub mod profile;
 pub mod user;
 pub mod variables;
 
-/// write data to a file
 pub async fn write_toml_config<T: ?Sized>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>
 where
     T: Serialize,
@@ -27,7 +26,6 @@ where
     Ok(())
 }
 
-/// read data from file
 pub async fn read_toml_config<T: ?Sized>(path: impl AsRef<Path>) -> anyhow::Result<T>
 where
     T: DeserializeOwned,
@@ -46,31 +44,14 @@ pub fn read_toml_config_sync<T: ?Sized>(path: impl AsRef<Path>) -> anyhow::Resul
 where
     T: DeserializeOwned,
 {
-    let path = path.as_ref();
-
-    let s = std::fs::read_to_string(path)?;
-    let body: T = toml::from_str(&s)?;
-
-    tracing::info!("Config {} read successfully", path.to_string_lossy());
-
-    Ok(body)
+    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+    runtime.block_on(read_toml_config::<T>(path))
 }
 
 pub fn write_toml_config_sync<T: ?Sized>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>
 where
     T: Serialize,
 {
-    let path = path.as_ref();
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    let mut file = std::fs::File::create(path)?;
-
-    let body = toml::to_string_pretty(data)?;
-
-    file.write_all(body.as_bytes())?;
-
-    tracing::info!("Config {} created successfully", path.to_string_lossy());
-
-    Ok(())
+    let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+    runtime.block_on(write_toml_config::<T>(data, path))
 }
