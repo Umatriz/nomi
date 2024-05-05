@@ -6,7 +6,7 @@ pub mod launch;
 pub mod profile;
 
 use crate::{
-    downloads::assets::AssetsDownload,
+    downloads::{assets::AssetsDownload, download_version::DownloadVersion},
     loaders::{fabric::Fabric, vanilla::Vanilla},
     utils::state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
 };
@@ -51,6 +51,7 @@ impl Inner {
 impl Instance {
     pub async fn download(&self) -> anyhow::Result<()> {
         match &self.instance {
+            // TODO: Refactor
             Inner::Vanilla(inner) => {
                 inner.download(&self.version_path, &self.version).await?;
                 inner.download_libraries(&self.libraries).await?;
@@ -109,7 +110,7 @@ pub struct AssetsInstance {
 }
 
 impl AssetsInstance {
-    pub async fn download(&self) -> anyhow::Result<()> {
+    pub async fn download(self) -> anyhow::Result<()> {
         self.inner.download_assets_chunked(&self.objects).await?;
         info!("Assets downloaded successfully");
 
@@ -200,6 +201,8 @@ impl<O, I, U> AssetsInstanceBuilder<O, I, U, Undefined> {
 
 #[cfg(test)]
 mod tests {
+    use futures_util::TryFutureExt;
+
     use super::*;
 
     #[tokio::test]
@@ -249,6 +252,7 @@ mod tests {
             .build();
 
         // builder.assets().await.unwrap().download().await.unwrap();
+        // builder.assets().and_then(|i| i.download()).await.unwrap();
 
         builder.download().await.unwrap();
     }

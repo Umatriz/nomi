@@ -1,14 +1,14 @@
 use std::path::{Path, PathBuf};
 
 use reqwest::Client;
-use tokio::{io::AsyncWriteExt, task::JoinSet};
+use tokio::task::JoinSet;
 
 use tracing::{error, info};
 
 use crate::{
-    downloads::download_file,
+    downloads::{download_file, download_version::DownloadVersion},
     repository::manifest::{Manifest, ManifestFile},
-    utils::get_launcher_manifest,
+    utils::{get_launcher_manifest, write_into_file},
 };
 
 #[derive(Debug)]
@@ -22,26 +22,29 @@ impl Vanilla {
         let client = Client::new();
         let launcher_manifest = get_launcher_manifest().await?;
 
-        let manifest = if let Some(val) = launcher_manifest.versions.iter().find(|i| i.id == id) {
-            client
-                .get(&val.url)
-                .send()
-                .await?
-                .json::<Manifest>()
-                .await?
-        } else {
+        let Some(val) = launcher_manifest.versions.iter().find(|i| i.id == id) else {
             error!("Cannot find this version");
 
             return Err(crate::error::Error::NoSuchVersion.into());
         };
 
+        let manifest = client
+            .get(&val.url)
+            .send()
+            .await?
+            .json::<Manifest>()
+            .await?;
+
         Ok(Self { manifest })
     }
+}
 
-    pub async fn download(
+#[async_trait::async_trait]
+impl DownloadVersion for Vanilla {
+    async fn download(
         &self,
-        dir: impl AsRef<Path>,
-        file_name: impl Into<String>,
+        dir: impl AsRef<Path> + Send,
+        file_name: impl Into<String> + Send,
     ) -> anyhow::Result<()> {
         let jar_name = format!("{}.jar", file_name.into());
         let path = dir.as_ref().join(jar_name);
@@ -53,7 +56,7 @@ impl Vanilla {
         Ok(())
     }
 
-    pub async fn download_libraries(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
+    async fn download_libraries(&self, dir: impl AsRef<Path> + Send + Sync) -> anyhow::Result<()> {
         let construct_path =
             |file_opt: Option<&ManifestFile>| -> Option<(String, Option<PathBuf>)> {
                 file_opt.map(|file| {
@@ -104,19 +107,13 @@ impl Vanilla {
         Ok(())
     }
 
-    pub async fn create_json(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
+    async fn create_json(&self, dir: impl AsRef<Path> + Send) -> anyhow::Result<()> {
         let file_name = format!("{}.json", self.manifest.id);
         let path = dir.as_ref().join(file_name);
 
-        if let Some(p) = dir.as_ref().parent() {
-            tokio::fs::create_dir_all(p).await?;
-        }
-
-        let mut file = tokio::fs::File::create(&path).await?;
-
         let body = serde_json::to_string_pretty(&self.manifest)?;
 
-        file.write_all(body.as_bytes()).await?;
+        write_into_file(body.as_bytes(), &path).await?;
 
         info!(
             "Version json {} created successfully",

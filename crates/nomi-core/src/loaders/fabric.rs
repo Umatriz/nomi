@@ -1,16 +1,20 @@
 use std::path::Path;
 
 use reqwest::Client;
-use tokio::{io::AsyncWriteExt, task::JoinSet};
+use tokio::task::JoinSet;
 use tracing::info;
 
 use crate::{
-    downloads::download_file,
+    downloads::{download_file, download_version::DownloadVersion},
     repository::{fabric_meta::FabricVersions, fabric_profile::FabricProfile},
-    utils::state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
+    utils::{
+        maven::MavenData,
+        state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
+        write_into_file,
+    },
 };
 
-use super::{maven::MavenData, vanilla::Vanilla};
+use super::vanilla::Vanilla;
 
 #[derive(Debug)]
 pub struct Fabric {
@@ -29,6 +33,7 @@ impl Fabric {
         let launcher_manifest = LAUNCHER_MANIFEST_STATE
             .get_or_try_init(launcher_manifest_state_try_init)
             .await?;
+
         if !launcher_manifest
             .launcher
             .versions
@@ -48,16 +53,23 @@ impl Fabric {
             .json()
             .await?;
 
-        let profile_version = if let Some(loader) = loader_version {
-            let loader = loader.into();
-            if let Some(loader) = versions.iter().find(|i| i.loader.version == loader) {
-                loader
-            } else {
-                &versions[0]
-            }
-        } else {
-            &versions[0]
-        };
+        // let profile_version = if let Some(loader) = loader_version {
+        //     let loader = loader.into();
+        //     if let Some(loader) = versions.iter().find(|i| i.loader.version == loader) {
+        //         loader
+        //     } else {
+        //         &versions[0]
+        //     }
+        // } else {
+        //     &versions[0]
+        // };
+
+        let profile_version = loader_version
+            .and_then(|loader| {
+                let loader = loader.into();
+                versions.iter().find(|i| i.loader.version == loader)
+            })
+            .unwrap_or_else(|| &versions[0]);
 
         let profile: FabricProfile = client
             .get(format!(
@@ -74,11 +86,14 @@ impl Fabric {
             game_version,
         })
     }
+}
 
-    pub async fn download(
+#[async_trait::async_trait]
+impl DownloadVersion for Fabric {
+    async fn download(
         &self,
-        dir: impl AsRef<Path>,
-        file_name: impl Into<String>,
+        dir: impl AsRef<Path> + Send,
+        file_name: impl Into<String> + Send,
     ) -> anyhow::Result<()> {
         let dir = dir.as_ref();
         Vanilla::new(&self.game_version)
@@ -91,7 +106,7 @@ impl Fabric {
         Ok(())
     }
 
-    pub async fn download_libraries(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
+    async fn download_libraries(&self, dir: impl AsRef<Path> + Send + Sync) -> anyhow::Result<()> {
         let dir = dir.as_ref();
         let mut set = JoinSet::new();
 
@@ -110,19 +125,13 @@ impl Fabric {
         Ok(())
     }
 
-    pub async fn create_json(&self, dir: impl AsRef<Path>) -> anyhow::Result<()> {
+    async fn create_json(&self, dir: impl AsRef<Path> + Send) -> anyhow::Result<()> {
         let file_name = format!("{}.json", self.profile.id);
         let path = dir.as_ref().join(file_name);
 
-        if let Some(p) = dir.as_ref().parent() {
-            tokio::fs::create_dir_all(p).await?;
-        }
-
-        let mut file = tokio::fs::File::create(&path).await?;
-
         let body = serde_json::to_string_pretty(&self.profile)?;
 
-        file.write_all(body.as_bytes()).await?;
+        write_into_file(body.as_bytes(), &path).await?;
 
         info!(
             "Version json {} created successfully",

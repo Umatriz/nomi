@@ -1,3 +1,4 @@
+use super::fabric_profile::Arguments;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -6,8 +7,8 @@ pub struct SimpleArgs {
     pub jvm: Vec<String>,
 }
 
-impl From<super::fabric_profile::Arguments> for SimpleArgs {
-    fn from(value: super::fabric_profile::Arguments) -> Self {
+impl From<Arguments> for SimpleArgs {
+    fn from(value: Arguments) -> Self {
         let mut args = SimpleArgs {
             game: vec![],
             jvm: vec![],

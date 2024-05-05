@@ -16,6 +16,8 @@ use crate::{
 
 use super::get_launcher_manifest;
 
+// TODO: Write helper functions for quick access
+
 pub static VARIABLES_STATE: OnceCell<Variables> = OnceCell::const_new();
 
 pub async fn variables_state_try_init() -> anyhow::Result<Variables> {

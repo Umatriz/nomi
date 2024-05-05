@@ -6,6 +6,7 @@ use tokio::io::AsyncWriteExt;
 
 use crate::repository::launcher_manifest::LauncherManifest;
 
+pub mod maven;
 pub mod state;
 
 pub const LAUNCHER_MANIFEST: &str = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
@@ -32,11 +33,6 @@ pub async fn write_into_file(data: &[u8], path: impl AsRef<Path>) -> anyhow::Res
     let mut file = tokio::fs::File::create(&path).await?;
 
     file.write_all(data).await?;
-
-    tracing::info!(
-        "Data written to the file {} successfully",
-        path.to_string_lossy()
-    );
 
     Ok(())
 }
