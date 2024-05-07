@@ -5,7 +5,8 @@ use nomi_core::{
         profile::{VersionProfile, VersionProfileBuilder, VersionProfilesConfig},
         read_toml_config, write_toml_config,
     },
-    instance::{launch::LaunchSettings, Inner, InstanceBuilder},
+    instance::{launch::LaunchSettings, InstanceBuilder},
+    loaders::{fabric::Fabric, vanilla::Vanilla},
     repository::{java_runner::JavaRunner, username::Username},
 };
 
@@ -40,9 +41,11 @@ async fn try_download(
         .version_path(mc_dir.join("versions").join(&version));
 
     let instance = match loader {
-        Loader::Vanilla => builder.instance(Inner::vanilla(&version).await?).build(),
+        Loader::Vanilla => builder
+            .instance(Box::new(Vanilla::new(&version).await?))
+            .build(),
         Loader::Fabric => builder
-            .instance(Inner::fabric(&version, None::<String>).await?)
+            .instance(Box::new(Fabric::new(&version, None::<String>).await?))
             .build(),
     };
 

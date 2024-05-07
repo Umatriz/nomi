@@ -1,24 +1,28 @@
 use const_typed_builder::Builder;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tracing::info;
 
+pub mod builder_ext;
 pub mod launch;
 pub mod profile;
+pub mod version_marker;
 
 use crate::{
-    downloads::{assets::AssetsDownload, download_version::DownloadVersion},
-    loaders::{fabric::Fabric, vanilla::Vanilla},
+    downloads::assets::AssetsDownloader,
     utils::state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
 };
 
-use self::launch::{LaunchInstance, LaunchInstanceBuilder, LaunchSettings};
+use self::{
+    launch::{LaunchInstance, LaunchInstanceBuilder, LaunchSettings},
+    version_marker::Version,
+};
 
 #[derive(Default, Debug)]
 pub struct Undefined;
 
 #[derive(Debug, Builder)]
 pub struct Instance {
-    instance: Inner,
+    instance: Box<dyn Version>,
     pub version: String,
     pub libraries: PathBuf,
     pub version_path: PathBuf,
@@ -27,46 +31,13 @@ pub struct Instance {
     pub name: String,
 }
 
-#[derive(Debug)]
-pub enum Inner {
-    Vanilla(Box<Vanilla>),
-    Fabric(Box<Fabric>),
-}
-
-impl Inner {
-    pub async fn vanilla(version_id: impl Into<String>) -> anyhow::Result<Inner> {
-        Ok(Inner::Vanilla(Box::new(Vanilla::new(version_id).await?)))
-    }
-
-    pub async fn fabric(
-        game_version: impl Into<String>,
-        loader_version: Option<impl Into<String>>,
-    ) -> anyhow::Result<Inner> {
-        Ok(Inner::Fabric(Box::new(
-            Fabric::new(game_version, loader_version).await?,
-        )))
-    }
-}
-
 impl Instance {
     pub async fn download(&self) -> anyhow::Result<()> {
-        match &self.instance {
-            // TODO: Refactor
-            Inner::Vanilla(inner) => {
-                inner.download(&self.version_path, &self.version).await?;
-                inner.download_libraries(&self.libraries).await?;
-                inner.create_json(&self.version_path).await?;
-            }
-            Inner::Fabric(inner) => {
-                inner.download(&self.version_path, &self.version).await?;
-                inner.download_libraries(&self.libraries).await?;
-                inner.create_json(&self.version_path).await?;
-
-                let vanilla = Vanilla::new(&self.version).await?;
-                vanilla.create_json(&self.version_path).await?;
-                vanilla.download_libraries(&self.libraries).await?;
-            }
-        }
+        self.instance
+            .download(&self.version_path, &self.version)
+            .await?;
+        self.instance.download_libraries(&self.libraries).await?;
+        self.instance.create_json(&self.version_path).await?;
 
         Ok(())
     }
@@ -77,13 +48,17 @@ impl Instance {
             .await?;
         let version_manifest = manifest.get_version_manifest(&self.version).await?;
 
-        AssetsInstanceBuilder::new(&self.version)
-            .id(version_manifest.asset_index.id)
-            .url(version_manifest.asset_index.url)
+        Ok(AssetsInstanceBuilder::new()
+            .downloader(
+                AssetsDownloader::new(
+                    version_manifest.asset_index.url,
+                    version_manifest.asset_index.id,
+                )
+                .await?,
+            )
             .indexes(self.assets.join("indexes"))
             .objects(self.assets.join("objects"))
-            .build()
-            .await
+            .build())
     }
 
     pub fn launch_instance(
@@ -96,112 +71,34 @@ impl Instance {
             Some(jvm) => builder.jvm_args(jvm),
             None => builder,
         };
-        match self.instance {
-            Inner::Vanilla(_) => builder.build(),
-            Inner::Fabric(inner) => builder.profile(inner.profile.into()).build(),
-        }
+        self.instance.insert(builder).build()
     }
 }
 
+#[derive(Builder)]
 pub struct AssetsInstance {
-    inner: AssetsDownload,
+    downloader: AssetsDownloader,
     objects: PathBuf,
     indexes: PathBuf,
 }
 
 impl AssetsInstance {
     pub async fn download(self) -> anyhow::Result<()> {
-        self.inner.download_assets_chunked(&self.objects).await?;
+        self.downloader
+            .download_assets_chunked(&self.objects)
+            .await?;
         info!("Assets downloaded successfully");
 
-        self.inner.get_assets_json(&self.indexes).await?;
+        self.downloader.get_assets_json(&self.indexes).await?;
         info!("Assets json created successfully");
 
         Ok(())
     }
 }
 
-#[derive(Default)]
-pub struct AssetsInstanceBuilder<O, I, U, N> {
-    version: String,
-    objects: O,
-    indexes: I,
-    url: U,
-    id: N,
-}
-
-impl AssetsInstanceBuilder<Undefined, Undefined, Undefined, Undefined> {
-    pub fn new(version: impl Into<String>) -> Self {
-        Self {
-            version: version.into(),
-            ..Default::default()
-        }
-    }
-}
-
-impl AssetsInstanceBuilder<PathBuf, PathBuf, String, String> {
-    pub async fn build(self) -> anyhow::Result<AssetsInstance> {
-        let assets = AssetsDownload::new(self.url, self.id).await?;
-
-        Ok(AssetsInstance {
-            inner: assets,
-            objects: self.objects,
-            indexes: self.indexes,
-        })
-    }
-}
-
-impl<I, U, N> AssetsInstanceBuilder<Undefined, I, U, N> {
-    pub fn objects(self, objects: impl AsRef<Path>) -> AssetsInstanceBuilder<PathBuf, I, U, N> {
-        AssetsInstanceBuilder {
-            version: self.version,
-            objects: objects.as_ref().to_path_buf(),
-            indexes: self.indexes,
-            url: self.url,
-            id: self.id,
-        }
-    }
-}
-
-impl<O, U, N> AssetsInstanceBuilder<O, Undefined, U, N> {
-    pub fn indexes(self, indexes: impl AsRef<Path>) -> AssetsInstanceBuilder<O, PathBuf, U, N> {
-        AssetsInstanceBuilder {
-            version: self.version,
-            objects: self.objects,
-            indexes: indexes.as_ref().to_path_buf(),
-            url: self.url,
-            id: self.id,
-        }
-    }
-}
-
-impl<O, I, N> AssetsInstanceBuilder<O, I, Undefined, N> {
-    pub fn url(self, url: impl Into<String>) -> AssetsInstanceBuilder<O, I, String, N> {
-        AssetsInstanceBuilder {
-            version: self.version,
-            objects: self.objects,
-            indexes: self.indexes,
-            url: url.into(),
-            id: self.id,
-        }
-    }
-}
-
-impl<O, I, U> AssetsInstanceBuilder<O, I, U, Undefined> {
-    pub fn id(self, id: impl Into<String>) -> AssetsInstanceBuilder<O, I, U, String> {
-        AssetsInstanceBuilder {
-            version: self.version,
-            objects: self.objects,
-            indexes: self.indexes,
-            url: self.url,
-            id: id.into(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use futures_util::TryFutureExt;
+    use crate::loaders::{fabric::Fabric, vanilla::Vanilla};
 
     use super::*;
 
@@ -211,7 +108,7 @@ mod tests {
             .version("1.18.2".into())
             .libraries("./minecraft/libraries".into())
             .version_path("./minecraft/instances/1.18.2".into())
-            .instance(Inner::vanilla("1.18.2").await.unwrap())
+            .instance(Box::new(Vanilla::new("1.18.2").await.unwrap()))
             .assets("./minecraft/assets".into())
             .game("./minecraft".into())
             .name("1.18.2-minecraft".into())
@@ -224,7 +121,7 @@ mod tests {
             .version("1.18.2".into())
             .libraries("./minecraft/libraries".into())
             .version_path("./minecraft/instances/1.18.2".into())
-            .instance(Inner::vanilla("1.18.2").await.unwrap())
+            .instance(Box::new(Vanilla::new("1.18.2").await.unwrap()))
             .assets("./minecraft/assets".into())
             .game("./minecraft".into())
             .name("1.18.2-minecraft".into())
@@ -245,7 +142,9 @@ mod tests {
             .version("1.18.2".into())
             .libraries("./minecraft/libraries".into())
             .version_path("./minecraft/instances/1.18.2".into())
-            .instance(Inner::fabric("1.18.2", None::<String>).await.unwrap())
+            .instance(Box::new(
+                Fabric::new("1.18.2", None::<String>).await.unwrap(),
+            ))
             .assets("./minecraft/assets".into())
             .game("./minecraft".into())
             .name("1.18.2-minecraft".into())

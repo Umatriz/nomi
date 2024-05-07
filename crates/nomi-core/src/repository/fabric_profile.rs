@@ -5,7 +5,7 @@ use crate::{instance::profile::LoaderProfile, utils::maven::MavenData};
 
 use super::{simple_args::SimpleArgs, simple_lib::SimpleLib};
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct FabricProfile {
     pub id: String,
@@ -42,7 +42,7 @@ pub struct Arguments {
     pub jvm: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Default, Debug)]
+#[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Library {
     pub name: String,

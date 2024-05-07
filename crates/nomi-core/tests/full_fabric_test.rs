@@ -1,6 +1,7 @@
 use nomi_core::{
     configs::profile::{VersionProfileBuilder, VersionProfilesConfig},
-    instance::{launch::LaunchSettings, Inner, InstanceBuilder},
+    instance::{launch::LaunchSettings, InstanceBuilder},
+    loaders::fabric::Fabric,
     repository::{java_runner::JavaRunner, username::Username},
 };
 
@@ -17,7 +18,9 @@ async fn full_fabric_test() {
         .game("./minecraft".into())
         .libraries("./minecraft/libraries".into())
         .assets("./minecraft/assets".into())
-        .instance(Inner::fabric("1.19.4", None::<String>).await.unwrap())
+        .instance(Box::new(
+            Fabric::new("1.19.4", None::<String>).await.unwrap(),
+        ))
         .build();
 
     instance.assets().await.unwrap().download().await.unwrap();

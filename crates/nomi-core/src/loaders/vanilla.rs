@@ -41,13 +41,9 @@ impl Vanilla {
 
 #[async_trait::async_trait]
 impl DownloadVersion for Vanilla {
-    async fn download(
-        &self,
-        dir: impl AsRef<Path> + Send,
-        file_name: impl Into<String> + Send,
-    ) -> anyhow::Result<()> {
-        let jar_name = format!("{}.jar", file_name.into());
-        let path = dir.as_ref().join(jar_name);
+    async fn download(&self, dir: &Path, file_name: &str) -> anyhow::Result<()> {
+        let jar_name = format!("{}.jar", file_name);
+        let path = dir.join(jar_name);
 
         download_file(&path, &self.manifest.downloads.client.url).await?;
 
@@ -56,13 +52,13 @@ impl DownloadVersion for Vanilla {
         Ok(())
     }
 
-    async fn download_libraries(&self, dir: impl AsRef<Path> + Send + Sync) -> anyhow::Result<()> {
+    async fn download_libraries(&self, dir: &Path) -> anyhow::Result<()> {
         let construct_path =
             |file_opt: Option<&ManifestFile>| -> Option<(String, Option<PathBuf>)> {
                 file_opt.map(|file| {
                     (
                         file.url.clone(),
-                        file.path.as_ref().map(|path| dir.as_ref().join(path)),
+                        file.path.as_ref().map(|path| dir.join(path)),
                     )
                 })
             };
@@ -107,9 +103,9 @@ impl DownloadVersion for Vanilla {
         Ok(())
     }
 
-    async fn create_json(&self, dir: impl AsRef<Path> + Send) -> anyhow::Result<()> {
+    async fn create_json(&self, dir: &Path) -> anyhow::Result<()> {
         let file_name = format!("{}.json", self.manifest.id);
-        let path = dir.as_ref().join(file_name);
+        let path = dir.join(file_name);
 
         let body = serde_json::to_string_pretty(&self.manifest)?;
 

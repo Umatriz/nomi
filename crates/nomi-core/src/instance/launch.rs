@@ -37,18 +37,6 @@ const CLASSPATH_SEPARATOR: &str = ":";
 const LAUNCHER_NAME: &str = "nomi";
 const LAUNCHER_VERSION: &str = "0.1.0";
 
-#[derive(Error, Debug)]
-pub enum LaunchError {
-    #[error("The game directory doesn't exist.")]
-    GameDirNotFound,
-
-    #[error("The java bin doesn't exist.")]
-    JavaBinNotFound,
-
-    #[error("The version file (.json) doesn't exist.")]
-    VersionFileNotFound,
-}
-
 #[derive(Serialize, Deserialize, Default, PartialEq, Debug, Clone)]
 pub struct LaunchSettings {
     #[serde(skip)]
@@ -70,26 +58,10 @@ pub struct LaunchSettings {
     pub version_type: String,
 }
 
-pub fn java_bin() -> Option<PathBuf> {
-    let _path = std::env::var("Path").unwrap();
-    let path_vec = _path.split(';').collect::<Vec<&str>>();
-    let mut java_bin: Option<PathBuf> = None;
-    for i in path_vec.iter() {
-        if i.contains("java") {
-            let pb = PathBuf::from(i).join("java.exe");
-            match pb.exists() {
-                true => java_bin = Some(pb),
-                false => java_bin = None,
-            }
-        }
-    }
-    java_bin
-}
-
-pub fn should_use_library(lib: &ManifestLibrary) -> anyhow::Result<bool> {
+pub fn should_use_library(lib: &ManifestLibrary) -> Option<bool> {
     match lib.rules.as_ref() {
-        Some(rules) => Ok(is_all_rules_satisfied(rules)?),
-        None => Ok(true),
+        Some(rules) => dbg!(is_all_rules_satisfied(rules)),
+        None => Some(true),
     }
 }
 
@@ -113,51 +85,52 @@ impl LaunchInstance {
         self.settings.uuid = uuid
     }
 
-    fn classpath(&self, libraries: Vec<ManifestLibrary>) -> anyhow::Result<(String, Vec<PathBuf>)> {
+    fn construct_lib_path(&self, path: &str) -> PathBuf {
+        let mut path = path.to_string();
+
+        if cfg!(target_os = "windows") {
+            path = path.replace('/', "\\")
+        };
+
+        self.settings.libraries_dir.join(path)
+    }
+
+    fn classpath(&self, libraries: &[ManifestLibrary]) -> Option<(String, Vec<PathBuf>)> {
         let mut classpath = vec![];
         let mut native_libs = vec![];
 
         classpath.push(self.settings.version_jar_file.clone());
 
         for lib in libraries.iter() {
-            if should_use_library(lib)? {
-                if let Some(artifact) = lib.downloads.artifact.as_ref() {
-                    let lib_path = artifact.path.clone().context("LibPath must be Some()")?;
+            if !dbg!(should_use_library(lib))? {
+                continue;
+            }
 
-                    let replaced_lib_path = if cfg!(target_os = "windows") {
-                        lib_path.replace('/', "\\")
-                    } else {
-                        lib_path
-                    };
+            if let Some(artifact) = lib.downloads.artifact.as_ref() {
+                let lib_path = artifact
+                    .path
+                    .as_ref()
+                    .map(|path| self.construct_lib_path(path))?;
 
-                    let final_lib_path =
-                        Path::new(&self.settings.libraries_dir).join(replaced_lib_path);
+                classpath.push(lib_path);
+            }
 
-                    classpath.push(final_lib_path);
-                }
+            if let Some(natives) = lib.downloads.classifiers.as_ref() {
+                let native_option = match std::env::consts::OS {
+                    "linux" => natives.natives_linux.as_ref(),
+                    "windows" => natives.natives_windows.as_ref(),
+                    "macos" => natives.natives_macos.as_ref(),
+                    _ => unreachable!(),
+                };
 
-                if let Some(natives) = lib.downloads.classifiers.as_ref() {
-                    let native_option = match std::env::consts::OS {
-                        "linux" => natives.natives_linux.as_ref(),
-                        "windows" => natives.natives_windows.as_ref(),
-                        "macos" => natives.natives_macos.as_ref(),
-                        _ => unreachable!(),
-                    };
+                if let Some(native_lib) = native_option {
+                    let lib_path = native_lib
+                        .path
+                        .as_ref()
+                        .map(|path| self.construct_lib_path(path))?;
 
-                    if let Some(native_lib) = native_option {
-                        let lib_path = native_lib.path.clone().context("LibPath must be Some()")?;
-
-                        let replaced_lib_path = if cfg!(target_os = "windows") {
-                            lib_path.replace('/', "\\")
-                        } else {
-                            lib_path
-                        };
-
-                        let final_lib_path = self.settings.libraries_dir.join(replaced_lib_path);
-
-                        native_libs.push(final_lib_path.clone());
-                        classpath.push(final_lib_path);
-                    }
+                    native_libs.push(lib_path.clone());
+                    classpath.push(lib_path);
                 }
             }
         }
@@ -167,13 +140,14 @@ impl LaunchInstance {
                 classpath.push(self.settings.libraries_dir.join(&lib.jar));
             })
         }
+
         let classpath_iter = classpath.iter().map(|p| p.display().to_string());
 
         let final_classpath =
             itertools::intersperse(classpath_iter, CLASSPATH_SEPARATOR.to_string())
                 .collect::<String>();
 
-        Ok((final_classpath, native_libs))
+        Some((final_classpath, native_libs))
     }
 
     fn process_natives(&self, natives: Vec<PathBuf>) -> anyhow::Result<()> {
@@ -204,36 +178,92 @@ impl LaunchInstance {
         Ok(())
     }
 
-    async fn build_args(&self) -> anyhow::Result<(Vec<String>, String)> {
+    async fn prepare_for_launch(&self) -> anyhow::Result<(Vec<String>, String)> {
         if !self.settings.game_dir.is_dir() {
-            return Err(LaunchError::GameDirNotFound.into());
+            return Err(anyhow::Error::msg("Cannot find game directory"));
         }
 
         if let JavaRunner::Path(p) = &self.settings.java_bin {
             if !p.is_file() {
-                return Err(LaunchError::JavaBinNotFound.into());
+                return Err(anyhow::Error::msg("Cannot find java binary"));
             }
         }
 
         if !self.settings.manifest_file.is_file() {
-            return Err(LaunchError::VersionFileNotFound.into());
+            return Err(anyhow::Error::msg("Cannot find version file (.json)"));
         }
 
         let manifest = read_json::<Manifest>(&self.settings.manifest_file).await?;
 
         let mut args: Vec<String> = vec![];
 
+        self.add_profile_args(&mut args, |prof| &prof.args.jvm);
+
+        let (classpath, native_libs) = self
+            .classpath(&manifest.libraries)
+            .context("Cannot construct classpath")?;
+
+        self.process_natives(native_libs)?;
+
+        self.build_args(&mut args, &manifest)?;
+
+        self.add_profile_args(&mut args, |prof| &prof.args.game);
+
+        args = args
+            .iter()
+            .map(|x| {
+                self.replace_args(
+                    x,
+                    &self.settings.assets,
+                    &self.settings.game_dir,
+                    &self.settings.natives_dir,
+                    &manifest.asset_index.id,
+                    &classpath,
+                )
+            })
+            .collect();
+
+        Ok((args, classpath))
+    }
+
+    fn add_profile_args(&self, args: &mut Vec<String>, iter: impl Fn(&LoaderProfile) -> &[String]) {
         if let Some(prof) = self.profile.as_ref() {
-            prof.args.jvm.iter().for_each(|a| {
+            iter(prof).iter().for_each(|a| {
                 dbg!(&a);
                 args.push(a.to_owned());
             })
         }
+    }
 
-        let (classpath, native_libs) = self.classpath(manifest.libraries)?;
+    fn build_args(&self, args: &mut Vec<String>, manifest: &Manifest) -> anyhow::Result<()> {
+        self.add_main_args(manifest, args)?;
 
-        self.process_natives(native_libs)?;
+        let main_class = match self.profile {
+            Some(ref prof) => &prof.main_class,
+            None => &manifest.main_class,
+        };
+        args.push(main_class.to_owned());
 
+        match &manifest.arguments {
+            Arguments::New { game, .. } => {
+                for arg in game {
+                    let JvmArgument::String(value) = arg else {
+                        break;
+                    };
+
+                    args.push(value.to_string());
+                }
+            }
+            Arguments::Old(arguments) => {
+                let mut separated = arguments.split_whitespace().map(String::from).collect_vec();
+                args.append(&mut separated);
+            }
+        };
+
+        Ok(())
+    }
+
+    fn add_main_args(&self, manifest: &Manifest, args: &mut Vec<String>) -> anyhow::Result<()> {
         match manifest.arguments {
             Arguments::New { ref jvm, .. } => {
                 for arg in jvm {
@@ -242,10 +272,13 @@ impl LaunchInstance {
                             args.push(value.to_string());
                         }
                         JvmArgument::Struct { value, rules, .. } => {
-                            if !is_all_rules_satisfied(rules)? {
+                            if !is_all_rules_satisfied(rules)
+                                .context("`is_all_rules_satisfied` returned None")?
+                            {
                                 continue;
                             }
 
+                            // TODO: rewrite it
                             if let Some(value) = value.as_str() {
                                 args.push(value.to_string());
                             } else if let Some(value_arr) = value.as_array() {
@@ -275,52 +308,7 @@ impl LaunchInstance {
             }
         }
 
-        let main_class = match self.profile {
-            Some(ref prof) => &prof.main_class,
-            None => &manifest.main_class,
-        };
-
-        args.push(main_class.to_owned());
-
-        match manifest.arguments {
-            Arguments::New { game, .. } => {
-                for arg in game {
-                    match arg {
-                        JvmArgument::String(value) => {
-                            args.push(value);
-                        }
-                        _ => break,
-                    }
-                }
-            }
-            Arguments::Old(arguments) => {
-                let mut split = arguments.split_whitespace().map(String::from).collect_vec();
-                args.append(&mut split);
-            }
-        };
-
-        if let Some(ref prof) = self.profile {
-            prof.args.game.iter().for_each(|a| {
-                dbg!(&a);
-                args.push(a.to_owned());
-            })
-        }
-
-        args = args
-            .iter()
-            .map(|x| {
-                self.replace_args(
-                    x,
-                    &self.settings.assets,
-                    &self.settings.game_dir,
-                    &self.settings.natives_dir,
-                    &manifest.asset_index.id,
-                    &classpath,
-                )
-            })
-            .collect();
-
-        Ok((args, classpath))
+        Ok(())
     }
 
     fn replace_args(
@@ -360,7 +348,7 @@ impl LaunchInstance {
     }
 
     pub async fn launch(&self) -> anyhow::Result<i32> {
-        let (args, _) = self.build_args().await?;
+        let (args, _) = self.prepare_for_launch().await?;
 
         let mut command = Command::new(self.settings.java_bin.get());
         if let Some(jvm) = self.jvm_args.as_ref() {

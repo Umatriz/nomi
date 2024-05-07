@@ -49,7 +49,8 @@ impl VersionProfile {
 mod tests {
     use crate::{
         configs::write_toml_config,
-        instance::{launch::LaunchSettings, Inner, InstanceBuilder},
+        instance::{launch::LaunchSettings, InstanceBuilder},
+        loaders::fabric::Fabric,
         repository::{java_runner::JavaRunner, username::Username},
     };
 
@@ -63,7 +64,7 @@ mod tests {
             .version("1.20".into())
             .libraries("./minecraft/libraries".into())
             .version_path("./minecraft/versions/1.20".into())
-            .instance(Inner::fabric("1.20", None::<String>).await.unwrap())
+            .instance(Box::new(Fabric::new("1.20", None::<String>).await.unwrap()))
             // .instance(Inner::vanilla("1.20").await.unwrap())
             .assets("./minecraft/assets".into())
             .game("./minecraft".into())

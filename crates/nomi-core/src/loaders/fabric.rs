@@ -77,11 +77,7 @@ impl Fabric {
 
 #[async_trait::async_trait]
 impl DownloadVersion for Fabric {
-    async fn download(
-        &self,
-        dir: impl AsRef<Path> + Send,
-        file_name: impl Into<String> + Send,
-    ) -> anyhow::Result<()> {
+    async fn download(&self, dir: &Path, file_name: &str) -> anyhow::Result<()> {
         let dir = dir.as_ref();
         Vanilla::new(&self.game_version)
             .await?
@@ -93,8 +89,7 @@ impl DownloadVersion for Fabric {
         Ok(())
     }
 
-    async fn download_libraries(&self, dir: impl AsRef<Path> + Send + Sync) -> anyhow::Result<()> {
-        let dir = dir.as_ref();
+    async fn download_libraries(&self, dir: &Path) -> anyhow::Result<()> {
         let mut set = JoinSet::new();
 
         self.profile.libraries.iter().for_each(|lib| {
@@ -112,9 +107,9 @@ impl DownloadVersion for Fabric {
         Ok(())
     }
 
-    async fn create_json(&self, dir: impl AsRef<Path> + Send) -> anyhow::Result<()> {
+    async fn create_json(&self, dir: &Path) -> anyhow::Result<()> {
         let file_name = format!("{}.json", self.profile.id);
-        let path = dir.as_ref().join(file_name);
+        let path = dir.join(file_name);
 
         let body = serde_json::to_string_pretty(&self.profile)?;
 
@@ -154,7 +149,7 @@ mod tests {
         Fabric::new("1.18.2", None::<String>)
             .await
             .unwrap()
-            .download(cur.join("minecraft"), "1.18.2.fabric")
+            .download(&cur.join("minecraft"), "1.18.2.fabric")
             .await
             .unwrap();
     }

@@ -1,4 +1,4 @@
-use nomi_core::instance::{Inner, InstanceBuilder};
+use nomi_core::{instance::InstanceBuilder, loaders::vanilla::Vanilla};
 use tracing::Level;
 
 #[tokio::test]
@@ -13,7 +13,7 @@ async fn download_test() {
         .version("1.18.2".into())
         .libraries("./minecraft/libraries".into())
         .version_path("./minecraft/versions/1.18.2".into())
-        .instance(Inner::vanilla("1.18.2").await.unwrap())
+        .instance(Box::new(Vanilla::new("1.18.2").await.unwrap()))
         .assets("./minecraft/assets".into())
         .game("./minecraft".into())
         .name("1.18.2-test".into())

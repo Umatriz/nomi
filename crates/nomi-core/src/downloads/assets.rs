@@ -6,8 +6,10 @@ use std::{
     collections::HashMap,
     path::{Path, PathBuf},
 };
-use tokio::{io::AsyncWriteExt, task::JoinSet};
+use tokio::task::JoinSet;
 use tracing::{error, info, trace};
+
+use crate::utils::write_into_file;
 
 use super::download_file;
 
@@ -23,13 +25,13 @@ pub struct AssetInformation {
 }
 
 #[derive(Debug)]
-pub struct AssetsDownload {
+pub struct AssetsDownloader {
     assets: Assets,
     id: String,
     url: String,
 }
 
-impl AssetsDownload {
+impl AssetsDownloader {
     pub async fn new(url: String, id: String) -> Result<Self> {
         Ok(Self {
             assets: Self::init(url.clone()).await?,
@@ -65,16 +67,9 @@ impl AssetsDownload {
         let filen = format!("{}.json", self.id);
         let path = assets_dir.join(filen);
 
-        if let Some(path) = path.parent() {
-            tokio::fs::create_dir_all(path).await?;
-        }
-
         let body = Client::new().get(&self.url).send().await?.text().await?;
 
-        let mut file = tokio::fs::File::create(path).await?;
-        file.write_all(body.as_bytes()).await?;
-
-        Ok(())
+        write_into_file(body.as_bytes(), &path).await
     }
 
     pub async fn download_assets_chunked(&self, dir: &Path) -> anyhow::Result<()> {
