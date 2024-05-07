@@ -78,7 +78,6 @@ impl Fabric {
 #[async_trait::async_trait]
 impl DownloadVersion for Fabric {
     async fn download(&self, dir: &Path, file_name: &str) -> anyhow::Result<()> {
-        let dir = dir.as_ref();
         Vanilla::new(&self.game_version)
             .await?
             .download(dir, file_name)

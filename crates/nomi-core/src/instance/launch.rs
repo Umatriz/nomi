@@ -7,7 +7,6 @@ use std::{
 use anyhow::Context;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use tokio::process::Command;
 
 use crate::{
