@@ -13,7 +13,7 @@ use crate::{
     instance::launch::macros::replace,
     repository::{
         java_runner::JavaRunner,
-        manifest::{Arguments, JvmArgument, Manifest, ManifestLibrary},
+        manifest::{Argument, Arguments, Manifest, ManifestLibrary, Value},
         username::Username,
     },
     utils::path_to_string,
@@ -25,6 +25,7 @@ use super::{
     Undefined,
 };
 
+pub mod args;
 pub mod rules;
 
 #[cfg(windows)]
@@ -57,10 +58,10 @@ pub struct LaunchSettings {
     pub version_type: String,
 }
 
-pub fn should_use_library(lib: &ManifestLibrary) -> Option<bool> {
+pub fn should_use_library(lib: &ManifestLibrary) -> bool {
     match lib.rules.as_ref() {
         Some(rules) => dbg!(is_all_rules_satisfied(rules)),
-        None => Some(true),
+        None => true,
     }
 }
 
@@ -101,7 +102,7 @@ impl LaunchInstance {
         classpath.push(self.settings.version_jar_file.clone());
 
         for lib in libraries.iter() {
-            if !dbg!(should_use_library(lib))? {
+            if !dbg!(should_use_library(lib)) {
                 continue;
             }
 
@@ -246,7 +247,7 @@ impl LaunchInstance {
         match &manifest.arguments {
             Arguments::New { game, .. } => {
                 for arg in game {
-                    let JvmArgument::String(value) = arg else {
+                    let Argument::String(value) = arg else {
                         break;
                     };
 
@@ -267,22 +268,20 @@ impl LaunchInstance {
             Arguments::New { ref jvm, .. } => {
                 for arg in jvm {
                     match arg {
-                        JvmArgument::String(value) => {
+                        Argument::String(value) => {
                             args.push(value.to_string());
                         }
-                        JvmArgument::Struct { value, rules, .. } => {
-                            if !is_all_rules_satisfied(rules)
-                                .context("`is_all_rules_satisfied` returned None")?
-                            {
+                        Argument::Struct { value, rules, .. } => {
+                            if !is_all_rules_satisfied(rules) {
                                 continue;
                             }
 
                             // TODO: rewrite it
-                            if let Some(value) = value.as_str() {
-                                args.push(value.to_string());
-                            } else if let Some(value_arr) = value.as_array() {
-                                for value in value_arr {
-                                    if let Some(value) = value.as_str() {
+
+                            match value {
+                                Value::String(v) => args.push(v.to_string()),
+                                Value::Array(arr) => {
+                                    for value in arr {
                                         args.push(value.to_string());
                                     }
                                 }

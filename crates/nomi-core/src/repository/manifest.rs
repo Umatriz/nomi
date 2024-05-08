@@ -24,27 +24,46 @@ pub struct Manifest {
 #[serde(untagged)]
 pub enum Arguments {
     New {
-        game: Vec<JvmArgument>,
-        jvm: Vec<JvmArgument>,
+        game: Vec<Argument>,
+        jvm: Vec<Argument>,
     },
     Old(String),
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(untagged)]
-pub enum JvmArgument {
+pub enum Argument {
+    Struct { rules: Vec<Rule>, value: Value },
     String(String),
-    Struct {
-        rules: Vec<Rules>,
-        value: serde_json::Value,
-    },
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum Value {
+    String(String),
+    Array(Vec<String>),
 }
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct Rules {
-    pub action: String,
-    pub features: Option<Features>,
-    pub os: Option<Os>,
+pub struct Rule {
+    pub action: Action,
+    #[serde(flatten)]
+    pub rule_kind: RuleKind,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum RuleKind {
+    #[serde(rename = "features")]
+    GameRule(Features),
+    #[serde(rename = "os")]
+    JvmRule(Os),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "snake_case")]
+pub enum Action {
+    Allow,
+    Disallow,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -101,7 +120,7 @@ pub struct ManifestLibrary {
     pub downloads: ManifestLibraryDownloads,
     pub name: String,
     // pub natives: Option<ManifestNatives>,
-    pub rules: Option<Vec<Rules>>,
+    pub rules: Option<Vec<Rule>>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -129,5 +148,11 @@ mod tests {
     async fn old_version_test() {
         let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/832d95b9f40699d4961394dcf6cf549e65f15dc5/1.12.2.json").await.unwrap();
         println!("{:#?}", manifest)
+    }
+
+    #[tokio::test]
+    async fn deserialize_test() {
+        let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/a871cbb4f8f31c471dad16adfa0920da3fd71a2d/1.20.6.json").await.unwrap();
+        println!("{:#?}", manifest.arguments)
     }
 }
