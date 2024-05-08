@@ -26,26 +26,6 @@ pub fn is_rule_passes(rule: &Rule) -> bool {
     }
 }
 
-// pub fn is_rule_satisfied(rule: &Rule) -> bool {
-//     // if let Some(target_os) = rule.os.as_ref().and_then(|os| os.name.as_ref()) {
-//     //     if env::consts::OS != target_os {
-//     //         return false;
-//     //     }
-//     // };
-
-//     // if let Some(ref features) = rule.features {
-//     //     let custom_res = features.has_custom_resolution.unwrap_or(false);
-//     //     let demo = features.is_demo_user.unwrap_or(false);
-//     //     let quick_realms: bool = features.is_quick_play_realms.unwrap_or(false);
-
-//     //     if custom_res || demo || quick_realms {
-//     //         return false;
-//     //     }
-//     // };
-
-//     true
-// }
-
 pub fn is_all_rules_satisfied(rules: &[Rule]) -> bool {
     for rule in rules.iter() {
         let satisfied = is_rule_passes(rule);
@@ -57,10 +37,4 @@ pub fn is_all_rules_satisfied(rules: &[Rule]) -> bool {
     }
 
     true
-}
-
-#[test]
-fn feature() {
-    dbg!(false || true || false);
-    dbg!(false && true && false);
 }

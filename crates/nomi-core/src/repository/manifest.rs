@@ -1,5 +1,3 @@
-use std::default;
-
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -32,28 +30,28 @@ pub enum Arguments {
     Old(String),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(untagged)]
 pub enum Argument {
     Struct { rules: Vec<Rule>, value: Value },
     String(String),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub enum Value {
     String(String),
     Array(Vec<String>),
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Rule {
     pub action: Action,
     #[serde(flatten)]
     pub rule_kind: Option<RuleKind>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum RuleKind {
     #[serde(rename = "features")]
     GameRule(Features),
@@ -68,14 +66,14 @@ pub enum Action {
     Disallow,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Features {
     pub is_demo_user: Option<bool>,
     pub has_custom_resolution: Option<bool>,
     pub is_quick_play_realms: Option<bool>,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Os {
     pub arch: Option<String>,
     pub name: Option<String>,
@@ -148,8 +146,8 @@ mod tests {
 
     #[tokio::test]
     async fn old_version_test() {
-        let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/832d95b9f40699d4961394dcf6cf549e65f15dc5/1.12.2.json").await.unwrap();
-        println!("{:#?}", manifest)
+        let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/d546f1707a3f2b7d034eece5ea2e311eda875787/1.8.9.json").await.unwrap();
+        println!("{:#?}", manifest.arguments)
     }
 
     #[tokio::test]
