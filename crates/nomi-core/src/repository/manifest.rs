@@ -1,3 +1,5 @@
+use std::default;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -48,7 +50,7 @@ pub enum Value {
 pub struct Rule {
     pub action: Action,
     #[serde(flatten)]
-    pub rule_kind: RuleKind,
+    pub rule_kind: Option<RuleKind>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -152,7 +154,7 @@ mod tests {
 
     #[tokio::test]
     async fn deserialize_test() {
-        let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/a871cbb4f8f31c471dad16adfa0920da3fd71a2d/1.20.6.json").await.unwrap();
-        println!("{:#?}", manifest.arguments)
+        let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/334b33fcba3c9be4b7514624c965256535bd7eba/1.18.2.json").await.unwrap();
+        println!("{:#?}", manifest.libraries[29])
     }
 }

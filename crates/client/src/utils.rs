@@ -1,5 +1,7 @@
 use std::{fmt::Display, future::Future, io::Write, sync::mpsc::Sender};
 
+use tracing::error;
+
 pub trait Crash<T> {
     fn crash(self) -> T;
 }
@@ -12,6 +14,7 @@ where
         match self {
             Ok(value) => value,
             Err(err) => {
+                error!("{}", err);
                 let mut file = std::fs::File::create("./CRASH_REPORT.txt").unwrap();
                 let _ = file.write_all(
                     format!("Nomi crashed with the following error:\n{}", err).as_bytes(),
