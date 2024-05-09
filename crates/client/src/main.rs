@@ -93,7 +93,9 @@ impl AppTabs {
 
 impl eframe::App for AppTabs {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.set_pixels_per_point(1.2);
+        //TODO: Maybe make it a setting
+        #[cfg(not(target_os = "macos"))] ctx.set_pixels_per_point(1.2);
+        #[cfg(target_os = "macos")] ctx.set_pixels_per_point(2.0);
         egui::TopBottomPanel::top("top_nav_bar").show(ctx, |ui| {
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 // ui.selectable_value(&mut self.current, Page::Main, "Main");
