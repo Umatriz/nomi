@@ -25,12 +25,6 @@ cargo run
 
 NOT AN OFFICIAL MINECRAFT [PRODUCT/SERVICE/EVENT/etc.]. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT
 
-### Main developers
-
-\<developer name> (discord username)
-
-- Umatriz (@umatriz)
-
 ---
 
 Copyright (C) 2023  umatriz

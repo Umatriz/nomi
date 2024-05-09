@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::{marker::PhantomData, path::PathBuf};
 
 use crate::{
     instance::launch::{
@@ -12,33 +12,35 @@ use crate::{
 
 use super::{rules::is_rule_passes, should_use_library, LaunchInstance, CLASSPATH_SEPARATOR};
 
-pub struct ArgumentsBuilder<'a> {
+pub enum Undefined {}
+pub enum Defined {}
+
+pub struct ArgumentsBuilder<'a, S> {
     instance: &'a LaunchInstance,
     manifest: &'a Manifest,
+    classpath: String,
+    native_libs: Vec<PathBuf>,
+
+    _marker: PhantomData<S>,
 }
 
 struct JvmArguments(Vec<Argument>);
 struct GameArguments(Vec<Argument>);
 
-impl<'a> ArgumentsBuilder<'a> {
-    pub fn new(instance: &'a LaunchInstance, manifest: &'a Manifest) -> Self {
-        Self { instance, manifest }
-    }
-
-    fn arguments_parser(
-        &self,
-        new_arguments_parser: impl Fn(JvmArguments, GameArguments) -> Vec<Argument>,
-        old_arguments_parser: impl Fn(String) -> Vec<String>,
-    ) -> Vec<String> {
-        match &self.manifest.arguments {
-            Arguments::New { jvm, game } => parse_arguments(new_arguments_parser(
-                JvmArguments(jvm.clone()),
-                GameArguments(game.clone()),
-            )),
-            Arguments::Old(arguments) => old_arguments_parser(arguments.clone()),
+impl<'a> ArgumentsBuilder<'a, Undefined> {
+    pub fn finish(&self) -> ArgumentsBuilder<'a, Defined> {
+        let (classpath, native_libs) = self.classpath();
+        ArgumentsBuilder {
+            instance: self.instance,
+            manifest: self.manifest,
+            classpath,
+            native_libs,
+            _marker: PhantomData,
         }
     }
+}
 
+impl<'a> ArgumentsBuilder<'a, Defined> {
     pub fn jvm_arguments(&self) -> Vec<String> {
         self.arguments_parser(
             |JvmArguments(jvm), _| jvm.clone(),
@@ -55,7 +57,7 @@ impl<'a> ArgumentsBuilder<'a> {
                         &self.instance.settings.version_jar_file.display()
                     ),
                     "-cp".to_string(),
-                    "${classpath}".to_string(),
+                    self.parse_args_from_str("${classpath}"),
                 ]
             },
         )
@@ -64,11 +66,95 @@ impl<'a> ArgumentsBuilder<'a> {
     pub fn game_arguments(&self) -> Vec<String> {
         self.arguments_parser(
             |_, GameArguments(game)| game.clone(),
-            |arguments| arguments.split_whitespace().map(String::from).collect(),
+            |arguments| {
+                arguments
+                    .split_whitespace()
+                    .map(|arg| self.parse_args_from_str(arg))
+                    .collect()
+            },
         )
     }
 
-    fn classpath(&self) -> Option<(String, Vec<PathBuf>)> {
+    fn parse_args_from_str(&self, source: &str) -> String {
+        replace!(source,
+            "${assets_root}" => &path_to_string(&self.instance.settings.assets),
+            "${game_assets}" => &path_to_string(&self.instance.settings.assets),
+            "${game_directory}" => &path_to_string(&self.instance.settings.game_dir),
+            "${natives_directory}" => &path_to_string(&self.instance.settings.natives_dir),
+            "${launcher_name}" => LAUNCHER_NAME,
+            "${launcher_version}" => LAUNCHER_VERSION,
+            "${auth_access_token}" => self.instance.settings
+                .access_token
+                .clone()
+                .unwrap_or("null".to_string())
+                .as_str(),
+            "${auth_session}" => "null",
+            "${auth_player_name}" => self.instance.settings.username.get(),
+            "${auth_uuid}" => self.instance.settings
+                .uuid
+                .clone()
+                .unwrap_or(uuid::Uuid::new_v4().to_string())
+                .as_str(),
+            "${version_type}" => &self.instance.settings.version_type,
+            "${version_name}" => &self.instance.settings.version,
+            "${assets_index_name}" => &self.manifest.asset_index.id,
+            "${user_properties}" => "{}",
+            "${classpath}" => &self.classpath
+        )
+    }
+
+    fn arguments_parser(
+        &self,
+        new_arguments_parser: impl Fn(JvmArguments, GameArguments) -> Vec<Argument>,
+        old_arguments_parser: impl Fn(String) -> Vec<String>,
+    ) -> Vec<String> {
+        match &self.manifest.arguments {
+            Arguments::New { jvm, game } => self.parse_arguments(new_arguments_parser(
+                JvmArguments(jvm.clone()),
+                GameArguments(game.clone()),
+            )),
+            Arguments::Old(arguments) => old_arguments_parser(arguments.clone()),
+        }
+    }
+
+    fn parse_arguments(&self, args: Vec<Argument>) -> Vec<String> {
+        args.into_iter()
+            .flat_map(|arg| match arg {
+                Argument::Struct { rules, value } => {
+                    if !rules.iter().all(is_rule_passes) {
+                        return vec![String::new()];
+                    }
+
+                    match value {
+                        Value::String(v) => vec![self.parse_args_from_str(&v)],
+                        Value::Array(arr) => arr
+                            .into_iter()
+                            .map(|arg| self.parse_args_from_str(&arg))
+                            .collect(),
+                    }
+                }
+                Argument::String(arg) => vec![self.parse_args_from_str(&arg)],
+            })
+            .filter(|arg| !arg.is_empty())
+            .collect::<Vec<String>>()
+    }
+}
+
+impl<'a, S> ArgumentsBuilder<'a, S> {
+    pub fn new(
+        instance: &'a LaunchInstance,
+        manifest: &'a Manifest,
+    ) -> ArgumentsBuilder<'a, Undefined> {
+        ArgumentsBuilder {
+            instance,
+            manifest,
+            classpath: String::new(),
+            native_libs: Vec::new(),
+            _marker: PhantomData,
+        }
+    }
+
+    fn classpath(&self) -> (String, Vec<PathBuf>) {
         fn match_natives(natives: &ManifestClassifiers) -> Option<&ManifestFile> {
             match std::env::consts::OS {
                 "linux" => natives.natives_linux.as_ref(),
@@ -128,63 +214,6 @@ impl<'a> ArgumentsBuilder<'a> {
             itertools::intersperse(classpath_iter, CLASSPATH_SEPARATOR.to_string())
                 .collect::<String>();
 
-        Some((final_classpath, native_libs))
+        (final_classpath, native_libs)
     }
-
-    fn parse_args_from_str(&self, source: &str, classpath: &str) -> String {
-        replace!(source,
-            "${assets_root}" => &path_to_string(&self.instance.settings.assets),
-            "${game_assets}" => &path_to_string(&self.instance.settings.assets),
-            "${game_directory}" => &path_to_string(&self.instance.settings.game_dir),
-            "${natives_directory}" => &path_to_string(&self.instance.settings.natives_dir),
-            "${launcher_name}" => LAUNCHER_NAME,
-            "${launcher_version}" => LAUNCHER_VERSION,
-            "${auth_access_token}" => self.instance.settings
-                .access_token
-                .clone()
-                .unwrap_or("null".to_string())
-                .as_str(),
-            "${auth_session}" => "null",
-            "${auth_player_name}" => self.instance.settings.username.get(),
-            "${auth_uuid}" => self.instance.settings
-                .uuid
-                .clone()
-                .unwrap_or(uuid::Uuid::new_v4().to_string())
-                .as_str(),
-            "${version_type}" => &self.instance.settings.version_type,
-            "${version_name}" => &self.instance.settings.version,
-            "${assets_index_name}" => &self.manifest.asset_index.id,
-            "${user_properties}" => "{}",
-            "${classpath}" => classpath
-        )
-    }
-}
-
-fn parse_arguments(args: Vec<Argument>) -> Vec<String> {
-    args.into_iter()
-        .flat_map(|arg| match arg {
-            Argument::Struct { rules, value } => {
-                if !rules.iter().all(is_rule_passes) {
-                    return vec![String::new()];
-                }
-
-                match value {
-                    Value::String(v) => vec![v.to_string()],
-                    Value::Array(arr) => arr,
-                }
-            }
-            Argument::String(a) => vec![a.to_string()],
-        })
-        .filter(|arg| !arg.is_empty())
-        .collect::<Vec<String>>()
-}
-
-#[test]
-fn feature() {
-    let iter = vec![(1, 2), (3, 4)].iter();
-
-    // something that can do it
-
-    let first = vec![1, 2, 3, 4];
-    let second = vec![2, 4];
 }
