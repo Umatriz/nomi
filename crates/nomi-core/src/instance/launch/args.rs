@@ -1,12 +1,16 @@
+use std::path::PathBuf;
+
 use crate::{
     instance::launch::{
         macros::replace, rules::is_all_rules_satisfied, LAUNCHER_NAME, LAUNCHER_VERSION,
     },
-    repository::manifest::{Argument, Arguments, Manifest, Value},
+    repository::manifest::{
+        Argument, Arguments, Manifest, ManifestClassifiers, ManifestFile, Value,
+    },
     utils::path_to_string,
 };
 
-use super::{rules::is_rule_passes, LaunchInstance};
+use super::{rules::is_rule_passes, should_use_library, LaunchInstance, CLASSPATH_SEPARATOR};
 
 pub struct ArgumentsBuilder<'a> {
     instance: &'a LaunchInstance,
@@ -64,6 +68,69 @@ impl<'a> ArgumentsBuilder<'a> {
         )
     }
 
+    fn classpath(&self) -> Option<(String, Vec<PathBuf>)> {
+        fn match_natives(natives: &ManifestClassifiers) -> Option<&ManifestFile> {
+            match std::env::consts::OS {
+                "linux" => natives.natives_linux.as_ref(),
+                "windows" => natives.natives_windows.as_ref(),
+                "macos" => natives.natives_macos.as_ref(),
+                _ => unreachable!(),
+            }
+        }
+
+        let mut classpath = vec![Some(self.instance.settings.version_jar_file.clone())];
+        let mut native_libs = vec![];
+
+        self.manifest
+            .libraries
+            .iter()
+            .filter(|lib| should_use_library(lib))
+            .map(|lib| {
+                (
+                    lib.downloads
+                        .artifact
+                        .as_ref()
+                        .and_then(|artifact| artifact.path.as_ref())
+                        .map(|path| self.instance.construct_lib_path(path)),
+                    lib.downloads
+                        .classifiers
+                        .as_ref()
+                        .and_then(|natives| match_natives(natives))
+                        .and_then(|native_lib| native_lib.path.as_ref())
+                        .map(|path| self.instance.construct_lib_path(path)),
+                )
+            })
+            .for_each(|(lib, native)| {
+                classpath.extend([lib, native.clone()]);
+                native_libs.push(native);
+            });
+
+        let mut classpath = classpath.into_iter().flatten().collect::<Vec<_>>();
+
+        let native_libs = native_libs.into_iter().flatten().collect::<Vec<_>>();
+
+        if let Some(libs) = self
+            .instance
+            .profile
+            .as_ref()
+            .map(|p| &p.libraries)
+            .map(|libs| {
+                libs.iter()
+                    .map(|lib| self.instance.settings.libraries_dir.join(&lib.jar))
+            })
+        {
+            classpath.extend(libs);
+        }
+
+        let classpath_iter = classpath.iter().map(|p| p.display().to_string());
+
+        let final_classpath =
+            itertools::intersperse(classpath_iter, CLASSPATH_SEPARATOR.to_string())
+                .collect::<String>();
+
+        Some((final_classpath, native_libs))
+    }
+
     fn parse_args_from_str(&self, source: &str, classpath: &str) -> String {
         replace!(source,
             "${assets_root}" => &path_to_string(&self.instance.settings.assets),
@@ -110,4 +177,14 @@ fn parse_arguments(args: Vec<Argument>) -> Vec<String> {
         })
         .filter(|arg| !arg.is_empty())
         .collect::<Vec<String>>()
+}
+
+#[test]
+fn feature() {
+    let iter = vec![(1, 2), (3, 4)].iter();
+
+    // something that can do it
+
+    let first = vec![1, 2, 3, 4];
+    let second = vec![2, 4];
 }

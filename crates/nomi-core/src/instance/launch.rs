@@ -97,7 +97,7 @@ impl LaunchInstance {
 
     fn classpath(&self, libraries: &[ManifestLibrary]) -> Option<(String, Vec<PathBuf>)> {
         let mut classpath = vec![];
-        let mut native_libs = vec![];
+        let mut native_libs: Vec<PathBuf> = vec![];
 
         classpath.push(self.settings.version_jar_file.clone());
 
