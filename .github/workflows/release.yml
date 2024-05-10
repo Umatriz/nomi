@@ -18,7 +18,7 @@ jobs:
       - name: Build project
         run: cargo build --target x86_64-pc-windows-gnu --release && cargo build --release
       - name: Publish release
-        uses: uses: ghalactic/github-release-from-tag@v5
+        uses: ghalactic/github-release-from-tag@v5
         with:
           assets: |
             - path: target/release/client
