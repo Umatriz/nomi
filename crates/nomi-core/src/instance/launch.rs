@@ -1,23 +1,17 @@
 use std::{
     fs::{File, OpenOptions},
     io,
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
-use anyhow::Context;
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 use tracing::info;
 
-use crate::{
-    instance::launch::macros::replace,
-    repository::{
-        java_runner::JavaRunner,
-        manifest::{Argument, Arguments, Manifest, ManifestLibrary, Value},
-        username::Username,
-    },
-    utils::path_to_string,
+use crate::repository::{
+    java_runner::JavaRunner,
+    manifest::{Manifest, ManifestLibrary},
+    username::Username,
 };
 use rules::is_all_rules_satisfied;
 
