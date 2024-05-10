@@ -40,7 +40,7 @@ pub struct VersionProfile {
 }
 
 impl VersionProfile {
-    pub async fn launch(&self) -> anyhow::Result<i32> {
+    pub async fn launch(&self) -> anyhow::Result<()> {
         self.instance.launch().await
     }
 }

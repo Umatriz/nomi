@@ -8,6 +8,7 @@ use anyhow::Context;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
+use tracing::info;
 
 use crate::{
     instance::launch::macros::replace,
@@ -19,6 +20,8 @@ use crate::{
     utils::path_to_string,
 };
 use rules::is_all_rules_satisfied;
+
+use self::args::ArgumentsBuilder;
 
 use super::{
     profile::{read_json, LoaderProfile},
@@ -69,7 +72,7 @@ pub fn should_use_library(lib: &ManifestLibrary) -> bool {
 pub struct LaunchInstance {
     pub settings: LaunchSettings,
     jvm_args: Option<Vec<String>>,
-    profile: Option<LoaderProfile>,
+    loader_profile: Option<LoaderProfile>,
 }
 
 impl LaunchInstance {
@@ -85,72 +88,7 @@ impl LaunchInstance {
         self.settings.uuid = uuid
     }
 
-    fn construct_lib_path(&self, path: &str) -> PathBuf {
-        let mut path = path.to_string();
-
-        if cfg!(target_os = "windows") {
-            path = path.replace('/', "\\")
-        };
-
-        self.settings.libraries_dir.join(path)
-    }
-
-    fn classpath(&self, libraries: &[ManifestLibrary]) -> Option<(String, Vec<PathBuf>)> {
-        let mut classpath = vec![];
-        let mut native_libs: Vec<PathBuf> = vec![];
-
-        classpath.push(self.settings.version_jar_file.clone());
-
-        for lib in libraries.iter() {
-            if !dbg!(should_use_library(lib)) {
-                continue;
-            }
-
-            if let Some(artifact) = lib.downloads.artifact.as_ref() {
-                let lib_path = artifact
-                    .path
-                    .as_ref()
-                    .map(|path| self.construct_lib_path(path))?;
-
-                classpath.push(lib_path);
-            }
-
-            if let Some(natives) = lib.downloads.classifiers.as_ref() {
-                let native_option = match std::env::consts::OS {
-                    "linux" => natives.natives_linux.as_ref(),
-                    "windows" => natives.natives_windows.as_ref(),
-                    "macos" => natives.natives_macos.as_ref(),
-                    _ => unreachable!(),
-                };
-
-                if let Some(native_lib) = native_option {
-                    let lib_path = native_lib
-                        .path
-                        .as_ref()
-                        .map(|path| self.construct_lib_path(path))?;
-
-                    native_libs.push(lib_path.clone());
-                    classpath.push(lib_path);
-                }
-            }
-        }
-
-        if let Some(extra_libs) = self.profile.as_ref().map(|p| &p.libraries) {
-            extra_libs.iter().for_each(|lib| {
-                classpath.push(self.settings.libraries_dir.join(&lib.jar));
-            })
-        }
-
-        let classpath_iter = classpath.iter().map(|p| p.display().to_string());
-
-        let final_classpath =
-            itertools::intersperse(classpath_iter, CLASSPATH_SEPARATOR.to_string())
-                .collect::<String>();
-
-        Some((final_classpath, native_libs))
-    }
-
-    fn process_natives(&self, natives: Vec<PathBuf>) -> anyhow::Result<()> {
+    fn process_natives(&self, natives: &[PathBuf]) -> anyhow::Result<()> {
         for lib in natives {
             let reader = OpenOptions::new().read(true).open(lib)?;
             std::fs::create_dir_all(&self.settings.natives_dir)?;
@@ -178,195 +116,40 @@ impl LaunchInstance {
         Ok(())
     }
 
-    async fn prepare_for_launch(&self) -> anyhow::Result<(Vec<String>, String)> {
-        if !self.settings.game_dir.is_dir() {
-            return Err(anyhow::Error::msg("Cannot find game directory"));
-        }
-
-        if let JavaRunner::Path(p) = &self.settings.java_bin {
-            if !p.is_file() {
-                return Err(anyhow::Error::msg("Cannot find java binary"));
-            }
-        }
-
-        if !self.settings.manifest_file.is_file() {
-            return Err(anyhow::Error::msg("Cannot find version file (.json)"));
-        }
-
+    pub async fn launch(&self) -> anyhow::Result<()> {
         let manifest = read_json::<Manifest>(&self.settings.manifest_file).await?;
 
-        let mut args: Vec<String> = vec![];
+        let arguments_builder = ArgumentsBuilder::new(self, &manifest).finish();
 
-        self.add_profile_args(&mut args, |prof| &prof.args.jvm);
+        self.process_natives(arguments_builder.get_native_libs())?;
 
-        let (classpath, native_libs) = self
-            .classpath(&manifest.libraries)
-            .context("Cannot construct classpath")?;
+        let custom_jvm_arguments = arguments_builder.custom_jvm_arguments();
+        let manifest_jvm_arguments = arguments_builder.manifest_jvm_arguments();
+        let manifest_game_arguments = arguments_builder.manifest_game_arguments();
 
-        self.process_natives(native_libs)?;
+        let main_class = arguments_builder.get_main_class();
 
-        self.build_args(&mut args, &manifest)?;
+        let loader_arguments = arguments_builder.loader_arguments();
 
-        self.add_profile_args(&mut args, |prof| &prof.args.game);
+        let loader_jvm_arguments = loader_arguments.jvm_arguments();
+        let loader_game_arguments = loader_arguments.game_arguments();
 
-        args = args
-            .iter()
-            .map(|x| {
-                self.replace_args(
-                    x,
-                    &self.settings.assets,
-                    &self.settings.game_dir,
-                    &self.settings.natives_dir,
-                    &manifest.asset_index.id,
-                    &classpath,
-                )
-            })
-            .collect();
+        let mut child = Command::new(self.settings.java_bin.get())
+            .args(custom_jvm_arguments)
+            .args(loader_jvm_arguments)
+            .args(manifest_jvm_arguments)
+            .arg(main_class)
+            .args(manifest_game_arguments)
+            .args(loader_game_arguments)
+            .spawn()?;
 
-        Ok((args, classpath))
-    }
-
-    fn add_profile_args(&self, args: &mut Vec<String>, iter: impl Fn(&LoaderProfile) -> &[String]) {
-        if let Some(prof) = self.profile.as_ref() {
-            iter(prof).iter().for_each(|a| {
-                dbg!(&a);
-                args.push(a.to_owned());
-            })
-        }
-    }
-
-    fn build_args(&self, args: &mut Vec<String>, manifest: &Manifest) -> anyhow::Result<()> {
-        self.add_main_args(manifest, args)?;
-
-        let main_class = match self.profile {
-            Some(ref prof) => &prof.main_class,
-            None => &manifest.main_class,
-        };
-        args.push(main_class.to_owned());
-
-        match &manifest.arguments {
-            Arguments::New { game, .. } => {
-                for arg in game {
-                    let Argument::String(value) = arg else {
-                        break;
-                    };
-
-                    args.push(value.to_string());
-                }
-            }
-            Arguments::Old(arguments) => {
-                let mut separated = arguments.split_whitespace().map(String::from).collect_vec();
-                args.append(&mut separated);
-            }
-        };
-
-        Ok(())
-    }
-
-    fn add_main_args(&self, manifest: &Manifest, args: &mut Vec<String>) -> anyhow::Result<()> {
-        match manifest.arguments {
-            Arguments::New { ref jvm, .. } => {
-                for arg in jvm {
-                    match arg {
-                        Argument::String(value) => {
-                            args.push(value.to_string());
-                        }
-                        Argument::Struct { value, rules, .. } => {
-                            if !is_all_rules_satisfied(rules) {
-                                continue;
-                            }
-
-                            // TODO: rewrite it
-
-                            match value {
-                                Value::String(v) => args.push(v.to_string()),
-                                Value::Array(arr) => {
-                                    for value in arr {
-                                        args.push(value.to_string());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            Arguments::Old(_) => {
-                args.push(format!(
-                    "-Djava.library.path={}",
-                    &self.settings.natives_dir.display()
-                ));
-                args.push("-Dminecraft.launcher.brand=${launcher_name}".into());
-                args.push("-Dminecraft.launcher.version=${launcher_version}".into());
-                args.push(format!(
-                    "-Dminecraft.client.jar={}",
-                    &self.settings.version_jar_file.display()
-                ));
-                args.push("-cp".to_string());
-                args.push("${classpath}".to_string());
-            }
-        }
-
-        Ok(())
-    }
-
-    fn replace_args(
-        &self,
-        x: &str,
-        assets_dir: &Path,
-        game_dir: &Path,
-        natives_dir: &Path,
-        assets_index: &str,
-        classpath: &str,
-    ) -> String {
-        replace!(x,
-            "${assets_root}" => &path_to_string(assets_dir),
-            "${game_assets}" => &path_to_string(assets_dir),
-            "${game_directory}" => &path_to_string(game_dir),
-            "${natives_directory}" => &path_to_string(natives_dir),
-            "${launcher_name}" => LAUNCHER_NAME,
-            "${launcher_version}" => LAUNCHER_VERSION,
-            "${auth_access_token}" => self.settings
-                .access_token
-                .clone()
-                .unwrap_or("null".to_string())
-                .as_str(),
-            "${auth_session}" => "null",
-            "${auth_player_name}" => self.settings.username.get(),
-            "${auth_uuid}" => self.settings
-                .uuid
-                .clone()
-                .unwrap_or(uuid::Uuid::new_v4().to_string())
-                .as_str(),
-            "${version_type}" => &self.settings.version_type,
-            "${version_name}" => &self.settings.version,
-            "${assets_index_name}" => assets_index,
-            "${user_properties}" => "{}",
-            "${classpath}" => classpath
-        )
-    }
-
-    pub async fn launch(&self) -> anyhow::Result<i32> {
-        let (args, _) = self.prepare_for_launch().await?;
-
-        let mut command = Command::new(self.settings.java_bin.get());
-        if let Some(jvm) = self.jvm_args.as_ref() {
-            command.args(jvm);
-        }
-        command.args(args).current_dir(&self.settings.game_dir);
-
-        println!("{:#?}", command);
-
-        let mut process = command.spawn().context("command failed to start")?;
-
-        let status = process
+        child
             .wait()
             .await?
             .code()
-            .context("can't get minecraft exit code")?;
+            .inspect(|code| info!("Minecraft exit code: {}", code));
 
-        // tokio::fs::remove_dir_all(&self.settings.natives_dir).await?;
-
-        Ok(status)
+        Ok(())
     }
 }
 
@@ -433,7 +216,7 @@ impl LaunchInstanceBuilder<LaunchSettings> {
         LaunchInstance {
             settings: self.settings,
             jvm_args: self.jvm_args,
-            profile: self.profile,
+            loader_profile: self.profile,
         }
     }
 }

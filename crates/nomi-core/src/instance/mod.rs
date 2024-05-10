@@ -1,6 +1,5 @@
 use const_typed_builder::Builder;
 use std::path::PathBuf;
-use tokio::sync::mpsc::Receiver;
 use tracing::info;
 
 pub mod builder_ext;

@@ -1,8 +1,9 @@
 use std::{marker::PhantomData, path::PathBuf};
 
 use crate::{
-    instance::launch::{
-        macros::replace, rules::is_all_rules_satisfied, LAUNCHER_NAME, LAUNCHER_VERSION,
+    instance::{
+        launch::{macros::replace, LAUNCHER_NAME, LAUNCHER_VERSION},
+        profile::LoaderProfile,
     },
     repository::manifest::{
         Argument, Arguments, Manifest, ManifestClassifiers, ManifestFile, Value,
@@ -15,7 +16,7 @@ use super::{rules::is_rule_passes, should_use_library, LaunchInstance, CLASSPATH
 pub enum Undefined {}
 pub enum Defined {}
 
-pub struct ArgumentsBuilder<'a, S> {
+pub struct ArgumentsBuilder<'a, S = Undefined> {
     instance: &'a LaunchInstance,
     manifest: &'a Manifest,
     classpath: String,
@@ -27,7 +28,32 @@ pub struct ArgumentsBuilder<'a, S> {
 struct JvmArguments(Vec<Argument>);
 struct GameArguments(Vec<Argument>);
 
+pub struct LoaderArguments<'a>(Option<&'a LoaderProfile>);
+
+impl<'a> LoaderArguments<'a> {
+    pub fn jvm_arguments(&self) -> &[String] {
+        self.0.map_or(&[], |profile| profile.args.jvm.as_slice())
+    }
+
+    pub fn game_arguments(&self) -> &[String] {
+        self.0.map_or(&[], |profile| profile.args.game.as_slice())
+    }
+}
+
 impl<'a> ArgumentsBuilder<'a, Undefined> {
+    pub fn new(
+        instance: &'a LaunchInstance,
+        manifest: &'a Manifest,
+    ) -> ArgumentsBuilder<'a, Undefined> {
+        ArgumentsBuilder {
+            instance,
+            manifest,
+            classpath: String::new(),
+            native_libs: Vec::new(),
+            _marker: PhantomData,
+        }
+    }
+
     pub fn finish(&self) -> ArgumentsBuilder<'a, Defined> {
         let (classpath, native_libs) = self.classpath();
         ArgumentsBuilder {
@@ -41,7 +67,29 @@ impl<'a> ArgumentsBuilder<'a, Undefined> {
 }
 
 impl<'a> ArgumentsBuilder<'a, Defined> {
-    pub fn jvm_arguments(&self) -> Vec<String> {
+    pub fn get_main_class(&self) -> &str {
+        self.instance
+            .loader_profile
+            .as_ref()
+            .map_or(&self.manifest.main_class, |profile| &profile.main_class)
+    }
+
+    pub fn get_native_libs(&self) -> &[PathBuf] {
+        self.native_libs.as_slice()
+    }
+
+    pub fn custom_jvm_arguments(&self) -> &[String] {
+        self.instance
+            .jvm_args
+            .as_ref()
+            .map_or(&[], |args| args.as_slice())
+    }
+
+    pub fn loader_arguments(&self) -> LoaderArguments<'a> {
+        LoaderArguments(self.instance.loader_profile.as_ref())
+    }
+
+    pub fn manifest_jvm_arguments(&self) -> Vec<String> {
         self.arguments_parser(
             |JvmArguments(jvm), _| jvm.clone(),
             |_| {
@@ -57,13 +105,13 @@ impl<'a> ArgumentsBuilder<'a, Defined> {
                         &self.instance.settings.version_jar_file.display()
                     ),
                     "-cp".to_string(),
-                    self.parse_args_from_str("${classpath}"),
+                    self.classpath.clone(),
                 ]
             },
         )
     }
 
-    pub fn game_arguments(&self) -> Vec<String> {
+    pub fn manifest_game_arguments(&self) -> Vec<String> {
         self.arguments_parser(
             |_, GameArguments(game)| game.clone(),
             |arguments| {
@@ -141,17 +189,14 @@ impl<'a> ArgumentsBuilder<'a, Defined> {
 }
 
 impl<'a, S> ArgumentsBuilder<'a, S> {
-    pub fn new(
-        instance: &'a LaunchInstance,
-        manifest: &'a Manifest,
-    ) -> ArgumentsBuilder<'a, Undefined> {
-        ArgumentsBuilder {
-            instance,
-            manifest,
-            classpath: String::new(),
-            native_libs: Vec::new(),
-            _marker: PhantomData,
-        }
+    fn construct_lib_path(&self, path: &str) -> PathBuf {
+        let mut path = path.to_string();
+
+        if cfg!(target_os = "windows") {
+            path = path.replace('/', "\\")
+        };
+
+        self.instance.settings.libraries_dir.join(path)
     }
 
     fn classpath(&self) -> (String, Vec<PathBuf>) {
@@ -177,13 +222,13 @@ impl<'a, S> ArgumentsBuilder<'a, S> {
                         .artifact
                         .as_ref()
                         .and_then(|artifact| artifact.path.as_ref())
-                        .map(|path| self.instance.construct_lib_path(path)),
+                        .map(|path| self.construct_lib_path(path)),
                     lib.downloads
                         .classifiers
                         .as_ref()
                         .and_then(|natives| match_natives(natives))
                         .and_then(|native_lib| native_lib.path.as_ref())
-                        .map(|path| self.instance.construct_lib_path(path)),
+                        .map(|path| self.construct_lib_path(path)),
                 )
             })
             .for_each(|(lib, native)| {
@@ -197,7 +242,7 @@ impl<'a, S> ArgumentsBuilder<'a, S> {
 
         if let Some(libs) = self
             .instance
-            .profile
+            .loader_profile
             .as_ref()
             .map(|p| &p.libraries)
             .map(|libs| {
