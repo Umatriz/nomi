@@ -1,0 +1,33 @@
+name: Release
+on:
+  push:
+    tags:
+      - '*'
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+        contents: write
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v4
+      - name: Setup MinGW
+        uses: egor-tensin/setup-mingw@v2.2.0
+      - name: Setup GCC
+        uses: egor-tensin/setup-gcc@v1.3
+      - name: Setup Rust
+        run: |
+          rustup default stable
+          rustup target add x86_64-pc-windows-gnu
+      - name: Build project
+        run: cargo build --target x86_64-pc-windows-gnu --release && cargo build --release
+      - name: Publish release
+        uses: ghalactic/github-release-from-tag@v5
+        with:
+          generateReleaseNotes: "true"
+          prerelease: "false"
+          assets: |
+            - path: target/release/client
+              name: client-linux
+            - path: target/x86_64-pc-windows-gnu/release/client.exe
+              name: client-windows.exe
