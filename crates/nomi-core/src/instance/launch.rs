@@ -21,14 +21,14 @@ use crate::{
 };
 use rules::is_all_rules_satisfied;
 
-use self::args::ArgumentsBuilder;
+use self::arguments::ArgumentsBuilder;
 
 use super::{
     profile::{read_json, LoaderProfile},
     Undefined,
 };
 
-pub mod args;
+pub mod arguments;
 pub mod rules;
 
 #[cfg(windows)]
