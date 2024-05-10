@@ -15,6 +15,7 @@ use utils::Crash;
 pub mod context;
 pub mod download;
 pub mod utils;
+pub mod client_settings;
 
 fn main() {
     let collector = egui_tracing::EventCollector::default().with_level(Level::INFO);
@@ -93,9 +94,7 @@ impl AppTabs {
 
 impl eframe::App for AppTabs {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        //TODO: Maybe make it a setting
-        #[cfg(not(target_os = "macos"))] ctx.set_pixels_per_point(1.2);
-        #[cfg(target_os = "macos")] ctx.set_pixels_per_point(2.0);
+        
         egui::TopBottomPanel::top("top_nav_bar").show(ctx, |ui| {
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 // ui.selectable_value(&mut self.current, Page::Main, "Main");
