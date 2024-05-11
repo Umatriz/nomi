@@ -1,9 +1,10 @@
 use crate::{
+    client_settings::{self, default_pixels_per_point_value, ClientSettings},
     download::spawn_download,
     utils::{spawn_future, spawn_tokio_future, Crash},
     Loader,
 };
-use eframe::egui::{self, Ui};
+use eframe::egui::{self, Color32, Ui};
 use egui_tracing::EventCollector;
 use nomi_core::{
     configs::{
@@ -24,6 +25,7 @@ use std::{
     sync::mpsc::{Receiver, Sender},
 };
 
+
 pub struct AppContext {
     pub collector: EventCollector,
 
@@ -33,6 +35,7 @@ pub struct AppContext {
 
     profiles: VersionProfilesConfig,
     settings: Settings,
+    client_settings: ClientSettings,
     // version_manifest: Option<&'static ManifestState>,
     release_versions: Option<Vec<&'static LauncherManifestVersion>>,
 
@@ -48,6 +51,7 @@ pub struct AppContext {
     settings_java_buf_tx: Sender<JavaRunner>,
     settings_java_buf_rx: Receiver<JavaRunner>,
     settings_block_save_button: bool,
+    settings_pixels_per_point: f32,
 }
 
 impl AppContext {
@@ -56,6 +60,9 @@ impl AppContext {
         let (settings_java_buf_tx, settings_java_buf_rx) = std::sync::mpsc::channel();
         let profiles =
             read_toml_config_sync::<VersionProfilesConfig>("./.nomi/configs/Profiles.toml");
+        let client_settings_res =
+            read_toml_config_sync::<ClientSettings>("./.nomi/configs/ClientSettings.gui.toml");
+        let client_settings = client_settings_res.unwrap_or_default();
         let settings_res = read_toml_config_sync::<Settings>("./.nomi/configs/User.toml");
         let settings = settings_res.unwrap_or_default();
 
@@ -91,6 +98,7 @@ impl AppContext {
             },
             settings_java_buf: java_bin,
             settings,
+            client_settings: client_settings,
             profile_name_buf: Default::default(),
             selected_version_buf: Default::default(),
             loader_buf: Loader::Vanilla,
@@ -99,10 +107,18 @@ impl AppContext {
             settings_uuid: "4350312f-04d5-4ee0-90b8-f883967593a0".to_string(),
             settings_block_save_button: false,
             settings_username: Default::default(),
+            settings_pixels_per_point: client_settings
+                .pixels_per_point
+                .unwrap_or(default_pixels_per_point_value()),
         })
     }
 
     pub fn show_main(&mut self, ui: &mut Ui) {
+        ui.ctx().set_pixels_per_point(
+            self.client_settings
+                .pixels_per_point
+                .unwrap_or(default_pixels_per_point_value()),
+        );
         if let Ok(data) = self.rx.try_recv() {
             self.profiles.add_profile(data);
         }
@@ -219,6 +235,15 @@ impl AppContext {
                 };
             }
         });
+        ui.collapsing("Other", |ui| {
+            ui.label(
+                egui::RichText::new("Pixels per point").font(egui::FontId::proportional(16.0)),
+            );
+            ui.add(
+                egui::Slider::new(&mut self.settings_pixels_per_point, 0.6..=5.0)
+                    .text("Pixel per point"),
+            )
+        });
         match self.settings_block_save_button {
             true => {
                 ui.add_enabled(false, egui::Button::new("Save"));
@@ -231,6 +256,14 @@ impl AppContext {
                         java_bin: Some(self.settings_java_buf.clone()),
                         uuid: Some(self.settings_uuid.clone()),
                     };
+                    let client_settings = ClientSettings {
+                        pixels_per_point: Some(self.settings_pixels_per_point),
+                    };
+                    let _ = write_toml_config_sync(
+                        &client_settings,
+                        "./.nomi/configs/ClientSettings.gui.toml",
+                    );
+                    self.client_settings = client_settings;
                     let _ = write_toml_config_sync(&settings, "./.nomi/configs/User.toml");
                 }
             }
