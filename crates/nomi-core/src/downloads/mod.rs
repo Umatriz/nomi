@@ -4,6 +4,11 @@ pub mod jvm_dowload;
 pub mod assets;
 pub mod download_version;
 
+pub mod downloadable;
+pub mod downloaders;
+pub mod queue;
+pub mod set;
+
 use std::path::{Path, PathBuf};
 
 use futures_util::stream::StreamExt;
