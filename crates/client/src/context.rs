@@ -1,5 +1,5 @@
 use crate::{
-    client_settings::{self, ClientSettings},
+    client_settings::{self, default_pixels_per_point_value, ClientSettings},
     download::spawn_download,
     utils::{spawn_future, spawn_tokio_future, Crash},
     Loader,
@@ -25,12 +25,6 @@ use std::{
     sync::mpsc::{Receiver, Sender},
 };
 
-fn default_pixels_per_point_value() -> f32 {
-    #[cfg(not(target_os = "macos"))]
-    return 1.2;
-    #[cfg(target_os = "macos")]
-    2.0
-}
 
 pub struct AppContext {
     pub collector: EventCollector,
@@ -68,9 +62,7 @@ impl AppContext {
             read_toml_config_sync::<VersionProfilesConfig>("./.nomi/configs/Profiles.toml");
         let client_settings_res =
             read_toml_config_sync::<ClientSettings>("./.nomi/configs/ClientSettings.gui.toml");
-        let client_settings = client_settings_res.unwrap_or(ClientSettings {
-            pixels_per_point: Some(default_pixels_per_point_value()),
-        });
+        let client_settings = client_settings_res.unwrap_or_default();
         let settings_res = read_toml_config_sync::<Settings>("./.nomi/configs/User.toml");
         let settings = settings_res.unwrap_or_default();
 
