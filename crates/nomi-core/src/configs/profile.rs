@@ -60,6 +60,8 @@ mod tests {
     async fn write_test() {
         let mut mock = VersionProfilesConfig { profiles: vec![] };
 
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+
         let builder = InstanceBuilder::new()
             .version("1.20".into())
             .libraries("./minecraft/libraries".into())
@@ -69,6 +71,7 @@ mod tests {
             .assets("./minecraft/assets".into())
             .game("./minecraft".into())
             .name("1.20-fabric-test".into())
+            .sender(tx)
             .build();
 
         let mc_dir = std::env::current_dir().unwrap().join("minecraft");

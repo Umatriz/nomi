@@ -5,6 +5,7 @@ use super::DownloadError;
 pub type DownloadResult = Result<DownloadStatus, DownloadError>;
 
 #[must_use]
+#[derive(Debug)]
 pub enum DownloadStatus {
     /// Downloaded successfully
     Success,

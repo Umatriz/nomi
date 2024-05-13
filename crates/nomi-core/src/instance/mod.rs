@@ -1,5 +1,6 @@
 use const_typed_builder::Builder;
 use std::path::PathBuf;
+use tokio::sync::mpsc::Sender;
 use tracing::info;
 
 pub mod builder_ext;
@@ -8,7 +9,7 @@ pub mod profile;
 pub mod version_marker;
 
 use crate::{
-    downloads::assets::AssetsDownloader,
+    downloads::{assets::AssetsDownloader, downloadable::DownloadResult},
     utils::state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
 };
 
@@ -23,6 +24,7 @@ pub struct Undefined;
 #[derive(Debug, Builder)]
 pub struct Instance {
     instance: Box<dyn Version>,
+    sender: Sender<DownloadResult>,
     pub version: String,
     pub libraries: PathBuf,
     pub version_path: PathBuf,
@@ -53,6 +55,7 @@ impl Instance {
                 AssetsDownloader::new(
                     version_manifest.asset_index.url,
                     version_manifest.asset_index.id,
+                    self.sender.clone(),
                 )
                 .await?,
             )
@@ -98,12 +101,15 @@ impl AssetsInstance {
 
 #[cfg(test)]
 mod tests {
+    use tracing::debug;
+
     use crate::loaders::{fabric::Fabric, vanilla::Vanilla};
 
     use super::*;
 
     #[tokio::test]
     async fn build_test() {
+        let (tx, _) = tokio::sync::mpsc::channel(100);
         let _builder = InstanceBuilder::new()
             .version("1.18.2".into())
             .libraries("./minecraft/libraries".into())
@@ -112,11 +118,13 @@ mod tests {
             .assets("./minecraft/assets".into())
             .game("./minecraft".into())
             .name("1.18.2-minecraft".into())
+            .sender(tx)
             .build();
     }
 
     #[tokio::test]
     async fn assets_test() {
+        let (tx, _) = tokio::sync::mpsc::channel(100);
         let builder = InstanceBuilder::new()
             .version("1.18.2".into())
             .libraries("./minecraft/libraries".into())
@@ -125,6 +133,7 @@ mod tests {
             .assets("./minecraft/assets".into())
             .game("./minecraft".into())
             .name("1.18.2-minecraft".into())
+            .sender(tx)
             .build();
 
         builder.assets().await.unwrap().download().await.unwrap();
@@ -138,6 +147,14 @@ mod tests {
             .finish();
         tracing::subscriber::set_global_default(subscriber).unwrap();
 
+        let (tx, mut rx) = tokio::sync::mpsc::channel(100);
+
+        tokio::spawn(async move {
+            while let Some(result) = rx.recv().await {
+                debug!("{:?}", result);
+            }
+        });
+
         let builder = InstanceBuilder::new()
             .version("1.18.2".into())
             .libraries("./minecraft/libraries".into())
@@ -148,6 +165,7 @@ mod tests {
             .assets("./minecraft/assets".into())
             .game("./minecraft".into())
             .name("1.18.2-minecraft".into())
+            .sender(tx)
             .build();
 
         // builder.assets().await.unwrap().download().await.unwrap();

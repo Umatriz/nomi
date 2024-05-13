@@ -11,7 +11,7 @@ async fn vanilla_test() {
         .with_max_level(tracing::Level::INFO)
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
-
+    let (tx, _) = tokio::sync::mpsc::channel(100);
     let builder = InstanceBuilder::new()
         .version("1.20".into())
         .libraries("./minecraft/libraries".into())
@@ -21,6 +21,7 @@ async fn vanilla_test() {
         .assets("./minecraft/assets".into())
         .game("./minecraft".into())
         .name("1.20-fabric-test".into())
+        .sender(tx)
         .build();
 
     let _assets = builder.assets().await.unwrap();

@@ -11,6 +11,7 @@ async fn full_fabric_test() {
 
     let current = std::env::current_dir().unwrap();
 
+    let (tx, _) = tokio::sync::mpsc::channel(100);
     let instance = InstanceBuilder::new()
         .name("Full-fabric-test".into())
         .version("1.19.4".into())
@@ -21,6 +22,7 @@ async fn full_fabric_test() {
         .instance(Box::new(
             Fabric::new("1.19.4", None::<String>).await.unwrap(),
         ))
+        .sender(tx)
         .build();
 
     instance.assets().await.unwrap().download().await.unwrap();

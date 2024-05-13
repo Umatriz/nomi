@@ -44,7 +44,7 @@ impl Downloader for DownloadSet {
     async fn download(&self, channel: Sender<Self::Data>) {
         let mut set = self.set.lock().await;
         while let Some(result) = set.join_next().await {
-            let _ = match result {
+            let _ = match dbg!(result) {
                 Ok(download_status) => channel.send(download_status).await,
                 Err(join_error) => {
                     channel

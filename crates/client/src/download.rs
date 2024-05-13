@@ -5,6 +5,7 @@ use nomi_core::{
         profile::{VersionProfile, VersionProfileBuilder, VersionProfilesConfig},
         read_toml_config, write_toml_config,
     },
+    downloads::downloadable::DownloadResult,
     instance::{launch::LaunchSettings, InstanceBuilder},
     loaders::{fabric::Fabric, vanilla::Vanilla},
     repository::{java_runner::JavaRunner, username::Username},
@@ -17,9 +18,13 @@ pub fn spawn_download(
     name: String,
     version: String,
     loader: Loader,
+    progress_tx: tokio::sync::mpsc::Sender<DownloadResult>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        let data = try_download(name, version, loader).await.crash();
+        let data = try_download(name, version, loader, progress_tx.clone())
+            .await
+            .crash();
+
         let _ = tx.send(data);
     })
 }
@@ -28,6 +33,7 @@ async fn try_download(
     name: String,
     version: String,
     loader: Loader,
+    sender: tokio::sync::mpsc::Sender<DownloadResult>,
 ) -> anyhow::Result<VersionProfile> {
     // return Err(std::io::Error::new(std::io::ErrorKind::BrokenPipe, "Error").into());
     let current = std::env::current_dir()?;
@@ -38,7 +44,8 @@ async fn try_download(
         .assets(mc_dir.join("assets"))
         .game(mc_dir.clone())
         .libraries(mc_dir.join("libraries"))
-        .version_path(mc_dir.join("versions").join(&version));
+        .version_path(mc_dir.join("versions").join(&version))
+        .sender(sender);
 
     let instance = match loader {
         Loader::Vanilla => builder

@@ -13,6 +13,7 @@ use nomi_core::{
         user::Settings,
         write_toml_config_sync,
     },
+    downloads::downloadable::DownloadResult,
     repository::{
         java_runner::JavaRunner, launcher_manifest::LauncherManifestVersion, username::Username,
     },
@@ -24,10 +25,15 @@ use std::{
     path::PathBuf,
     sync::mpsc::{Receiver, Sender},
 };
-
+use tracing::error;
 
 pub struct AppContext {
     pub collector: EventCollector,
+
+    download_progress_tx: tokio::sync::mpsc::Sender<DownloadResult>,
+    download_progress_rx: tokio::sync::mpsc::Receiver<DownloadResult>,
+
+    download_progress: u32,
 
     tx: Sender<VersionProfile>,
     rx: Receiver<VersionProfile>,
@@ -70,9 +76,14 @@ impl AppContext {
             LAUNCHER_MANIFEST_STATE.get_or_try_init(launcher_manifest_state_try_init),
         );
 
+        let (download_progress_tx, download_progress_rx) = tokio::sync::mpsc::channel(500);
+
         let java_bin = settings.java_bin.clone().unwrap_or_default();
         Ok(Self {
             collector,
+            download_progress_tx,
+            download_progress_rx,
+            download_progress: 0,
             release_versions: match state {
                 Ok(data) => Some(
                     data.launcher
@@ -114,6 +125,8 @@ impl AppContext {
     }
 
     pub fn show_main(&mut self, ui: &mut Ui) {
+        ui.label(format!("{}", self.download_progress));
+
         ui.ctx().set_pixels_per_point(
             self.client_settings
                 .pixels_per_point
@@ -121,6 +134,11 @@ impl AppContext {
         );
         if let Ok(data) = self.rx.try_recv() {
             self.profiles.add_profile(data);
+        }
+
+        if let Ok(data) = self.download_progress_rx.try_recv() {
+            // TODO: Handle result
+            self.download_progress += dbg!(data).map_or(0, |_| 1)
         }
 
         if !self.tasks.is_empty() {
@@ -297,12 +315,14 @@ impl AppContext {
             ui.label("You must install vanilla before Fabric");
 
             if ui.button("Create and download").clicked() {
+                self.download_progress = 0;
                 let handle = spawn_download(
                     self.tx.clone(),
                     // ctx.clone(),
                     self.profile_name_buf.clone(),
                     profiles[self.selected_version_buf].id.clone(),
                     self.loader_buf.clone(),
+                    self.download_progress_tx.clone(),
                 );
                 self.tasks.push((
                     handle,
