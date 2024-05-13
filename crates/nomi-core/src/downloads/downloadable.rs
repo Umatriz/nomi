@@ -2,14 +2,14 @@ use tokio::sync::mpsc::Sender;
 
 use super::DownloadError;
 
+pub type DownloadResult = Result<DownloadStatus, DownloadError>;
+
 #[must_use]
 pub enum DownloadStatus {
     /// Downloaded successfully
     Success,
     /// Downloaded successfully certain amount of elements
     SuccessWithProgress(u32),
-    /// Error during downloading, must retry
-    Error(DownloadError),
 }
 
 impl DownloadStatus {
@@ -18,20 +18,33 @@ impl DownloadStatus {
     }
 }
 
-impl From<Result<(), DownloadError>> for DownloadStatus {
-    fn from(value: Result<(), DownloadError>) -> Self {
-        match value {
-            Ok(_) => Self::Success,
-            Err(err) => Self::Error(err),
-        }
-    }
-}
-
 #[async_trait::async_trait]
 pub trait Downloadable: Send + Sync {
-    type Out;
+    type Out: Send;
 
-    async fn download(&self, channel: Sender<DownloadStatus>) -> Self::Out;
+    async fn download(&self) -> Self::Out;
 }
 
-const _: Option<Box<dyn Downloadable<Out = ()>>> = None;
+const _: Option<Box<dyn Downloadable<Out = DownloadResult>>> = None;
+
+#[async_trait::async_trait]
+pub trait Downloader: Send + Sync {
+    type Data;
+
+    async fn download(&self, channel: Sender<Self::Data>);
+}
+
+const _: Option<Box<dyn Downloader<Data = DownloadResult>>> = None;
+
+#[async_trait::async_trait]
+impl<T> Downloader for T
+where
+    T: Downloadable,
+{
+    type Data = T::Out;
+
+    async fn download(&self, channel: Sender<Self::Data>) {
+        let result = self.download().await;
+        let _ = channel.send(result).await;
+    }
+}

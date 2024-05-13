@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use futures_util::stream::StreamExt;
 use reqwest::Client;
-use tokio::io::AsyncWriteExt;
+use tokio::{io::AsyncWriteExt, task::JoinError};
 use tracing::{debug, error};
 
 #[derive(Debug, thiserror::Error)]
@@ -24,6 +24,9 @@ pub enum DownloadError {
         path: PathBuf,
         error: String,
     },
+
+    #[error("{0}")]
+    JoinError(#[from] JoinError),
 }
 
 pub(crate) async fn download_file(

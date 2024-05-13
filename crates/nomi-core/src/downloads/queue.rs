@@ -1,12 +1,10 @@
-use std::sync::Arc;
-
 use tokio::sync::mpsc::Sender;
 
-use super::downloadable::{DownloadStatus, Downloadable};
+use super::downloadable::{DownloadResult, Downloader};
 
 #[derive(Default)]
 pub struct DownloadQueue {
-    queue: Vec<Arc<dyn Downloadable<Out = ()>>>,
+    queue: Vec<Box<dyn Downloader<Data = DownloadResult>>>,
 }
 
 impl DownloadQueue {
@@ -16,18 +14,18 @@ impl DownloadQueue {
 
     pub fn add<D>(&mut self, downloader: D) -> &mut Self
     where
-        D: Downloadable<Out = ()> + 'static,
+        D: Downloader<Data = DownloadResult> + 'static,
     {
-        self.queue.push(Arc::new(downloader));
+        self.queue.push(Box::new(downloader));
         self
     }
 }
 
 #[async_trait::async_trait]
-impl Downloadable for DownloadQueue {
-    type Out = ();
+impl Downloader for DownloadQueue {
+    type Data = DownloadResult;
 
-    async fn download(&self, channel: Sender<DownloadStatus>) -> Self::Out {
+    async fn download(&self, channel: Sender<Self::Data>) {
         for downloader in &self.queue {
             downloader.download(channel.clone()).await;
         }

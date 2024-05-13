@@ -120,6 +120,7 @@ impl AssetsDownloader {
                             error!("Downloading error: {}", error);
                             retry.spawn(download_file(path, url));
                         }
+                        crate::downloads::DownloadError::JoinError(_) => continue,
                     }
                     err_assets += 1;
                 } else {
