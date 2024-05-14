@@ -8,7 +8,7 @@ use tracing::{error, info};
 use crate::{
     downloads::{download_file, download_version::DownloadVersion},
     repository::manifest::{Manifest, ManifestFile},
-    utils::{get_launcher_manifest, write_into_file},
+    utils::{get_launcher_manifest, write_to_file},
 };
 
 #[derive(Debug)]
@@ -109,7 +109,7 @@ impl DownloadVersion for Vanilla {
 
         let body = serde_json::to_string_pretty(&self.manifest)?;
 
-        write_into_file(body.as_bytes(), &path).await?;
+        write_to_file(body.as_bytes(), &path).await?;
 
         info!(
             "Version json {} created successfully",

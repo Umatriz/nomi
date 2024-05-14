@@ -1,4 +1,6 @@
-use nomi_core::{instance::InstanceBuilder, loaders::vanilla::Vanilla};
+use nomi_core::{
+    downloads::downloadable::Downloader, instance::InstanceBuilder, loaders::vanilla::Vanilla,
+};
 use tracing::Level;
 
 #[tokio::test]
@@ -19,10 +21,10 @@ async fn download_test() {
         .assets("./minecraft/assets".into())
         .game("./minecraft".into())
         .name("1.18.2-test".into())
-        .sender(tx)
+        .sender(tx.clone())
         .build();
 
-    instance.assets().await.unwrap().download().await.unwrap();
+    instance.assets().await.unwrap().download(tx).await;
 
     instance.download().await.unwrap();
 }

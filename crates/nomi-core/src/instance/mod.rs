@@ -9,7 +9,7 @@ pub mod profile;
 pub mod version_marker;
 
 use crate::{
-    downloads::{assets::AssetsDownloader, downloadable::DownloadResult},
+    downloads::{downloadable::DownloadResult, downloaders::assets::AssetsDownloader},
     utils::state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
 };
 
@@ -44,24 +44,19 @@ impl Instance {
         Ok(())
     }
 
-    pub async fn assets(&self) -> anyhow::Result<AssetsInstance> {
+    pub async fn assets(&self) -> anyhow::Result<AssetsDownloader> {
         let manifest = LAUNCHER_MANIFEST_STATE
             .get_or_try_init(launcher_manifest_state_try_init)
             .await?;
         let version_manifest = manifest.get_version_manifest(&self.version).await?;
 
-        Ok(AssetsInstanceBuilder::new()
-            .downloader(
-                AssetsDownloader::new(
-                    version_manifest.asset_index.url,
-                    version_manifest.asset_index.id,
-                    self.sender.clone(),
-                )
-                .await?,
-            )
-            .indexes(self.assets.join("indexes"))
-            .objects(self.assets.join("objects"))
-            .build())
+        AssetsDownloader::new(
+            version_manifest.asset_index.url,
+            version_manifest.asset_index.id,
+            self.assets.join("objects"),
+            self.assets.join("indexes"),
+        )
+        .await
     }
 
     pub fn launch_instance(
@@ -78,32 +73,14 @@ impl Instance {
     }
 }
 
-#[derive(Builder)]
-pub struct AssetsInstance {
-    downloader: AssetsDownloader,
-    objects: PathBuf,
-    indexes: PathBuf,
-}
-
-impl AssetsInstance {
-    pub async fn download(self) -> anyhow::Result<()> {
-        self.downloader
-            .download_assets_chunked(&self.objects)
-            .await?;
-        info!("Assets downloaded successfully");
-
-        self.downloader.get_assets_json(&self.indexes).await?;
-        info!("Assets json created successfully");
-
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use tracing::debug;
 
-    use crate::loaders::{fabric::Fabric, vanilla::Vanilla};
+    use crate::{
+        downloads::downloadable::Downloader,
+        loaders::{fabric::Fabric, vanilla::Vanilla},
+    };
 
     use super::*;
 
@@ -133,10 +110,10 @@ mod tests {
             .assets("./minecraft/assets".into())
             .game("./minecraft".into())
             .name("1.18.2-minecraft".into())
-            .sender(tx)
+            .sender(tx.clone())
             .build();
 
-        builder.assets().await.unwrap().download().await.unwrap();
+        builder.assets().await.unwrap().download(tx).await;
     }
 
     #[tokio::test]

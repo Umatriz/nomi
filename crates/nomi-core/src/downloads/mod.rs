@@ -1,7 +1,6 @@
 #[cfg(target_os = "windows")]
 pub mod jvm_dowload;
 
-pub mod assets;
 pub mod download_version;
 
 pub mod downloadable;

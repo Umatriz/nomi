@@ -1,6 +1,6 @@
 use tokio::sync::mpsc::Sender;
 
-use super::DownloadError;
+use super::{downloaders::assets::AssetsDownloaderIo, DownloadError};
 
 pub type DownloadResult = Result<DownloadStatus, DownloadError>;
 
@@ -49,3 +49,16 @@ where
         let _ = channel.send(result).await;
     }
 }
+
+#[async_trait::async_trait]
+pub trait DownloaderIo {
+    async fn io(&self) -> anyhow::Result<()>;
+}
+
+const _: Option<Box<dyn DownloaderIo>> = None;
+
+pub trait DownloaderIoExt<'a, I: DownloaderIo> {
+    fn get_io(&'a self) -> I;
+}
+
+const _: Option<Box<dyn DownloaderIoExt<AssetsDownloaderIo>>> = None;

@@ -5,7 +5,7 @@ use nomi_core::{
         profile::{VersionProfile, VersionProfileBuilder, VersionProfilesConfig},
         read_toml_config, write_toml_config,
     },
-    downloads::downloadable::DownloadResult,
+    downloads::downloadable::{DownloadResult, Downloader},
     instance::{launch::LaunchSettings, InstanceBuilder},
     loaders::{fabric::Fabric, vanilla::Vanilla},
     repository::{java_runner::JavaRunner, username::Username},
@@ -45,7 +45,7 @@ async fn try_download(
         .game(mc_dir.clone())
         .libraries(mc_dir.join("libraries"))
         .version_path(mc_dir.join("versions").join(&version))
-        .sender(sender);
+        .sender(sender.clone());
 
     let instance = match loader {
         Loader::Vanilla => builder
@@ -57,7 +57,7 @@ async fn try_download(
     };
 
     instance.download().await?;
-    instance.assets().await?.download().await?;
+    instance.assets().await?.download(sender.clone()).await;
 
     let confgis = current.join(".nomi/configs");
 

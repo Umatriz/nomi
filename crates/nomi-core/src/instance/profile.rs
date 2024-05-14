@@ -4,7 +4,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     repository::{simple_args::SimpleArgs, simple_lib::SimpleLib},
-    utils::write_into_file,
+    utils::write_to_file,
 };
 
 pub async fn read_json<T>(path: impl AsRef<Path>) -> anyhow::Result<T>
@@ -22,7 +22,7 @@ where
     let path = path.as_ref();
     let body = serde_json::to_string_pretty(data)?;
 
-    write_into_file(body.as_bytes(), path).await?;
+    write_to_file(body.as_bytes(), path).await?;
 
     tracing::info!("Config {} created successfully", path.to_string_lossy());
 

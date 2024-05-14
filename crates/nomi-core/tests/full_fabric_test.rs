@@ -1,5 +1,6 @@
 use nomi_core::{
     configs::profile::{VersionProfileBuilder, VersionProfilesConfig},
+    downloads::downloadable::Downloader,
     instance::{launch::LaunchSettings, InstanceBuilder},
     loaders::fabric::Fabric,
     repository::{java_runner::JavaRunner, username::Username},
@@ -22,10 +23,10 @@ async fn full_fabric_test() {
         .instance(Box::new(
             Fabric::new("1.19.4", None::<String>).await.unwrap(),
         ))
-        .sender(tx)
+        .sender(tx.clone())
         .build();
 
-    instance.assets().await.unwrap().download().await.unwrap();
+    instance.assets().await.unwrap().download(tx).await;
     instance.download().await.unwrap();
 
     let mc_dir = current.join("minecraft");

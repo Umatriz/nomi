@@ -10,7 +10,7 @@ use crate::{
     utils::{
         maven::MavenData,
         state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
-        write_into_file,
+        write_to_file,
     },
 };
 
@@ -112,7 +112,7 @@ impl DownloadVersion for Fabric {
 
         let body = serde_json::to_string_pretty(&self.profile)?;
 
-        write_into_file(body.as_bytes(), &path).await?;
+        write_to_file(body.as_bytes(), &path).await?;
 
         info!(
             "Version json {} created successfully",

@@ -25,7 +25,7 @@ pub async fn get_launcher_manifest() -> anyhow::Result<LauncherManifest> {
         .await?)
 }
 
-pub async fn write_into_file(data: &[u8], path: impl AsRef<Path>) -> anyhow::Result<()> {
+pub async fn write_to_file(data: &[u8], path: impl AsRef<Path>) -> anyhow::Result<()> {
     let path = path.as_ref();
     if let Some(dir) = path.parent() {
         tokio::fs::create_dir_all(dir).await?;
