@@ -8,10 +8,7 @@ use tracing::info;
 
 use crate::{
     downloads::{
-        download_file,
-        downloadable::{
-            DownloadResult, DownloadStatus, Downloadable, Downloader, DownloaderIo, DownloaderIoExt,
-        },
+        downloadable::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
         downloaders::file::FileDownloader,
         set::DownloadSet,
     },
@@ -35,7 +32,6 @@ pub struct AssetsDownloader {
     objects: PathBuf,
     indexes: PathBuf,
     id: String,
-    url: String,
 }
 
 impl AssetsDownloader {
@@ -47,12 +43,11 @@ impl AssetsDownloader {
             objects,
             indexes,
             id,
-            url,
         })
     }
 }
 
-impl<'a> DownloaderIoExt<'a, AssetsDownloaderIo<'a>> for AssetsDownloader {
+impl<'a> DownloaderIOExt<'a, AssetsDownloaderIo<'a>> for AssetsDownloader {
     fn get_io(&'a self) -> AssetsDownloaderIo<'a> {
         AssetsDownloaderIo {
             assets: &self.assets,
@@ -69,7 +64,7 @@ pub struct AssetsDownloaderIo<'a> {
 }
 
 #[async_trait::async_trait]
-impl DownloaderIo for AssetsDownloaderIo<'_> {
+impl DownloaderIO for AssetsDownloaderIo<'_> {
     async fn io(&self) -> anyhow::Result<()> {
         let path = self.indexes.join(format!("{}.json", self.id));
 
@@ -83,7 +78,7 @@ impl DownloaderIo for AssetsDownloaderIo<'_> {
 impl Downloader for AssetsDownloader {
     type Data = DownloadResult;
 
-    async fn download(&self, channel: Sender<Self::Data>) {
+    async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
         let assets_chunks = self
             .assets
             .objects
@@ -109,10 +104,12 @@ impl Downloader for AssetsDownloader {
                     asset.hash
                 );
 
-                download_set.add(FileDownloader::new(url, path)).await;
+                download_set
+                    .add(Box::new(FileDownloader::new(url, path)))
+                    .await;
             }
 
-            download_set.download(channel.clone()).await;
+            Box::new(download_set).download(channel.clone()).await;
 
             info!("Assets chunk downloaded");
         }
@@ -138,6 +135,6 @@ mod tests {
 
         let io = assets_downloader.get_io();
 
-        let set = DownloadQueue::new().add(assets_downloader);
+        let set = DownloadQueue::new().with_downloader(assets_downloader);
     }
 }

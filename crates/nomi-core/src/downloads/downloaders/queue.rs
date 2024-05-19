@@ -1,6 +1,6 @@
 use tokio::sync::mpsc::Sender;
 
-use super::downloadable::{DownloadResult, Downloader};
+use crate::downloads::downloadable::{DownloadResult, Downloader};
 
 #[derive(Default)]
 pub struct DownloadQueue {
@@ -12,7 +12,7 @@ impl DownloadQueue {
         Self::default()
     }
 
-    pub fn add<D>(&mut self, downloader: D) -> &mut Self
+    pub fn with_downloader<D>(mut self, downloader: D) -> Self
     where
         D: Downloader<Data = DownloadResult> + 'static,
     {
@@ -25,8 +25,8 @@ impl DownloadQueue {
 impl Downloader for DownloadQueue {
     type Data = DownloadResult;
 
-    async fn download(&self, channel: Sender<Self::Data>) {
-        for downloader in &self.queue {
+    async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
+        for downloader in self.queue {
             downloader.download(channel.clone()).await;
         }
     }

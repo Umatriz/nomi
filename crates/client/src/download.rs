@@ -6,6 +6,7 @@ use nomi_core::{
         read_toml_config, write_toml_config,
     },
     downloads::downloadable::{DownloadResult, Downloader},
+    game_paths::GamePaths,
     instance::{launch::LaunchSettings, InstanceBuilder},
     loaders::{fabric::Fabric, vanilla::Vanilla},
     repository::{java_runner::JavaRunner, username::Username},
@@ -38,26 +39,35 @@ async fn try_download(
     // return Err(std::io::Error::new(std::io::ErrorKind::BrokenPipe, "Error").into());
     let current = std::env::current_dir()?;
     let mc_dir: std::path::PathBuf = current.join("minecraft");
+
+    let game_paths = GamePaths {
+        game: mc_dir.clone(),
+        assets: mc_dir.join("assets"),
+        version: mc_dir.join("versions").join(&version),
+        libraries: mc_dir.join("libraries"),
+    };
+
     let builder = InstanceBuilder::new()
         .name(name.to_string())
         .version(version.clone())
-        .assets(mc_dir.join("assets"))
-        .game(mc_dir.clone())
-        .libraries(mc_dir.join("libraries"))
-        .version_path(mc_dir.join("versions").join(&version))
+        .game_paths(game_paths.clone())
         .sender(sender.clone());
 
     let instance = match loader {
         Loader::Vanilla => builder
-            .instance(Box::new(Vanilla::new(&version).await?))
+            .instance(Box::new(Vanilla::new(&version, game_paths.clone()).await?))
             .build(),
         Loader::Fabric => builder
-            .instance(Box::new(Fabric::new(&version, None::<String>).await?))
+            .instance(Box::new(
+                Fabric::new(&version, None::<String>, game_paths).await?,
+            ))
             .build(),
     };
 
     instance.download().await?;
-    instance.assets().await?.download(sender.clone()).await;
+    Box::new(instance.assets().await?)
+        .download(sender.clone())
+        .await;
 
     let confgis = current.join(".nomi/configs");
 
@@ -71,13 +81,19 @@ async fn try_download(
         access_token: None,
         username: Username::default(),
         uuid: None,
-        assets: instance.assets.clone(),
-        game_dir: instance.game.clone(),
+        assets: instance.game_paths.assets.clone(),
+        game_dir: instance.game_paths.game.clone(),
         java_bin: JavaRunner::default(),
-        libraries_dir: instance.libraries.clone(),
-        manifest_file: instance.version_path.join(format!("{}.json", &version)),
-        natives_dir: instance.version_path.join("natives"),
-        version_jar_file: instance.version_path.join(format!("{}.jar", &version)),
+        libraries_dir: instance.game_paths.libraries.clone(),
+        manifest_file: instance
+            .game_paths
+            .version
+            .join(format!("{}.json", &version)),
+        natives_dir: instance.game_paths.version.join("natives"),
+        version_jar_file: instance
+            .game_paths
+            .version
+            .join(format!("{}.jar", &version)),
         version,
         version_type: "release".into(),
     };

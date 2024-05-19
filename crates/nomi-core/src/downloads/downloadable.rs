@@ -23,7 +23,7 @@ impl DownloadStatus {
 pub trait Downloadable: Send + Sync {
     type Out: Send;
 
-    async fn download(&self) -> Self::Out;
+    async fn download(self: Box<Self>) -> Self::Out;
 }
 
 const _: Option<Box<dyn Downloadable<Out = DownloadResult>>> = None;
@@ -32,7 +32,7 @@ const _: Option<Box<dyn Downloadable<Out = DownloadResult>>> = None;
 pub trait Downloader: Send + Sync {
     type Data;
 
-    async fn download(&self, channel: Sender<Self::Data>);
+    async fn download(self: Box<Self>, channel: Sender<Self::Data>);
 }
 
 const _: Option<Box<dyn Downloader<Data = DownloadResult>>> = None;
@@ -44,21 +44,21 @@ where
 {
     type Data = T::Out;
 
-    async fn download(&self, channel: Sender<Self::Data>) {
+    async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
         let result = self.download().await;
         let _ = channel.send(result).await;
     }
 }
 
 #[async_trait::async_trait]
-pub trait DownloaderIo {
+pub trait DownloaderIO {
     async fn io(&self) -> anyhow::Result<()>;
 }
 
-const _: Option<Box<dyn DownloaderIo>> = None;
+const _: Option<Box<dyn DownloaderIO>> = None;
 
-pub trait DownloaderIoExt<'a, I: DownloaderIo> {
+pub trait DownloaderIOExt<'a, I: DownloaderIO> {
     fn get_io(&'a self) -> I;
 }
 
-const _: Option<Box<dyn DownloaderIoExt<AssetsDownloaderIo>>> = None;
+const _: Option<Box<dyn DownloaderIOExt<AssetsDownloaderIo>>> = None;

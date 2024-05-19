@@ -10,6 +10,7 @@ pub mod version_marker;
 
 use crate::{
     downloads::{downloadable::DownloadResult, downloaders::assets::AssetsDownloader},
+    game_paths::GamePaths,
     utils::state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
 };
 
@@ -25,21 +26,20 @@ pub struct Undefined;
 pub struct Instance {
     instance: Box<dyn Version>,
     sender: Sender<DownloadResult>,
+    pub game_paths: GamePaths,
     pub version: String,
-    pub libraries: PathBuf,
-    pub version_path: PathBuf,
-    pub assets: PathBuf,
-    pub game: PathBuf,
     pub name: String,
 }
 
 impl Instance {
     pub async fn download(&self) -> anyhow::Result<()> {
         self.instance
-            .download(&self.version_path, &self.version)
+            .download(&self.game_paths.version, &self.version)
             .await?;
-        self.instance.download_libraries(&self.libraries).await?;
-        self.instance.create_json(&self.version_path).await?;
+        self.instance
+            .download_libraries(&self.game_paths.libraries)
+            .await?;
+        self.instance.create_json(&self.game_paths.version).await?;
 
         Ok(())
     }
@@ -53,8 +53,8 @@ impl Instance {
         AssetsDownloader::new(
             version_manifest.asset_index.url,
             version_manifest.asset_index.id,
-            self.assets.join("objects"),
-            self.assets.join("indexes"),
+            self.game_paths.assets.join("objects"),
+            self.game_paths.assets.join("indexes"),
         )
         .await
     }
@@ -73,81 +73,77 @@ impl Instance {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use tracing::debug;
+// #[cfg(test)]
+// mod tests {
+//     use tracing::debug;
 
-    use crate::{
-        downloads::downloadable::Downloader,
-        loaders::{fabric::Fabric, vanilla::Vanilla},
-    };
+//     use crate::{
+//         downloads::downloadable::Downloader,
+//         game_paths::GamePaths,
+//         loaders::{fabric::Fabric, vanilla::Vanilla},
+//     };
 
-    use super::*;
+//     use super::*;
 
-    #[tokio::test]
-    async fn build_test() {
-        let (tx, _) = tokio::sync::mpsc::channel(100);
-        let _builder = InstanceBuilder::new()
-            .version("1.18.2".into())
-            .libraries("./minecraft/libraries".into())
-            .version_path("./minecraft/instances/1.18.2".into())
-            .instance(Box::new(Vanilla::new("1.18.2").await.unwrap()))
-            .assets("./minecraft/assets".into())
-            .game("./minecraft".into())
-            .name("1.18.2-minecraft".into())
-            .sender(tx)
-            .build();
-    }
+//     #[tokio::test]
+//     async fn assets_test() {
+//         let game_paths = GamePaths {
+//             game: "./minecraft".into(),
+//             assets: "./minecraft/assets".into(),
+//             version: "./minecraft/instances/1.18.2".into(),
+//             libraries: "./minecraft/libraries".into(),
+//         };
 
-    #[tokio::test]
-    async fn assets_test() {
-        let (tx, _) = tokio::sync::mpsc::channel(100);
-        let builder = InstanceBuilder::new()
-            .version("1.18.2".into())
-            .libraries("./minecraft/libraries".into())
-            .version_path("./minecraft/instances/1.18.2".into())
-            .instance(Box::new(Vanilla::new("1.18.2").await.unwrap()))
-            .assets("./minecraft/assets".into())
-            .game("./minecraft".into())
-            .name("1.18.2-minecraft".into())
-            .sender(tx.clone())
-            .build();
+//         let (tx, _) = tokio::sync::mpsc::channel(100);
+//         let builder = InstanceBuilder::new()
+//             .version("1.18.2".into())
+//             .game_paths(game_paths)
+//             .instance(Box::new(Vanilla::new("1.18.2").await.unwrap()))
+//             .name("1.18.2-minecraft".into())
+//             .sender(tx.clone())
+//             .build();
 
-        builder.assets().await.unwrap().download(tx).await;
-    }
+//         Box::new(builder.assets().await.unwrap()).download(tx).await;
+//     }
 
-    #[tokio::test]
-    async fn fabric_test() {
-        let subscriber = tracing_subscriber::fmt()
-            .pretty()
-            .with_max_level(tracing::Level::INFO)
-            .finish();
-        tracing::subscriber::set_global_default(subscriber).unwrap();
+//     #[tokio::test]
+//     async fn fabric_test() {
+//         let subscriber = tracing_subscriber::fmt()
+//             .pretty()
+//             .with_max_level(tracing::Level::INFO)
+//             .finish();
+//         tracing::subscriber::set_global_default(subscriber).unwrap();
 
-        let (tx, mut rx) = tokio::sync::mpsc::channel(100);
+//         let (tx, mut rx) = tokio::sync::mpsc::channel(100);
 
-        tokio::spawn(async move {
-            while let Some(result) = rx.recv().await {
-                debug!("{:?}", result);
-            }
-        });
+//         tokio::spawn(async move {
+//             while let Some(result) = rx.recv().await {
+//                 debug!("{:?}", result);
+//             }
+//         });
 
-        let builder = InstanceBuilder::new()
-            .version("1.18.2".into())
-            .libraries("./minecraft/libraries".into())
-            .version_path("./minecraft/instances/1.18.2".into())
-            .instance(Box::new(
-                Fabric::new("1.18.2", None::<String>).await.unwrap(),
-            ))
-            .assets("./minecraft/assets".into())
-            .game("./minecraft".into())
-            .name("1.18.2-minecraft".into())
-            .sender(tx)
-            .build();
+//         let game_paths = GamePaths {
+//             game: "./minecraft".into(),
+//             assets: "./minecraft/assets".into(),
+//             version: "./minecraft/instances/1.18.2".into(),
+//             libraries: "./minecraft/libraries".into(),
+//         };
 
-        // builder.assets().await.unwrap().download().await.unwrap();
-        // builder.assets().and_then(|i| i.download()).await.unwrap();
+//         let builder = InstanceBuilder::new()
+//             .version("1.18.2".into())
+//             .game_paths(game_paths.clone())
+//             .instance(Box::new(
+//                 Fabric::new("1.18.2", None::<String>, game_paths)
+//                     .await
+//                     .unwrap(),
+//             ))
+//             .name("1.18.2-minecraft".into())
+//             .sender(tx)
+//             .build();
 
-        builder.download().await.unwrap();
-    }
-}
+//         // builder.assets().await.unwrap().download().await.unwrap();
+//         // builder.assets().and_then(|i| i.download()).await.unwrap();
+
+//         builder.download().await.unwrap();
+//     }
+// }

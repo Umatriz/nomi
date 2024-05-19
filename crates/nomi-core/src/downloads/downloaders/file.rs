@@ -20,7 +20,7 @@ impl FileDownloader {
 impl Downloadable for FileDownloader {
     type Out = DownloadResult;
 
-    async fn download(&self) -> Self::Out {
+    async fn download(self: Box<Self>) -> Self::Out {
         download_file(&self.path, &self.url)
             .await
             .map(|_| DownloadStatus::Success)

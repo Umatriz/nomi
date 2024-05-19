@@ -16,7 +16,7 @@ pub struct FabricProfile {
     pub _type: String,
     pub main_class: String,
     pub arguments: Arguments,
-    pub libraries: Vec<Library>,
+    pub libraries: Vec<FabricLibrary>,
 }
 
 impl From<FabricProfile> for LoaderProfile {
@@ -44,7 +44,7 @@ pub struct Arguments {
 
 #[derive(Serialize, Deserialize, Default, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Library {
+pub struct FabricLibrary {
     pub name: String,
     pub url: String,
 }

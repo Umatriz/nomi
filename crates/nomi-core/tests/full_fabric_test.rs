@@ -1,6 +1,7 @@
 use nomi_core::{
     configs::profile::{VersionProfileBuilder, VersionProfilesConfig},
     downloads::downloadable::Downloader,
+    game_paths::GamePaths,
     instance::{launch::LaunchSettings, InstanceBuilder},
     loaders::fabric::Fabric,
     repository::{java_runner::JavaRunner, username::Username},
@@ -13,20 +14,29 @@ async fn full_fabric_test() {
     let current = std::env::current_dir().unwrap();
 
     let (tx, _) = tokio::sync::mpsc::channel(100);
+
+    let game_paths = GamePaths {
+        game: "./minecraft".into(),
+        assets: "./minecraft/assets".into(),
+        version: "./minecraft/versions/Full-fabric-test".into(),
+        libraries: "./minecraft/libraries".into(),
+    };
+
     let instance = InstanceBuilder::new()
         .name("Full-fabric-test".into())
         .version("1.19.4".into())
-        .version_path("./minecraft/versions/Full-fabric-test".into())
-        .game("./minecraft".into())
-        .libraries("./minecraft/libraries".into())
-        .assets("./minecraft/assets".into())
+        .game_paths(game_paths.clone())
         .instance(Box::new(
-            Fabric::new("1.19.4", None::<String>).await.unwrap(),
+            Fabric::new("1.19.4", None::<String>, game_paths)
+                .await
+                .unwrap(),
         ))
         .sender(tx.clone())
         .build();
 
-    instance.assets().await.unwrap().download(tx).await;
+    Box::new(instance.assets().await.unwrap())
+        .download(tx)
+        .await;
     instance.download().await.unwrap();
 
     let mc_dir = current.join("minecraft");

@@ -1,23 +1,34 @@
 use std::path::{Path, PathBuf};
 
 use reqwest::Client;
-use tokio::task::JoinSet;
+use tokio::{sync::mpsc::Sender, task::JoinSet};
 
 use tracing::{error, info};
 
 use crate::{
-    downloads::{download_file, download_version::DownloadVersion},
-    repository::manifest::{Manifest, ManifestFile},
+    downloads::{
+        download_file,
+        download_version::DownloadVersion,
+        downloadable::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
+        downloaders::{
+            file::FileDownloader,
+            libraries::{LibrariesDownloader, LibrariesMapper},
+        },
+        DownloadQueue,
+    },
+    game_paths::GamePaths,
+    repository::manifest::{Manifest, ManifestClassifiers, ManifestFile, ManifestLibrary},
     utils::{get_launcher_manifest, write_to_file},
 };
 
 #[derive(Debug)]
 pub struct Vanilla {
     manifest: Manifest,
+    game_paths: GamePaths,
 }
 
 impl Vanilla {
-    pub async fn new(version_id: impl Into<String>) -> anyhow::Result<Self> {
+    pub async fn new(version_id: impl Into<String>, game_paths: GamePaths) -> anyhow::Result<Self> {
         let id = version_id.into();
         let client = Client::new();
         let launcher_manifest = get_launcher_manifest().await?;
@@ -35,7 +46,119 @@ impl Vanilla {
             .json::<Manifest>()
             .await?;
 
-        Ok(Self { manifest })
+        Ok(Self {
+            manifest,
+            game_paths,
+        })
+    }
+}
+
+fn manifest_file_to_downloader(
+    manifest_file: &ManifestFile,
+    target_path: &Path,
+) -> Option<FileDownloader> {
+    manifest_file
+        .path
+        .as_ref()
+        .map(|path| target_path.join(path))
+        .map(|path| (manifest_file.url.clone(), path))
+        .filter(|(_, path)| !path.exists())
+        .map(|(url, path)| FileDownloader::new(url, path))
+}
+
+pub struct VanillaLibrariesMapper<'a> {
+    path: &'a Path,
+}
+
+impl LibrariesMapper<ManifestLibrary> for VanillaLibrariesMapper<'_> {
+    fn proceed(&self, library: &ManifestLibrary) -> Option<FileDownloader> {
+        library
+            .downloads
+            .artifact
+            .as_ref()
+            .and_then(|file| manifest_file_to_downloader(file, self.path))
+    }
+}
+
+pub struct VanillaNativeLibrariesMapper<'a> {
+    path: &'a Path,
+}
+
+impl LibrariesMapper<ManifestLibrary> for VanillaNativeLibrariesMapper<'_> {
+    fn proceed(&self, library: &ManifestLibrary) -> Option<FileDownloader> {
+        fn match_natives(natives: &ManifestClassifiers) -> Option<&ManifestFile> {
+            match std::env::consts::OS {
+                "linux" => natives.natives_linux.as_ref(),
+                "windows" => natives.natives_windows.as_ref(),
+                "macos" => natives.natives_macos.as_ref(),
+                _ => unreachable!(),
+            }
+        }
+
+        library
+            .downloads
+            .classifiers
+            .as_ref()
+            .and_then(match_natives)
+            .and_then(|file| manifest_file_to_downloader(file, self.path))
+    }
+}
+
+pub struct VanillaIO<'a> {
+    manifest: &'a Manifest,
+    version_path: &'a Path,
+}
+
+#[async_trait::async_trait]
+impl DownloaderIO for VanillaIO<'_> {
+    async fn io(&self) -> anyhow::Result<()> {
+        let path = self.version_path.join(format!("{}.json", self.manifest.id));
+
+        let body = serde_json::to_string_pretty(&self.manifest)?;
+
+        write_to_file(body.as_bytes(), &path).await
+    }
+}
+
+#[async_trait::async_trait]
+impl Downloader for Vanilla {
+    type Data = DownloadResult;
+
+    async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
+        let libraries_mapper = VanillaLibrariesMapper {
+            path: &self.game_paths.libraries,
+        };
+
+        let native_libraries_mapper = VanillaNativeLibrariesMapper {
+            path: &self.game_paths.libraries,
+        };
+
+        let queue = DownloadQueue::new()
+            .with_downloader(LibrariesDownloader::new(
+                libraries_mapper,
+                &self.manifest.libraries,
+            ))
+            .with_downloader(LibrariesDownloader::new(
+                native_libraries_mapper,
+                &self.manifest.libraries,
+            ))
+            .with_downloader(FileDownloader::new(
+                self.manifest.downloads.client.url.clone(),
+                self.game_paths
+                    .version
+                    .join(format!("{}.jar", self.manifest.id)),
+            ));
+
+        Box::new(queue).download(channel).await;
+    }
+}
+
+impl<'a> DownloaderIOExt<'a, VanillaIO<'a>> for Vanilla {
+    fn get_io(&'a self) -> VanillaIO<'a> {
+        VanillaIO {
+            manifest: &self.manifest,
+            version_path: &self.game_paths.version,
+        }
     }
 }
 

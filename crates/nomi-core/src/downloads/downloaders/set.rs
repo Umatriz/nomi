@@ -1,23 +1,15 @@
-use tokio::{
-    sync::{mpsc::Sender, Mutex},
-    task::JoinSet,
-};
+use tokio::{sync::mpsc::Sender, task::JoinSet};
 
-use super::{
+use crate::downloads::{
     downloadable::{DownloadResult, Downloadable, Downloader},
     DownloadError,
 };
 
+/// Downloader that starts downloading all provided [`Downloadable`] elements
+/// when [`Downloader::download`] is called
+#[derive(Default)]
 pub struct DownloadSet {
-    set: Mutex<JoinSet<DownloadResult>>,
-}
-
-impl Default for DownloadSet {
-    fn default() -> Self {
-        Self {
-            set: Mutex::new(JoinSet::new()),
-        }
-    }
+    set: Vec<Box<dyn Downloadable<Out = DownloadResult>>>,
 }
 
 impl DownloadSet {
@@ -25,14 +17,11 @@ impl DownloadSet {
         Self::default()
     }
 
-    pub async fn add<D>(&mut self, downloader: D) -> &mut Self
+    pub async fn add<D>(&mut self, downloader: Box<D>) -> &mut Self
     where
         D: Downloadable<Out = DownloadResult> + 'static,
     {
-        {
-            let mut set = self.set.lock().await;
-            set.spawn(async move { downloader.download().await });
-        }
+        self.set.push(downloader);
         self
     }
 }
@@ -41,8 +30,13 @@ impl DownloadSet {
 impl Downloader for DownloadSet {
     type Data = DownloadResult;
 
-    async fn download(&self, channel: Sender<Self::Data>) {
-        let mut set = self.set.lock().await;
+    async fn download(mut self: Box<Self>, channel: Sender<Self::Data>) {
+        let mut set = JoinSet::new();
+
+        for downloader in self.set {
+            set.spawn(downloader.download());
+        }
+
         while let Some(result) = set.join_next().await {
             let _ = match dbg!(result) {
                 Ok(download_status) => channel.send(download_status).await,

@@ -1,12 +1,12 @@
 #[cfg(target_os = "windows")]
 pub mod jvm_dowload;
 
-pub mod download_version;
-
 pub mod downloadable;
 pub mod downloaders;
-pub mod queue;
-pub mod set;
+
+pub mod download_version;
+
+pub use downloaders::*;
 
 use std::path::{Path, PathBuf};
 

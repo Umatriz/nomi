@@ -6,3 +6,5 @@ pub mod repository;
 
 pub mod error;
 pub mod utils;
+
+pub mod game_paths;
