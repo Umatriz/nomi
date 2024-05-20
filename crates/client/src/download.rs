@@ -64,19 +64,6 @@ async fn try_download(
             .build(),
     };
 
-    instance.download().await?;
-    Box::new(instance.assets().await?)
-        .download(sender.clone())
-        .await;
-
-    let confgis = current.join(".nomi/configs");
-
-    let mut profiles: VersionProfilesConfig = if confgis.join("Profiles.toml").exists() {
-        read_toml_config(confgis.join("Profiles.toml")).await?
-    } else {
-        VersionProfilesConfig { profiles: vec![] }
-    };
-
     let settings = LaunchSettings {
         access_token: None,
         username: Username::default(),
@@ -102,6 +89,20 @@ async fn try_download(
         settings,
         Some(vec!["-Xms2G".to_string(), "-Xmx4G".to_string()]),
     );
+
+    Box::new(instance.assets().await?)
+        .download(sender.clone())
+        .await;
+
+    instance.download().await?;
+
+    let confgis = current.join(".nomi/configs");
+
+    let mut profiles: VersionProfilesConfig = if confgis.join("Profiles.toml").exists() {
+        read_toml_config(confgis.join("Profiles.toml")).await?
+    } else {
+        VersionProfilesConfig { profiles: vec![] }
+    };
 
     let profile = VersionProfileBuilder::new()
         .id(profiles.create_id())

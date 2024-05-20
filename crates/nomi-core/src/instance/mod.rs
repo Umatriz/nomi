@@ -9,7 +9,10 @@ pub mod profile;
 pub mod version_marker;
 
 use crate::{
-    downloads::{downloadable::DownloadResult, downloaders::assets::AssetsDownloader},
+    downloads::{
+        downloadable::{DownloadResult, DownloaderIO},
+        downloaders::assets::AssetsDownloader,
+    },
     game_paths::GamePaths,
     utils::state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
 };
@@ -32,14 +35,21 @@ pub struct Instance {
 }
 
 impl Instance {
-    pub async fn download(&self) -> anyhow::Result<()> {
-        self.instance
-            .download(&self.game_paths.version, &self.version)
-            .await?;
-        self.instance
-            .download_libraries(&self.game_paths.libraries)
-            .await?;
-        self.instance.create_json(&self.game_paths.version).await?;
+    pub async fn download(self) -> anyhow::Result<()> {
+        // self.instance
+        //     .download(&self.game_paths.version, &self.version)
+        //     .await?;
+        // self.instance
+        //     .download_libraries(&self.game_paths.libraries)
+        //     .await?;
+        // self.instance.create_json(&self.game_paths.version).await?;
+
+        {
+            let io = self.instance.get_io_dyn();
+            io.io().await?;
+        }
+
+        self.instance.download(self.sender.clone()).await;
 
         Ok(())
     }
@@ -60,7 +70,7 @@ impl Instance {
     }
 
     pub fn launch_instance(
-        self,
+        &self,
         settings: LaunchSettings,
         jvm_args: Option<Vec<String>>,
     ) -> LaunchInstance {

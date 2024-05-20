@@ -34,11 +34,6 @@ async fn full_fabric_test() {
         .sender(tx.clone())
         .build();
 
-    Box::new(instance.assets().await.unwrap())
-        .download(tx)
-        .await;
-    instance.download().await.unwrap();
-
     let mc_dir = current.join("minecraft");
 
     let settings = LaunchSettings {
@@ -57,6 +52,11 @@ async fn full_fabric_test() {
     };
 
     let launch = instance.launch_instance(settings, None);
+
+    Box::new(instance.assets().await.unwrap())
+        .download(tx)
+        .await;
+    instance.download().await.unwrap();
 
     let mock = VersionProfilesConfig { profiles: vec![] };
     let profile = VersionProfileBuilder::new()

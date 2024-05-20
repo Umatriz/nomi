@@ -1,13 +1,26 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, sync::Arc};
 
 use crate::{
-    downloads::download_version::DownloadVersion,
-    loaders::{fabric::Fabric, vanilla::Vanilla},
+    downloads::downloadable::{
+        DownloadResult, Downloader, DownloaderIO, DownloaderIOExt, ObjectSafeDownloaderIOExt,
+    },
+    loaders::{
+        fabric::{Fabric, FabricIO},
+        vanilla::{Vanilla, VanillaIO},
+    },
 };
 
 use super::builder_ext::LaunchInstanceBuilderExt;
 
-pub trait Version: LaunchInstanceBuilderExt + DownloadVersion + Debug + Send + Sync {}
+pub trait Version:
+    LaunchInstanceBuilderExt
+    + Downloader<Data = DownloadResult>
+    + for<'a> ObjectSafeDownloaderIOExt<'a>
+    + Debug
+    + Send
+    + Sync
+{
+}
 
 impl Version for Vanilla {}
 impl Version for Fabric {}

@@ -4,8 +4,6 @@ pub mod jvm_dowload;
 pub mod downloadable;
 pub mod downloaders;
 
-pub mod download_version;
-
 pub use downloaders::*;
 
 use std::path::{Path, PathBuf};

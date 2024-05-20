@@ -47,7 +47,9 @@ impl AssetsDownloader {
     }
 }
 
-impl<'a> DownloaderIOExt<'a, AssetsDownloaderIo<'a>> for AssetsDownloader {
+impl<'a> DownloaderIOExt<'a> for AssetsDownloader {
+    type IO = AssetsDownloaderIo<'a>;
+
     fn get_io(&'a self) -> AssetsDownloaderIo<'a> {
         AssetsDownloaderIo {
             assets: &self.assets,

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use tokio::sync::mpsc::Sender;
 
 use super::{downloaders::assets::AssetsDownloaderIo, DownloadError};
@@ -57,8 +59,23 @@ pub trait DownloaderIO {
 
 const _: Option<Box<dyn DownloaderIO>> = None;
 
-pub trait DownloaderIOExt<'a, I: DownloaderIO> {
-    fn get_io(&'a self) -> I;
+pub trait DownloaderIOExt<'a> {
+    type IO: DownloaderIO;
+
+    fn get_io(&'a self) -> Self::IO;
 }
 
-const _: Option<Box<dyn DownloaderIOExt<AssetsDownloaderIo>>> = None;
+const _: Option<Box<dyn DownloaderIOExt<IO = AssetsDownloaderIo>>> = None;
+
+pub trait ObjectSafeDownloaderIOExt<'a> {
+    fn get_io_dyn(&'a self) -> Box<dyn DownloaderIO + Send + 'a>;
+}
+
+impl<'a, T: DownloaderIOExt<'a>> ObjectSafeDownloaderIOExt<'a> for T
+where
+    T::IO: Send,
+{
+    fn get_io_dyn(&'a self) -> Box<dyn DownloaderIO + Send + 'a> {
+        Box::new(self.get_io())
+    }
+}

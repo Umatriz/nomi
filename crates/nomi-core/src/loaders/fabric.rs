@@ -7,7 +7,6 @@ use tracing::info;
 use crate::{
     downloads::{
         download_file,
-        download_version::DownloadVersion,
         downloadable::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
         downloaders::{
             file::FileDownloader,
@@ -135,7 +134,9 @@ impl Downloader for Fabric {
     }
 }
 
-impl<'a> DownloaderIOExt<'a, FabricIO<'a>> for Fabric {
+impl<'a> DownloaderIOExt<'a> for Fabric {
+    type IO = FabricIO<'a>;
+
     fn get_io(&'a self) -> FabricIO<'a> {
         FabricIO {
             profile: &self.profile,
@@ -144,50 +145,50 @@ impl<'a> DownloaderIOExt<'a, FabricIO<'a>> for Fabric {
     }
 }
 
-#[async_trait::async_trait]
-impl DownloadVersion for Fabric {
-    async fn download(&self, dir: &Path, file_name: &str) -> anyhow::Result<()> {
-        // Vanilla::new(&self.game_version)
-        //     .await?
-        //     .download(dir, file_name)
-        //     .await?;
+// #[async_trait::async_trait]
+// impl DownloadVersion for Fabric {
+//     async fn download(&self, dir: &Path, file_name: &str) -> anyhow::Result<()> {
+//         // Vanilla::new(&self.game_version)
+//         //     .await?
+//         //     .download(dir, file_name)
+//         //     .await?;
 
-        info!("Fabric downloaded successfully");
+//         info!("Fabric downloaded successfully");
 
-        Ok(())
-    }
+//         Ok(())
+//     }
 
-    async fn download_libraries(&self, dir: &Path) -> anyhow::Result<()> {
-        let mut set = JoinSet::new();
+//     async fn download_libraries(&self, dir: &Path) -> anyhow::Result<()> {
+//         let mut set = JoinSet::new();
 
-        self.profile.libraries.iter().for_each(|lib| {
-            let maven = MavenData::new(&lib.name);
-            let path = dir.join(maven.path);
-            if !path.exists() {
-                set.spawn(download_file(path, format!("{}{}", lib.url, maven.url)));
-            }
-        });
+//         self.profile.libraries.iter().for_each(|lib| {
+//             let maven = MavenData::new(&lib.name);
+//             let path = dir.join(maven.path);
+//             if !path.exists() {
+//                 set.spawn(download_file(path, format!("{}{}", lib.url, maven.url)));
+//             }
+//         });
 
-        while let Some(res) = set.join_next().await {
-            res??
-        }
+//         while let Some(res) = set.join_next().await {
+//             res??
+//         }
 
-        Ok(())
-    }
+//         Ok(())
+//     }
 
-    async fn create_json(&self, dir: &Path) -> anyhow::Result<()> {
-        let file_name = format!("{}.json", self.profile.id);
-        let path = dir.join(file_name);
+//     async fn create_json(&self, dir: &Path) -> anyhow::Result<()> {
+//         let file_name = format!("{}.json", self.profile.id);
+//         let path = dir.join(file_name);
 
-        let body = serde_json::to_string_pretty(&self.profile)?;
+//         let body = serde_json::to_string_pretty(&self.profile)?;
 
-        write_to_file(body.as_bytes(), &path).await?;
+//         write_to_file(body.as_bytes(), &path).await?;
 
-        info!(
-            "Version json {} created successfully",
-            path.to_string_lossy()
-        );
+//         info!(
+//             "Version json {} created successfully",
+//             path.to_string_lossy()
+//         );
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }
