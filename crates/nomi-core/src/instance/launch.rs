@@ -8,19 +8,19 @@ use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 use tracing::info;
 
-use crate::repository::{
-    java_runner::JavaRunner,
-    manifest::{Manifest, ManifestLibrary},
-    username::Username,
+use crate::{
+    fs::read_json_config,
+    repository::{
+        java_runner::JavaRunner,
+        manifest::{Manifest, ManifestLibrary},
+        username::Username,
+    },
 };
 use rules::is_all_rules_satisfied;
 
 use self::arguments::ArgumentsBuilder;
 
-use super::{
-    profile::{read_json, LoaderProfile},
-    Undefined,
-};
+use super::{profile::LoaderProfile, Undefined};
 
 pub mod arguments;
 pub mod rules;
@@ -111,7 +111,7 @@ impl LaunchInstance {
     }
 
     pub async fn launch(&self) -> anyhow::Result<()> {
-        let manifest = read_json::<Manifest>(&self.settings.manifest_file).await?;
+        let manifest = read_json_config::<Manifest>(&self.settings.manifest_file).await?;
 
         let arguments_builder = ArgumentsBuilder::new(self, &manifest).finish();
 
@@ -217,7 +217,7 @@ impl LaunchInstanceBuilder<LaunchSettings> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{instance::profile::read_json, repository::fabric_profile::FabricProfile};
+    use crate::repository::fabric_profile::FabricProfile;
 
     use super::*;
 
@@ -239,7 +239,7 @@ mod tests {
             version_type: "release".to_string(),
         };
 
-        let fabric = read_json::<FabricProfile>(
+        let fabric = read_json_config::<FabricProfile>(
             "./minecraft/instances/1.18.2/fabric-loader-0.14.23-1.18.2.json",
         )
         .await

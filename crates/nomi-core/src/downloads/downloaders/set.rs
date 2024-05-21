@@ -1,7 +1,7 @@
 use tokio::{sync::mpsc::Sender, task::JoinSet};
 
 use crate::downloads::{
-    downloadable::{DownloadResult, Downloadable, Downloader},
+    traits::{DownloadResult, Downloadable, Downloader},
     DownloadError,
 };
 

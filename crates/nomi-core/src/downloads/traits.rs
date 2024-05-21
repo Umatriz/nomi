@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use tokio::sync::mpsc::Sender;
 
 use super::{downloaders::assets::AssetsDownloaderIo, DownloadError};

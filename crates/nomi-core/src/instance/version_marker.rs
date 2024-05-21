@@ -1,13 +1,8 @@
-use std::{fmt::Debug, sync::Arc};
+use std::fmt::Debug;
 
 use crate::{
-    downloads::downloadable::{
-        DownloadResult, Downloader, DownloaderIO, DownloaderIOExt, ObjectSafeDownloaderIOExt,
-    },
-    loaders::{
-        fabric::{Fabric, FabricIO},
-        vanilla::{Vanilla, VanillaIO},
-    },
+    downloads::traits::{DownloadResult, Downloader, ObjectSafeDownloaderIOExt},
+    loaders::{fabric::Fabric, vanilla::Vanilla},
 };
 
 use super::builder_ext::LaunchInstanceBuilderExt;

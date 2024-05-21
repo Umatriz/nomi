@@ -48,7 +48,7 @@ impl VersionProfile {
 #[cfg(test)]
 mod tests {
     use crate::{
-        configs::write_toml_config,
+        fs::write_toml_config,
         game_paths::GamePaths,
         instance::{launch::LaunchSettings, InstanceBuilder},
         loaders::fabric::Fabric,

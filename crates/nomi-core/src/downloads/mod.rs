@@ -1,8 +1,8 @@
 #[cfg(target_os = "windows")]
 pub mod jvm_dowload;
 
-pub mod downloadable;
 pub mod downloaders;
+pub mod traits;
 
 pub use downloaders::*;
 

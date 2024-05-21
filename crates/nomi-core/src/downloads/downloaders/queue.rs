@@ -1,6 +1,6 @@
 use tokio::sync::mpsc::Sender;
 
-use crate::downloads::downloadable::{DownloadResult, Downloader};
+use crate::downloads::traits::{DownloadResult, Downloader};
 
 #[derive(Default)]
 pub struct DownloadQueue {

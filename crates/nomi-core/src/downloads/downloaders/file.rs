@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use crate::downloads::{
     download_file,
-    downloadable::{DownloadResult, DownloadStatus, Downloadable},
+    traits::{DownloadResult, DownloadStatus, Downloadable},
 };
 
 pub struct FileDownloader {

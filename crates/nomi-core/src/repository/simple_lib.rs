@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::utils::maven::MavenData;
+use crate::maven_data::MavenData;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SimpleLib {

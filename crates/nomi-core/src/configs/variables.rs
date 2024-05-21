@@ -15,8 +15,7 @@ impl Variables {
 
 #[cfg(test)]
 mod tests {
-    use crate::configs::read_toml_config;
-    use crate::configs::write_toml_config;
+    use crate::fs::{read_toml_config, write_toml_config};
 
     use super::*;
 

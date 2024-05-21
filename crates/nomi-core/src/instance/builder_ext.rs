@@ -2,14 +2,14 @@ use crate::loaders::{fabric::Fabric, vanilla::Vanilla};
 
 use super::launch::{LaunchInstanceBuilder, LaunchSettings};
 
-const _: Option<Box<dyn LaunchInstanceBuilderExt>> = None;
-
 pub trait LaunchInstanceBuilderExt {
     fn insert(
         &self,
         builder: LaunchInstanceBuilder<LaunchSettings>,
     ) -> LaunchInstanceBuilder<LaunchSettings>;
 }
+
+const _: Option<Box<dyn LaunchInstanceBuilderExt>> = None;
 
 impl LaunchInstanceBuilderExt for Vanilla {
     fn insert(

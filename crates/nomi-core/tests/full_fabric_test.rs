@@ -1,6 +1,6 @@
 use nomi_core::{
     configs::profile::{VersionProfileBuilder, VersionProfilesConfig},
-    downloads::downloadable::Downloader,
+    downloads::traits::Downloader,
     game_paths::GamePaths,
     instance::{launch::LaunchSettings, InstanceBuilder},
     loaders::fabric::Fabric,

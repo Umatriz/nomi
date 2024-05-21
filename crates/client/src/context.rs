@@ -9,15 +9,14 @@ use egui_tracing::EventCollector;
 use nomi_core::{
     configs::{
         profile::{VersionProfile, VersionProfilesConfig},
-        read_toml_config_sync,
         user::Settings,
-        write_toml_config_sync,
     },
-    downloads::downloadable::DownloadResult,
+    downloads::traits::DownloadResult,
+    fs::{read_toml_config_sync, write_toml_config_sync},
     repository::{
         java_runner::JavaRunner, launcher_manifest::LauncherManifestVersion, username::Username,
     },
-    utils::state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
+    state::get_launcher_manifest_state,
 };
 use rfd::AsyncFileDialog;
 use std::{
@@ -25,7 +24,6 @@ use std::{
     path::PathBuf,
     sync::mpsc::{Receiver, Sender},
 };
-use tracing::error;
 
 pub struct AppContext {
     pub collector: EventCollector,
@@ -72,9 +70,7 @@ impl AppContext {
         let settings_res = read_toml_config_sync::<Settings>("./.nomi/configs/User.toml");
         let settings = settings_res.unwrap_or_default();
 
-        let state = pollster::block_on(
-            LAUNCHER_MANIFEST_STATE.get_or_try_init(launcher_manifest_state_try_init),
-        );
+        let state = pollster::block_on(get_launcher_manifest_state());
 
         let (download_progress_tx, download_progress_rx) = tokio::sync::mpsc::channel(500);
 
@@ -109,7 +105,7 @@ impl AppContext {
             },
             settings_java_buf: java_bin,
             settings,
-            client_settings: client_settings,
+            client_settings,
             profile_name_buf: Default::default(),
             selected_version_buf: Default::default(),
             loader_buf: Loader::Vanilla,

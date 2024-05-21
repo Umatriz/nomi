@@ -140,19 +140,20 @@ pub struct ManifestClassifiers {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::get;
+
+    use reqwest::get;
 
     use super::*;
 
     #[tokio::test]
     async fn old_version_test() {
-        let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/d546f1707a3f2b7d034eece5ea2e311eda875787/1.8.9.json").await.unwrap();
+        let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/d546f1707a3f2b7d034eece5ea2e311eda875787/1.8.9.json").await.unwrap().json().await.unwrap();
         println!("{:#?}", manifest.arguments)
     }
 
     #[tokio::test]
     async fn deserialize_test() {
-        let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/334b33fcba3c9be4b7514624c965256535bd7eba/1.18.2.json").await.unwrap();
+        let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/334b33fcba3c9be4b7514624c965256535bd7eba/1.18.2.json").await.unwrap().json().await.unwrap();
         println!("{:#?}", manifest.libraries[29])
     }
 }

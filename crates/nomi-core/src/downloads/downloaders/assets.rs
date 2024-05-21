@@ -8,11 +8,11 @@ use tracing::info;
 
 use crate::{
     downloads::{
-        downloadable::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
         downloaders::file::FileDownloader,
         set::DownloadSet,
+        traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
     },
-    utils::write_to_file,
+    fs::write_json_config,
 };
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -69,10 +69,7 @@ pub struct AssetsDownloaderIo<'a> {
 impl DownloaderIO for AssetsDownloaderIo<'_> {
     async fn io(&self) -> anyhow::Result<()> {
         let path = self.indexes.join(format!("{}.json", self.id));
-
-        let body = serde_json::to_string(&self.assets)?;
-
-        write_to_file(body.as_bytes(), &path).await
+        write_json_config(&self.assets, path).await
     }
 }
 

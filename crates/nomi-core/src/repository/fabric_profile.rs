@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::{instance::profile::LoaderProfile, utils::maven::MavenData};
+use crate::{instance::profile::LoaderProfile, maven_data::MavenData};
 
 use super::{simple_args::SimpleArgs, simple_lib::SimpleLib};
 

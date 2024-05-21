@@ -1,28 +1,24 @@
 use std::path::{Path, PathBuf};
 
 use reqwest::Client;
-use tokio::{sync::mpsc::Sender, task::JoinSet};
-use tracing::info;
+use tokio::sync::mpsc::Sender;
 
 use crate::{
     downloads::{
-        download_file,
-        downloadable::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
         downloaders::{
             file::FileDownloader,
             libraries::{LibrariesDownloader, LibrariesMapper},
         },
+        traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
     },
+    fs::write_to_file,
     game_paths::GamePaths,
+    maven_data::MavenData,
     repository::{
         fabric_meta::FabricVersions,
         fabric_profile::{FabricLibrary, FabricProfile},
     },
-    utils::{
-        maven::MavenData,
-        state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
-        write_to_file,
-    },
+    state::get_launcher_manifest_state,
 };
 
 #[derive(Debug)]
@@ -41,9 +37,7 @@ impl Fabric {
         let game_version = game_version.into();
 
         let client = Client::new();
-        let launcher_manifest = LAUNCHER_MANIFEST_STATE
-            .get_or_try_init(launcher_manifest_state_try_init)
-            .await?;
+        let launcher_manifest = get_launcher_manifest_state().await?;
 
         if !launcher_manifest
             .launcher

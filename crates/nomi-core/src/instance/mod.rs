@@ -1,7 +1,5 @@
 use const_typed_builder::Builder;
-use std::path::PathBuf;
 use tokio::sync::mpsc::Sender;
-use tracing::info;
 
 pub mod builder_ext;
 pub mod launch;
@@ -9,12 +7,9 @@ pub mod profile;
 pub mod version_marker;
 
 use crate::{
-    downloads::{
-        downloadable::{DownloadResult, DownloaderIO},
-        downloaders::assets::AssetsDownloader,
-    },
+    downloads::{downloaders::assets::AssetsDownloader, traits::DownloadResult},
     game_paths::GamePaths,
-    utils::state::{launcher_manifest_state_try_init, LAUNCHER_MANIFEST_STATE},
+    state::get_launcher_manifest_state,
 };
 
 use self::{
@@ -55,9 +50,7 @@ impl Instance {
     }
 
     pub async fn assets(&self) -> anyhow::Result<AssetsDownloader> {
-        let manifest = LAUNCHER_MANIFEST_STATE
-            .get_or_try_init(launcher_manifest_state_try_init)
-            .await?;
+        let manifest = get_launcher_manifest_state().await?;
         let version_manifest = manifest.get_version_manifest(&self.version).await?;
 
         AssetsDownloader::new(
@@ -79,6 +72,7 @@ impl Instance {
             Some(jvm) => builder.jvm_args(jvm),
             None => builder,
         };
+
         self.instance.insert(builder).build()
     }
 }

@@ -1,23 +1,23 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use reqwest::Client;
-use tokio::{sync::mpsc::Sender, task::JoinSet};
+use tokio::sync::mpsc::Sender;
 
-use tracing::{error, info};
+use tracing::error;
 
 use crate::{
     downloads::{
-        download_file,
-        downloadable::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
         downloaders::{
             file::FileDownloader,
             libraries::{LibrariesDownloader, LibrariesMapper},
         },
+        traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
         DownloadQueue,
     },
+    fs::write_to_file,
     game_paths::GamePaths,
     repository::manifest::{Manifest, ManifestClassifiers, ManifestFile, ManifestLibrary},
-    utils::{get_launcher_manifest, write_to_file},
+    state::get_launcher_manifest,
 };
 
 #[derive(Debug)]

@@ -2,7 +2,7 @@ use itertools::Itertools;
 use tokio::sync::mpsc::Sender;
 
 use crate::downloads::{
-    downloadable::{DownloadResult, Downloader},
+    traits::{DownloadResult, Downloader},
     DownloadSet,
 };
 

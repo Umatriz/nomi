@@ -1,11 +1,9 @@
 use std::sync::mpsc::Sender;
 
 use nomi_core::{
-    configs::{
-        profile::{VersionProfile, VersionProfileBuilder, VersionProfilesConfig},
-        read_toml_config, write_toml_config,
-    },
-    downloads::downloadable::{DownloadResult, Downloader},
+    configs::profile::{VersionProfile, VersionProfileBuilder, VersionProfilesConfig},
+    downloads::traits::{DownloadResult, Downloader},
+    fs::{read_toml_config, write_toml_config},
     game_paths::GamePaths,
     instance::{launch::LaunchSettings, InstanceBuilder},
     loaders::{fabric::Fabric, vanilla::Vanilla},
