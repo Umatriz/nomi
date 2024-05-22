@@ -12,6 +12,7 @@ pub trait LibrariesMapper<L> {
     fn proceed(&self, library: &L) -> Option<FileDownloader>;
 }
 
+#[derive(Debug)]
 pub struct LibrariesDownloader {
     downloads: Vec<FileDownloader>,
 }
@@ -33,6 +34,10 @@ impl LibrariesDownloader {
 #[async_trait::async_trait]
 impl Downloader for LibrariesDownloader {
     type Data = DownloadResult;
+
+    fn len(&self) -> u32 {
+        self.downloads.len() as u32
+    }
 
     async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
         let mut download_set = DownloadSet::new();

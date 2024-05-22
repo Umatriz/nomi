@@ -26,6 +26,7 @@ pub struct Fabric {
     pub game_version: String,
     pub profile: FabricProfile,
     game_paths: GamePaths,
+    libraries_downloader: LibrariesDownloader,
 }
 
 impl Fabric {
@@ -71,10 +72,17 @@ impl Fabric {
             .json()
             .await?;
 
+        let mapper = FabricLibrariesMapper {
+            libraries: game_paths.libraries.clone(),
+        };
+
+        let libraries_downloader = LibrariesDownloader::new(&mapper, &profile.libraries);
+
         Ok(Self {
             game_version,
             profile,
             game_paths,
+            libraries_downloader,
         })
     }
 }
@@ -116,14 +124,12 @@ impl LibrariesMapper<FabricLibrary> for FabricLibrariesMapper {
 impl Downloader for Fabric {
     type Data = DownloadResult;
 
-    async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
-        let mapper = FabricLibrariesMapper {
-            libraries: self.game_paths.libraries.clone(),
-        };
+    fn len(&self) -> u32 {
+        self.libraries_downloader.len()
+    }
 
-        Box::new(LibrariesDownloader::new(&mapper, &self.profile.libraries))
-            .download(channel)
-            .await;
+    async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
+        Box::new(self.libraries_downloader).download(channel).await;
     }
 }
 

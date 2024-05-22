@@ -22,8 +22,8 @@ pub struct Undefined;
 
 #[derive(Debug, Builder)]
 pub struct Instance {
-    instance: Box<dyn Version>,
-    sender: Sender<DownloadResult>,
+    pub instance: Box<dyn Version>,
+    pub sender: Sender<DownloadResult>,
     pub game_paths: GamePaths,
     pub version: String,
     pub name: String,

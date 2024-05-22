@@ -32,6 +32,8 @@ const _: Option<Box<dyn Downloadable<Out = DownloadResult>>> = None;
 pub trait Downloader: Send + Sync {
     type Data;
 
+    /// Returns the number of items to download
+    fn len(&self) -> u32;
     async fn download(self: Box<Self>, channel: Sender<Self::Data>);
 }
 
@@ -43,6 +45,10 @@ where
     T: Downloadable,
 {
     type Data = T::Out;
+
+    fn len(&self) -> u32 {
+        1
+    }
 
     async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
         let result = self.download().await;

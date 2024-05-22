@@ -5,6 +5,7 @@ use crate::downloads::{
     traits::{DownloadResult, DownloadStatus, Downloadable},
 };
 
+#[derive(Debug)]
 pub struct FileDownloader {
     url: String,
     path: PathBuf,

@@ -24,6 +24,7 @@ use crate::{
 pub struct Vanilla {
     manifest: Manifest,
     game_paths: GamePaths,
+    queue: DownloadQueue,
 }
 
 impl Vanilla {
@@ -45,9 +46,32 @@ impl Vanilla {
             .json::<Manifest>()
             .await?;
 
+        let libraries_mapper = VanillaLibrariesMapper {
+            path: &game_paths.libraries,
+        };
+
+        let native_libraries_mapper = VanillaNativeLibrariesMapper {
+            path: &game_paths.libraries,
+        };
+
+        let queue = DownloadQueue::new()
+            .with_downloader(LibrariesDownloader::new(
+                &libraries_mapper,
+                &manifest.libraries,
+            ))
+            .with_downloader(LibrariesDownloader::new(
+                &native_libraries_mapper,
+                &manifest.libraries,
+            ))
+            .with_downloader(FileDownloader::new(
+                manifest.downloads.client.url.clone(),
+                game_paths.version.join(format!("{}.jar", manifest.id)),
+            ));
+
         Ok(Self {
             manifest,
             game_paths,
+            queue,
         })
     }
 }
@@ -124,32 +148,12 @@ impl DownloaderIO for VanillaIO<'_> {
 impl Downloader for Vanilla {
     type Data = DownloadResult;
 
+    fn len(&self) -> u32 {
+        self.queue.len()
+    }
+
     async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
-        let libraries_mapper = VanillaLibrariesMapper {
-            path: &self.game_paths.libraries,
-        };
-
-        let native_libraries_mapper = VanillaNativeLibrariesMapper {
-            path: &self.game_paths.libraries,
-        };
-
-        let queue = DownloadQueue::new()
-            .with_downloader(LibrariesDownloader::new(
-                &libraries_mapper,
-                &self.manifest.libraries,
-            ))
-            .with_downloader(LibrariesDownloader::new(
-                &native_libraries_mapper,
-                &self.manifest.libraries,
-            ))
-            .with_downloader(FileDownloader::new(
-                self.manifest.downloads.client.url.clone(),
-                self.game_paths
-                    .version
-                    .join(format!("{}.jar", self.manifest.id)),
-            ));
-
-        Box::new(queue).download(channel).await;
+        Box::new(self.queue).download(channel).await;
     }
 }
 

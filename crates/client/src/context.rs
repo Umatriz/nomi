@@ -29,7 +29,11 @@ pub struct AppContext {
     download_progress_tx: tokio::sync::mpsc::Sender<DownloadResult>,
     download_progress_rx: tokio::sync::mpsc::Receiver<DownloadResult>,
 
+    download_total_tx: tokio::sync::mpsc::Sender<u32>,
+    download_total_rx: tokio::sync::mpsc::Receiver<u32>,
+
     download_progress: u32,
+    download_total: u32,
 
     tx: Sender<VersionProfile>,
     rx: Receiver<VersionProfile>,
@@ -72,12 +76,17 @@ impl AppContext {
 
         let (download_progress_tx, download_progress_rx) = tokio::sync::mpsc::channel(500);
 
+        let (download_total_tx, download_total_rx) = tokio::sync::mpsc::channel(100);
+
         let java_bin = settings.java_bin.clone().unwrap_or_default();
         Ok(Self {
             collector,
             download_progress_tx,
             download_progress_rx,
             download_progress: 0,
+            download_total: 0,
+            download_total_tx,
+            download_total_rx,
             release_versions: match state {
                 Ok(data) => Some(
                     data.versions
@@ -118,20 +127,28 @@ impl AppContext {
     }
 
     pub fn show_main(&mut self, ui: &mut Ui) {
-        ui.label(format!("{}", self.download_progress));
+        ui.label(format!(
+            "{}/{}",
+            self.download_progress, self.download_total
+        ));
 
         ui.ctx().set_pixels_per_point(
             self.client_settings
                 .pixels_per_point
                 .unwrap_or(default_pixels_per_point_value()),
         );
+
         if let Ok(data) = self.rx.try_recv() {
             self.profiles.add_profile(data);
         }
 
         if let Ok(data) = self.download_progress_rx.try_recv() {
             // TODO: Handle result
-            self.download_progress += dbg!(data).map_or(0, |_| 1)
+            self.download_progress += data.map_or(0, |_| 1)
+        }
+
+        if let Ok(data) = self.download_total_rx.try_recv() {
+            self.download_total = data
         }
 
         if !self.tasks.is_empty() {
@@ -309,6 +326,7 @@ impl AppContext {
 
             if ui.button("Create and download").clicked() {
                 self.download_progress = 0;
+
                 let handle = spawn_download(
                     self.tx.clone(),
                     // ctx.clone(),
@@ -316,7 +334,9 @@ impl AppContext {
                     profiles[self.selected_version_buf].id.clone(),
                     self.loader_buf.clone(),
                     self.download_progress_tx.clone(),
+                    self.download_total_tx.clone(),
                 );
+
                 self.tasks.push((
                     handle,
                     format!(

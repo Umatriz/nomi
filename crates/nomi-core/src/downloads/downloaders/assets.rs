@@ -10,10 +10,12 @@ use crate::{
     downloads::{
         downloaders::file::FileDownloader,
         set::DownloadSet,
-        traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
+        traits::{DownloadResult, Downloadable, Downloader, DownloaderIO, DownloaderIOExt},
     },
     fs::write_json_config,
 };
+
+use super::DownloadQueue;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Assets {
@@ -28,8 +30,8 @@ pub struct AssetInformation {
 
 #[derive(Debug)]
 pub struct AssetsDownloader {
+    queue: DownloadQueue,
     assets: Assets,
-    objects: PathBuf,
     indexes: PathBuf,
     id: String,
 }
@@ -38,9 +40,39 @@ impl AssetsDownloader {
     pub async fn new(url: String, id: String, objects: PathBuf, indexes: PathBuf) -> Result<Self> {
         let assets: Assets = Client::new().get(&url).send().await?.json().await?;
 
+        let mut queue =
+            DownloadQueue::new().with_inspector(|| info!("Asset chunk downloaded successfully"));
+
+        assets
+            .objects
+            .iter()
+            .collect_vec()
+            .chunks(100)
+            .map(|c| c.iter().map(|(_, v)| v).copied())
+            .map(|chunk| {
+                chunk
+                    .filter_map(|asset| {
+                        let path = objects.join(&asset.hash[0..2]).join(&asset.hash);
+                        (!path.exists()).then_some(FileDownloader::new(
+                            format!(
+                                "https://resources.download.minecraft.net/{}/{}",
+                                &asset.hash[0..2],
+                                asset.hash
+                            ),
+                            path,
+                        ))
+                    })
+                    .map::<Box<dyn Downloadable<Out = DownloadResult>>, _>(|downloader| {
+                        Box::new(downloader)
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .map(DownloadSet::from_vec_dyn)
+            .for_each(|downloader| queue.add_downloader(downloader));
+
         Ok(Self {
+            queue,
             assets,
-            objects,
             indexes,
             id,
         })
@@ -77,38 +109,11 @@ impl DownloaderIO for AssetsDownloaderIo<'_> {
 impl Downloader for AssetsDownloader {
     type Data = DownloadResult;
 
+    fn len(&self) -> u32 {
+        self.queue.len()
+    }
+
     async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
-        let assets_chunks = self
-            .assets
-            .objects
-            .iter()
-            .collect_vec()
-            .chunks(100)
-            .map(|c| c.iter().map(|(_, v)| v).copied().collect())
-            .collect::<Vec<Vec<_>>>();
-
-        for chunk in &assets_chunks {
-            let mut download_set = DownloadSet::new();
-
-            for asset in chunk {
-                let path = self.objects.join(&asset.hash[0..2]).join(&asset.hash);
-
-                if path.exists() {
-                    continue;
-                }
-
-                let url = format!(
-                    "https://resources.download.minecraft.net/{}/{}",
-                    &asset.hash[0..2],
-                    asset.hash
-                );
-
-                download_set.add(Box::new(FileDownloader::new(url, path)));
-            }
-
-            Box::new(download_set).download(channel.clone()).await;
-
-            info!("Assets chunk downloaded");
-        }
+        Box::new(self.queue).download(channel).await;
     }
 }

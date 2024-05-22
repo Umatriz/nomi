@@ -1,8 +1,11 @@
-use std::sync::mpsc::Sender;
+use std::sync::{atomic::AtomicU32, mpsc::Sender, Arc};
 
 use nomi_core::{
     configs::profile::{VersionProfile, VersionProfileBuilder, VersionProfilesConfig},
-    downloads::traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
+    downloads::{
+        traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
+        DownloadQueue,
+    },
     fs::{read_toml_config, write_toml_config},
     game_paths::GamePaths,
     instance::{launch::LaunchSettings, InstanceBuilder},
@@ -18,9 +21,10 @@ pub fn spawn_download(
     version: String,
     loader: Loader,
     progress_tx: tokio::sync::mpsc::Sender<DownloadResult>,
+    total_tx: tokio::sync::mpsc::Sender<u32>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        let data = try_download(name, version, loader, progress_tx.clone())
+        let data = try_download(name, version, loader, progress_tx.clone(), total_tx)
             .await
             .crash();
 
@@ -33,6 +37,7 @@ async fn try_download(
     version: String,
     loader: Loader,
     sender: tokio::sync::mpsc::Sender<DownloadResult>,
+    total_tx: tokio::sync::mpsc::Sender<u32>,
 ) -> anyhow::Result<VersionProfile> {
     // return Err(std::io::Error::new(std::io::ErrorKind::BrokenPipe, "Error").into());
     let current = std::env::current_dir()?;
@@ -92,9 +97,18 @@ async fn try_download(
 
     assets.get_io().io().await?;
 
-    Box::new(assets).download(sender.clone()).await;
+    let downloader: Box<dyn Downloader<Data = DownloadResult>> =
+        instance.instance.into_downloader();
 
-    instance.download().await?;
+    let downloader = DownloadQueue::new()
+        .with_downloader(assets)
+        .with_downloader_dyn(downloader);
+
+    let _ = total_tx.send(downloader.len()).await;
+
+    Box::new(downloader).download(sender).await;
+
+    // instance.download().await?;
 
     let confgis = current.join(".nomi/configs");
 

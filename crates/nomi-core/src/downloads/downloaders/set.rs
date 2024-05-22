@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use tokio::{sync::mpsc::Sender, task::JoinSet};
 
 use crate::downloads::{
@@ -12,9 +14,19 @@ pub struct DownloadSet {
     set: Vec<Box<dyn Downloadable<Out = DownloadResult>>>,
 }
 
+impl Debug for DownloadSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DownloadSet").finish()
+    }
+}
+
 impl DownloadSet {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn from_vec_dyn(vec: Vec<Box<dyn Downloadable<Out = DownloadResult>>>) -> Self {
+        Self { set: vec }
     }
 
     pub fn add<D>(&mut self, downloader: Box<D>) -> &mut Self
@@ -29,6 +41,10 @@ impl DownloadSet {
 #[async_trait::async_trait]
 impl Downloader for DownloadSet {
     type Data = DownloadResult;
+
+    fn len(&self) -> u32 {
+        self.set.len() as u32
+    }
 
     async fn download(mut self: Box<Self>, channel: Sender<Self::Data>) {
         let mut set = JoinSet::new();
