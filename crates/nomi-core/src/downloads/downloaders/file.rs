@@ -23,6 +23,6 @@ impl Downloadable for FileDownloader {
     async fn download(self: Box<Self>) -> Self::Out {
         download_file(&self.path, &self.url)
             .await
-            .map(|_| DownloadStatus::Success)
+            .map(|()| DownloadStatus::Success)
     }
 }

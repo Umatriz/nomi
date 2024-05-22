@@ -33,7 +33,7 @@ impl<'de> Visitor<'de> for UsernameVisitor {
     {
         match Username::new(v) {
             Ok(u) => Ok(u),
-            Err(e) => Err(E::custom(format!("{:#?}", e))),
+            Err(e) => Err(E::custom(format!("{e:#?}"))),
         }
     }
 }
@@ -70,7 +70,8 @@ impl Username {
         }
     }
 
-    pub fn get(&self) -> &String {
+    #[must_use]
+    pub fn get(&self) -> &str {
         &self.0
     }
 }
@@ -95,6 +96,6 @@ mod tests {
     fn deserialize_test() {
         let s = "username = \"ssd\"";
         let toml = toml::from_str::<Wrap>(s).unwrap();
-        println!("{:#?}", toml);
+        println!("{toml:#?}");
     }
 }

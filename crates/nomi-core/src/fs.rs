@@ -9,7 +9,7 @@ where
 {
     let path = path.as_ref();
     let body = toml::to_string_pretty(data)?;
-    write_to_file(body.as_bytes(), path);
+    write_to_file(body.as_bytes(), path).await?;
 
     tracing::info!(
         "Config {} has been created successfully",

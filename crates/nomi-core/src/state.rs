@@ -3,16 +3,16 @@ use reqwest::{get, Client};
 use tokio::sync::OnceCell;
 
 use crate::repository::{
-    launcher_manifest::{LauncherManifest, LauncherManifestVersion},
+    launcher_manifest::{LauncherManifest, Version},
     manifest::Manifest,
 };
 
 // TODO: Write helper functions for quick access
 
 pub const LAUNCHER_MANIFEST: &str = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
-pub static LAUNCHER_MANIFEST_STATE: OnceCell<ManifestState> = OnceCell::const_new();
+pub static LAUNCHER_MANIFEST_STATE: OnceCell<LauncherManifest> = OnceCell::const_new();
 
-pub async fn get_launcher_manifest() -> anyhow::Result<LauncherManifest> {
+async fn get_launcher_manifest_internal() -> anyhow::Result<LauncherManifest> {
     tracing::debug!("Calling Launcher Manifest");
     Ok(Client::new()
         .get(LAUNCHER_MANIFEST)
@@ -22,27 +22,16 @@ pub async fn get_launcher_manifest() -> anyhow::Result<LauncherManifest> {
         .await?)
 }
 
-pub async fn get_launcher_manifest_state() -> anyhow::Result<&'static ManifestState> {
+pub async fn get_launcher_manifest() -> anyhow::Result<&'static LauncherManifest> {
     LAUNCHER_MANIFEST_STATE
-        .get_or_try_init(launcher_manifest_state_try_init)
+        .get_or_try_init(get_launcher_manifest_internal)
         .await
 }
 
-async fn launcher_manifest_state_try_init() -> anyhow::Result<ManifestState> {
-    Ok(ManifestState {
-        launcher: get_launcher_manifest().await?,
-    })
-}
-
-#[derive(Debug, Default)]
-pub struct ManifestState {
-    pub launcher: LauncherManifest,
-}
-
-impl ManifestState {
-    pub fn find_version(&self, version: impl Into<String>) -> Option<&LauncherManifestVersion> {
+impl LauncherManifest {
+    pub fn find_version(&self, version: impl Into<String>) -> Option<&Version> {
         let version = version.into();
-        self.launcher.versions.iter().find(|v| v.id == version)
+        self.versions.iter().find(|v| v.id == version)
     }
 
     pub async fn get_version_manifest(
@@ -54,7 +43,7 @@ impl ManifestState {
             .context("cannot find such version")?
             .url;
 
-        get(url).await?.json().await.map_err(|err| err.into())
+        get(url).await?.json().await.map_err(Into::into)
     }
 
     pub async fn get_version_manifest_content(

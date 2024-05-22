@@ -5,13 +5,13 @@ use serde::{Deserialize, Serialize};
 pub struct Manifest {
     #[serde(alias = "minecraftArguments")]
     pub arguments: Arguments,
-    pub asset_index: ManifestAssetIndex,
+    pub asset_index: AssetIndex,
     pub assets: String,
     pub compliance_level: i8,
-    pub downloads: ManifestDownloads,
+    pub downloads: Downloads,
     pub id: String,
-    pub java_version: ManifestJavaVersion,
-    pub libraries: Vec<ManifestLibrary>,
+    pub java_version: JavaVersion,
+    pub libraries: Vec<Library>,
     pub main_class: String,
     pub minimum_launcher_version: i8,
     pub release_time: String,
@@ -82,7 +82,7 @@ pub struct Os {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ManifestAssetIndex {
+pub struct AssetIndex {
     pub id: String,
     pub sha1: String,
     pub size: i32,
@@ -91,16 +91,16 @@ pub struct ManifestAssetIndex {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct ManifestDownloads {
-    pub client: ManifestFile,
-    pub client_mappings: Option<ManifestFile>,
-    pub server: Option<ManifestFile>,
-    pub server_mappings: Option<ManifestFile>,
+pub struct Downloads {
+    pub client: DownloadFile,
+    pub client_mappings: Option<DownloadFile>,
+    pub server: Option<DownloadFile>,
+    pub server_mappings: Option<DownloadFile>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ManifestFile {
+pub struct DownloadFile {
     pub path: Option<String>,
     pub sha1: String,
     pub size: i32,
@@ -109,15 +109,15 @@ pub struct ManifestFile {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ManifestJavaVersion {
+pub struct JavaVersion {
     pub component: String,
     pub major_version: i8,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ManifestLibrary {
-    pub downloads: ManifestLibraryDownloads,
+pub struct Library {
+    pub downloads: LibraryDownloads,
     pub name: String,
     // pub natives: Option<ManifestNatives>,
     pub rules: Option<Vec<Rule>>,
@@ -125,17 +125,17 @@ pub struct ManifestLibrary {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct ManifestLibraryDownloads {
-    pub artifact: Option<ManifestFile>,
-    pub classifiers: Option<ManifestClassifiers>,
+pub struct LibraryDownloads {
+    pub artifact: Option<DownloadFile>,
+    pub classifiers: Option<Classifiers>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "kebab-case")]
-pub struct ManifestClassifiers {
-    pub natives_macos: Option<ManifestFile>,
-    pub natives_windows: Option<ManifestFile>,
-    pub natives_linux: Option<ManifestFile>,
+pub struct Classifiers {
+    pub natives_macos: Option<DownloadFile>,
+    pub natives_windows: Option<DownloadFile>,
+    pub natives_linux: Option<DownloadFile>,
 }
 
 #[cfg(test)]
@@ -148,12 +148,12 @@ mod tests {
     #[tokio::test]
     async fn old_version_test() {
         let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/d546f1707a3f2b7d034eece5ea2e311eda875787/1.8.9.json").await.unwrap().json().await.unwrap();
-        println!("{:#?}", manifest.arguments)
+        println!("{:#?}", manifest.arguments);
     }
 
     #[tokio::test]
     async fn deserialize_test() {
         let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/334b33fcba3c9be4b7514624c965256535bd7eba/1.18.2.json").await.unwrap().json().await.unwrap();
-        println!("{:#?}", manifest.libraries[29])
+        println!("{:#?}", manifest.libraries[29]);
     }
 }

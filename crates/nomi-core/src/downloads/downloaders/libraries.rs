@@ -17,7 +17,7 @@ pub struct LibrariesDownloader {
 }
 
 impl LibrariesDownloader {
-    pub fn new<M, L>(mapper: M, libraries: &[L]) -> Self
+    pub fn new<M, L>(mapper: &M, libraries: &[L]) -> Self
     where
         M: LibrariesMapper<L>,
     {
@@ -38,7 +38,7 @@ impl Downloader for LibrariesDownloader {
         let mut download_set = DownloadSet::new();
 
         for downloader in self.downloads {
-            download_set.add(Box::new(downloader)).await;
+            download_set.add(Box::new(downloader));
         }
 
         Box::new(download_set).download(channel).await;

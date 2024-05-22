@@ -9,7 +9,7 @@ pub mod version_marker;
 use crate::{
     downloads::{downloaders::assets::AssetsDownloader, traits::DownloadResult},
     game_paths::GamePaths,
-    state::get_launcher_manifest_state,
+    state::get_launcher_manifest,
 };
 
 use self::{
@@ -50,7 +50,7 @@ impl Instance {
     }
 
     pub async fn assets(&self) -> anyhow::Result<AssetsDownloader> {
-        let manifest = get_launcher_manifest_state().await?;
+        let manifest = get_launcher_manifest().await?;
         let version_manifest = manifest.get_version_manifest(&self.version).await?;
 
         AssetsDownloader::new(
@@ -62,6 +62,7 @@ impl Instance {
         .await
     }
 
+    #[must_use]
     pub fn launch_instance(
         &self,
         settings: LaunchSettings,

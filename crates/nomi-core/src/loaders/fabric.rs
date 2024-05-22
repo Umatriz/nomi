@@ -18,7 +18,7 @@ use crate::{
         fabric_meta::FabricVersions,
         fabric_profile::{FabricLibrary, FabricProfile},
     },
-    state::get_launcher_manifest_state,
+    state::get_launcher_manifest,
 };
 
 #[derive(Debug)]
@@ -37,10 +37,9 @@ impl Fabric {
         let game_version = game_version.into();
 
         let client = Client::new();
-        let launcher_manifest = get_launcher_manifest_state().await?;
+        let launcher_manifest = get_launcher_manifest().await?;
 
         if !launcher_manifest
-            .launcher
             .versions
             .iter()
             .any(|v| v.id == game_version)
@@ -50,8 +49,7 @@ impl Fabric {
 
         let versions: FabricVersions = client
             .get(format!(
-                "https://meta.fabricmc.net/v2/versions/loader/{}",
-                game_version
+                "https://meta.fabricmc.net/v2/versions/loader/{game_version}"
             ))
             .send()
             .await?
@@ -59,7 +57,7 @@ impl Fabric {
             .await?;
 
         let profile_version = loader_version
-            .map(|s| s.into())
+            .map(Into::into)
             .and_then(|loader| versions.iter().find(|i| i.loader.version == loader))
             .unwrap_or_else(|| &versions[0]);
 
@@ -74,13 +72,14 @@ impl Fabric {
             .await?;
 
         Ok(Self {
-            profile,
             game_version,
+            profile,
             game_paths,
         })
     }
 }
 
+#[allow(clippy::module_name_repetitions)]
 pub struct FabricIO<'a> {
     profile: &'a FabricProfile,
     version_path: &'a Path,
@@ -97,7 +96,7 @@ impl<'a> DownloaderIO for FabricIO<'a> {
     }
 }
 
-pub struct FabricLibrariesMapper {
+struct FabricLibrariesMapper {
     libraries: PathBuf,
 }
 
@@ -122,7 +121,7 @@ impl Downloader for Fabric {
             libraries: self.game_paths.libraries.clone(),
         };
 
-        Box::new(LibrariesDownloader::new(mapper, &self.profile.libraries))
+        Box::new(LibrariesDownloader::new(&mapper, &self.profile.libraries))
             .download(channel)
             .await;
     }

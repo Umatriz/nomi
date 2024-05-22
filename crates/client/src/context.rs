@@ -1,10 +1,10 @@
 use crate::{
-    client_settings::{self, default_pixels_per_point_value, ClientSettings},
+    client_settings::{default_pixels_per_point_value, ClientSettings},
     download::spawn_download,
     utils::{spawn_future, spawn_tokio_future, Crash},
     Loader,
 };
-use eframe::egui::{self, Color32, Ui};
+use eframe::egui::{self, Ui};
 use egui_tracing::EventCollector;
 use nomi_core::{
     configs::{
@@ -13,10 +13,8 @@ use nomi_core::{
     },
     downloads::traits::DownloadResult,
     fs::{read_toml_config_sync, write_toml_config_sync},
-    repository::{
-        java_runner::JavaRunner, launcher_manifest::LauncherManifestVersion, username::Username,
-    },
-    state::get_launcher_manifest_state,
+    repository::{java_runner::JavaRunner, launcher_manifest::Version, username::Username},
+    state::get_launcher_manifest,
 };
 use rfd::AsyncFileDialog;
 use std::{
@@ -41,7 +39,7 @@ pub struct AppContext {
     settings: Settings,
     client_settings: ClientSettings,
     // version_manifest: Option<&'static ManifestState>,
-    release_versions: Option<Vec<&'static LauncherManifestVersion>>,
+    release_versions: Option<Vec<&'static Version>>,
 
     profile_name_buf: String,
     selected_version_buf: usize,
@@ -70,7 +68,7 @@ impl AppContext {
         let settings_res = read_toml_config_sync::<Settings>("./.nomi/configs/User.toml");
         let settings = settings_res.unwrap_or_default();
 
-        let state = pollster::block_on(get_launcher_manifest_state());
+        let state = pollster::block_on(get_launcher_manifest());
 
         let (download_progress_tx, download_progress_rx) = tokio::sync::mpsc::channel(500);
 
@@ -82,8 +80,7 @@ impl AppContext {
             download_progress: 0,
             release_versions: match state {
                 Ok(data) => Some(
-                    data.launcher
-                        .versions
+                    data.versions
                         .iter()
                         .filter(|i| i.version_type == *"release")
                         .collect::<Vec<_>>(),

@@ -16,7 +16,7 @@ use crate::{
     },
     fs::write_to_file,
     game_paths::GamePaths,
-    repository::manifest::{Manifest, ManifestClassifiers, ManifestFile, ManifestLibrary},
+    repository::manifest::{Classifiers, DownloadFile, Library, Manifest},
     state::get_launcher_manifest,
 };
 
@@ -53,7 +53,7 @@ impl Vanilla {
 }
 
 fn manifest_file_to_downloader(
-    manifest_file: &ManifestFile,
+    manifest_file: &DownloadFile,
     target_path: &Path,
 ) -> Option<FileDownloader> {
     manifest_file
@@ -65,12 +65,12 @@ fn manifest_file_to_downloader(
         .map(|(url, path)| FileDownloader::new(url, path))
 }
 
-pub struct VanillaLibrariesMapper<'a> {
+struct VanillaLibrariesMapper<'a> {
     path: &'a Path,
 }
 
-impl LibrariesMapper<ManifestLibrary> for VanillaLibrariesMapper<'_> {
-    fn proceed(&self, library: &ManifestLibrary) -> Option<FileDownloader> {
+impl LibrariesMapper<Library> for VanillaLibrariesMapper<'_> {
+    fn proceed(&self, library: &Library) -> Option<FileDownloader> {
         library
             .downloads
             .artifact
@@ -79,13 +79,13 @@ impl LibrariesMapper<ManifestLibrary> for VanillaLibrariesMapper<'_> {
     }
 }
 
-pub struct VanillaNativeLibrariesMapper<'a> {
+struct VanillaNativeLibrariesMapper<'a> {
     path: &'a Path,
 }
 
-impl LibrariesMapper<ManifestLibrary> for VanillaNativeLibrariesMapper<'_> {
-    fn proceed(&self, library: &ManifestLibrary) -> Option<FileDownloader> {
-        fn match_natives(natives: &ManifestClassifiers) -> Option<&ManifestFile> {
+impl LibrariesMapper<Library> for VanillaNativeLibrariesMapper<'_> {
+    fn proceed(&self, library: &Library) -> Option<FileDownloader> {
+        fn match_natives(natives: &Classifiers) -> Option<&DownloadFile> {
             match std::env::consts::OS {
                 "linux" => natives.natives_linux.as_ref(),
                 "windows" => natives.natives_windows.as_ref(),
@@ -103,6 +103,7 @@ impl LibrariesMapper<ManifestLibrary> for VanillaNativeLibrariesMapper<'_> {
     }
 }
 
+#[allow(clippy::module_name_repetitions)]
 pub struct VanillaIO<'a> {
     manifest: &'a Manifest,
     version_path: &'a Path,
@@ -134,11 +135,11 @@ impl Downloader for Vanilla {
 
         let queue = DownloadQueue::new()
             .with_downloader(LibrariesDownloader::new(
-                libraries_mapper,
+                &libraries_mapper,
                 &self.manifest.libraries,
             ))
             .with_downloader(LibrariesDownloader::new(
-                native_libraries_mapper,
+                &native_libraries_mapper,
                 &self.manifest.libraries,
             ))
             .with_downloader(FileDownloader::new(

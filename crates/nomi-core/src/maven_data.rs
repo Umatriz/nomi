@@ -10,6 +10,7 @@ pub struct MavenData {
 }
 
 impl MavenData {
+    #[must_use]
     pub fn new(artifact: &str) -> Self {
         let mut chunks = artifact.split(':').map(|i| vec![i]).collect_vec();
         let group = chunks[0][0];
@@ -44,7 +45,7 @@ mod tests {
         let artifact = "net.fabricmc:fabric-loader:0.14.22";
 
         let maven = MavenData::new(artifact);
-        println!("{:#?}", maven);
+        println!("{maven:#?}");
     }
 
     #[tokio::test]

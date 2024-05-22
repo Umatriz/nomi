@@ -5,12 +5,14 @@ use serde::{Deserialize, Serialize};
 use crate::utils::path_to_string;
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[must_use]
 pub enum JavaRunner {
     String(String),
     Path(PathBuf),
 }
 
 impl JavaRunner {
+    #[must_use]
     pub fn get(&self) -> &dyn AsRef<OsStr> {
         match self {
             JavaRunner::String(s) => s,
@@ -18,6 +20,7 @@ impl JavaRunner {
         }
     }
 
+    #[must_use]
     pub fn get_string(&self) -> String {
         match self {
             JavaRunner::String(s) => s.to_string(),

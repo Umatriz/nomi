@@ -17,7 +17,7 @@ impl DownloadSet {
         Self::default()
     }
 
-    pub async fn add<D>(&mut self, downloader: Box<D>) -> &mut Self
+    pub fn add<D>(&mut self, downloader: Box<D>) -> &mut Self
     where
         D: Downloadable<Out = DownloadResult> + 'static,
     {

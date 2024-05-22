@@ -1,7 +1,7 @@
 use std::{
     fs::{File, OpenOptions},
     io,
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use serde::{Deserialize, Serialize};
@@ -12,7 +12,7 @@ use crate::{
     fs::read_json_config,
     repository::{
         java_runner::JavaRunner,
-        manifest::{Manifest, ManifestLibrary},
+        manifest::{Library, Manifest},
         username::Username,
     },
 };
@@ -20,7 +20,7 @@ use rules::is_all_rules_satisfied;
 
 use self::arguments::ArgumentsBuilder;
 
-use super::{profile::LoaderProfile, Undefined};
+use super::{profile::Loader, Undefined};
 
 pub mod arguments;
 pub mod rules;
@@ -55,7 +55,7 @@ pub struct LaunchSettings {
     pub version_type: String,
 }
 
-pub fn should_use_library(lib: &ManifestLibrary) -> bool {
+pub fn should_use_library(lib: &Library) -> bool {
     match lib.rules.as_ref() {
         Some(rules) => dbg!(is_all_rules_satisfied(rules)),
         None => true,
@@ -66,20 +66,20 @@ pub fn should_use_library(lib: &ManifestLibrary) -> bool {
 pub struct LaunchInstance {
     pub settings: LaunchSettings,
     jvm_args: Option<Vec<String>>,
-    loader_profile: Option<LoaderProfile>,
+    loader_profile: Option<Loader>,
 }
 
 impl LaunchInstance {
     pub fn set_username(&mut self, username: Username) {
-        self.settings.username = username
+        self.settings.username = username;
     }
 
     pub fn set_access_token(&mut self, access_token: Option<String>) {
-        self.settings.access_token = access_token
+        self.settings.access_token = access_token;
     }
 
     pub fn set_uuid(&mut self, uuid: Option<String>) {
-        self.settings.uuid = uuid
+        self.settings.uuid = uuid;
     }
 
     fn process_natives(&self, natives: &[PathBuf]) -> anyhow::Result<()> {
@@ -97,7 +97,15 @@ impl LaunchInstance {
 
             names
                 .into_iter()
-                .filter(|l| l.ends_with(".dll") || l.ends_with(".so") || l.ends_with(".dylib"))
+                .filter(|l| {
+                    let path = Path::new(l).extension();
+
+                    let check = |expected_ext| {
+                        path.map_or(false, |ext| ext.eq_ignore_ascii_case(expected_ext))
+                    };
+
+                    check("dll") || check("so") || check("dylib")
+                })
                 .try_for_each(|lib| {
                     let mut file = archive.by_name(&lib)?;
                     let mut out = File::create(self.settings.natives_dir.join(lib))?;
@@ -163,10 +171,12 @@ pub mod macros {
 }
 
 #[derive(Default)]
+#[must_use]
+#[allow(clippy::module_name_repetitions)]
 pub struct LaunchInstanceBuilder<S> {
     settings: S,
     jvm_args: Option<Vec<String>>,
-    profile: Option<LoaderProfile>,
+    profile: Option<Loader>,
 }
 
 impl LaunchInstanceBuilder<Undefined> {
@@ -186,7 +196,7 @@ impl LaunchInstanceBuilder<Undefined> {
 }
 
 impl<S> LaunchInstanceBuilder<S> {
-    pub fn profile(self, profile: LoaderProfile) -> LaunchInstanceBuilder<S> {
+    pub fn profile(self, profile: Loader) -> LaunchInstanceBuilder<S> {
         LaunchInstanceBuilder {
             settings: self.settings,
             jvm_args: self.jvm_args,
@@ -206,6 +216,7 @@ impl<S> LaunchInstanceBuilder<S> {
 }
 
 impl LaunchInstanceBuilder<LaunchSettings> {
+    #[must_use]
     pub fn build(self) -> LaunchInstance {
         LaunchInstance {
             settings: self.settings,

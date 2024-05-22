@@ -12,6 +12,7 @@ impl DownloadQueue {
         Self::default()
     }
 
+    #[must_use]
     pub fn with_downloader<D>(mut self, downloader: D) -> Self
     where
         D: Downloader<Data = DownloadResult> + 'static,

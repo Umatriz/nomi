@@ -9,7 +9,7 @@ const PORTABLE_URL: &str = "https://download.oracle.com/java/17/latest/jdk-17_wi
 const JDK_17_0_7_PORTABLE_SHA256: &str =
     "98385c1fd4db7ad3fd7ca2f33a1fadae0b15486cfde699138d47002d7068084a";
 
-async fn check_hash(path: PathBuf, hash: &str) -> anyhow::Result<()> {
+fn check_hash(path: PathBuf, hash: &str) -> anyhow::Result<()> {
     let sha = sha256::try_digest(path)?;
 
     if sha != hash {
@@ -29,8 +29,7 @@ pub async fn download_java(temporary_dir_path: &Path, java_dir_path: &Path) -> a
     check_hash(
         temporary_dir_path.join(archive_filename),
         JDK_17_0_7_PORTABLE_SHA256,
-    )
-    .await?;
+    )?;
 
     let archive = std::fs::File::open(temporary_dir_path.join(archive_filename))?;
 

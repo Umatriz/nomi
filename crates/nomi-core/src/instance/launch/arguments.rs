@@ -3,11 +3,9 @@ use std::{marker::PhantomData, path::PathBuf};
 use crate::{
     instance::{
         launch::{macros::replace, LAUNCHER_NAME, LAUNCHER_VERSION},
-        profile::LoaderProfile,
+        profile::Loader,
     },
-    repository::manifest::{
-        Argument, Arguments, Manifest, ManifestClassifiers, ManifestFile, Value,
-    },
+    repository::manifest::{Argument, Arguments, Classifiers, DownloadFile, Manifest, Value},
     utils::path_to_string,
 };
 
@@ -28,7 +26,7 @@ pub struct ArgumentsBuilder<'a, S = Undefined> {
 struct JvmArguments(Vec<Argument>);
 struct GameArguments(Vec<Argument>);
 
-pub struct LoaderArguments<'a>(Option<&'a LoaderProfile>);
+pub struct LoaderArguments<'a>(Option<&'a Loader>);
 
 impl<'a> LoaderArguments<'a> {
     pub fn jvm_arguments(&self) -> &[String] {
@@ -193,14 +191,14 @@ impl<'a, S> ArgumentsBuilder<'a, S> {
         let mut path = path.to_string();
 
         if cfg!(target_os = "windows") {
-            path = path.replace('/', "\\")
+            path = path.replace('/', "\\");
         };
 
         self.instance.settings.libraries_dir.join(path)
     }
 
     fn classpath(&self) -> (String, Vec<PathBuf>) {
-        fn match_natives(natives: &ManifestClassifiers) -> Option<&ManifestFile> {
+        fn match_natives(natives: &Classifiers) -> Option<&DownloadFile> {
             match std::env::consts::OS {
                 "linux" => natives.natives_linux.as_ref(),
                 "windows" => natives.natives_windows.as_ref(),

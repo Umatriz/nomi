@@ -9,12 +9,11 @@ pub struct VersionProfilesConfig {
 }
 
 impl VersionProfilesConfig {
-    /// creates new `VersionProfile` and pushes it to the `profiles` field
     pub fn add_profile(&mut self, profile: VersionProfile) {
-        self.profiles.push(profile)
+        self.profiles.push(profile);
     }
 
-    /// create id for profile
+    /// Create an id for the profile
     /// depends on the last id in the vector
     pub fn create_id(&self) -> i32 {
         match &self.profiles.iter().max_by_key(|x| x.id) {
@@ -61,7 +60,7 @@ mod tests {
     async fn write_test() {
         let mut mock = VersionProfilesConfig { profiles: vec![] };
 
-        let (tx, rx) = tokio::sync::mpsc::channel(100);
+        let (tx, _rx) = tokio::sync::mpsc::channel(100);
 
         let game_paths = GamePaths {
             game: "./minecraft".into(),

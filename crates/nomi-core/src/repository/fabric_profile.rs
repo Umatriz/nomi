@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::{instance::profile::LoaderProfile, maven_data::MavenData};
+use crate::{instance::profile::Loader, maven_data::MavenData};
 
 use super::{simple_args::SimpleArgs, simple_lib::SimpleLib};
 
@@ -19,9 +19,9 @@ pub struct FabricProfile {
     pub libraries: Vec<FabricLibrary>,
 }
 
-impl From<FabricProfile> for LoaderProfile {
+impl From<FabricProfile> for Loader {
     fn from(val: FabricProfile) -> Self {
-        LoaderProfile {
+        Loader {
             name: val.id,
             main_class: val.main_class,
             args: SimpleArgs::from(val.arguments),

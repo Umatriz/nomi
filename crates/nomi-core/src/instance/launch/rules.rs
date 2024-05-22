@@ -27,7 +27,7 @@ pub fn is_rule_passes(rule: &Rule) -> bool {
 }
 
 pub fn is_all_rules_satisfied(rules: &[Rule]) -> bool {
-    for rule in rules.iter() {
+    for rule in rules {
         let satisfied = is_rule_passes(rule);
         let use_lib = matches!(rule.action, Action::Allow);
 

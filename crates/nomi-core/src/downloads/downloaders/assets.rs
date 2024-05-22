@@ -84,7 +84,7 @@ impl Downloader for AssetsDownloader {
             .iter()
             .collect_vec()
             .chunks(100)
-            .map(|c| c.iter().map(|(_, v)| v).cloned().collect())
+            .map(|c| c.iter().map(|(_, v)| v).copied().collect())
             .collect::<Vec<Vec<_>>>();
 
         for chunk in &assets_chunks {
@@ -103,37 +103,12 @@ impl Downloader for AssetsDownloader {
                     asset.hash
                 );
 
-                download_set
-                    .add(Box::new(FileDownloader::new(url, path)))
-                    .await;
+                download_set.add(Box::new(FileDownloader::new(url, path)));
             }
 
             Box::new(download_set).download(channel.clone()).await;
 
             info!("Assets chunk downloaded");
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::downloads::queue::DownloadQueue;
-
-    use super::*;
-
-    #[tokio::test]
-    async fn assets_test() {
-        let assets_downloader = AssetsDownloader::new(
-            "url".into(),
-            "id".into(),
-            "objects".into(),
-            "indexes".into(),
-        )
-        .await
-        .unwrap();
-
-        let io = assets_downloader.get_io();
-
-        let set = DownloadQueue::new().with_downloader(assets_downloader);
     }
 }
