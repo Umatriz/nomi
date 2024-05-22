@@ -10,13 +10,8 @@ use tracing::info;
 
 use crate::{
     fs::read_json_config,
-    repository::{
-        java_runner::JavaRunner,
-        manifest::{Library, Manifest},
-        username::Username,
-    },
+    repository::{java_runner::JavaRunner, manifest::Manifest, username::Username},
 };
-use rules::is_all_rules_satisfied;
 
 use self::arguments::ArgumentsBuilder;
 
@@ -53,13 +48,6 @@ pub struct LaunchSettings {
 
     pub version: String,
     pub version_type: String,
-}
-
-pub fn should_use_library(lib: &Library) -> bool {
-    match lib.rules.as_ref() {
-        Some(rules) => dbg!(is_all_rules_satisfied(rules)),
-        None => true,
-    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]

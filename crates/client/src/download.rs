@@ -2,7 +2,7 @@ use std::sync::mpsc::Sender;
 
 use nomi_core::{
     configs::profile::{VersionProfile, VersionProfileBuilder, VersionProfilesConfig},
-    downloads::traits::{DownloadResult, Downloader},
+    downloads::traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
     fs::{read_toml_config, write_toml_config},
     game_paths::GamePaths,
     instance::{launch::LaunchSettings, InstanceBuilder},
@@ -88,9 +88,11 @@ async fn try_download(
         Some(vec!["-Xms2G".to_string(), "-Xmx4G".to_string()]),
     );
 
-    Box::new(instance.assets().await?)
-        .download(sender.clone())
-        .await;
+    let assets = instance.assets().await?;
+
+    assets.get_io().io().await?;
+
+    Box::new(assets).download(sender.clone()).await;
 
     instance.download().await?;
 

@@ -2,14 +2,14 @@ use std::{marker::PhantomData, path::PathBuf};
 
 use crate::{
     instance::{
-        launch::{macros::replace, LAUNCHER_NAME, LAUNCHER_VERSION},
+        launch::{macros::replace, rules::is_library_passes, LAUNCHER_NAME, LAUNCHER_VERSION},
         profile::Loader,
     },
     repository::manifest::{Argument, Arguments, Classifiers, DownloadFile, Manifest, Value},
     utils::path_to_string,
 };
 
-use super::{rules::is_rule_passes, should_use_library, LaunchInstance, CLASSPATH_SEPARATOR};
+use super::{rules::is_rule_passes, LaunchInstance, CLASSPATH_SEPARATOR};
 
 pub enum Undefined {}
 pub enum Defined {}
@@ -145,7 +145,7 @@ impl<'a> ArgumentsBuilder<'a, Defined> {
             "${version_name}" => &self.instance.settings.version,
             "${assets_index_name}" => &self.manifest.asset_index.id,
             "${user_properties}" => "{}",
-            "${classpath}" => &self.classpath
+            "${classpath}" => dbg!(&self.classpath)
         )
     }
 
@@ -187,16 +187,6 @@ impl<'a> ArgumentsBuilder<'a, Defined> {
 }
 
 impl<'a, S> ArgumentsBuilder<'a, S> {
-    fn construct_lib_path(&self, path: &str) -> PathBuf {
-        let mut path = path.to_string();
-
-        if cfg!(target_os = "windows") {
-            path = path.replace('/', "\\");
-        };
-
-        self.instance.settings.libraries_dir.join(path)
-    }
-
     fn classpath(&self) -> (String, Vec<PathBuf>) {
         fn match_natives(natives: &Classifiers) -> Option<&DownloadFile> {
             match std::env::consts::OS {
@@ -213,20 +203,20 @@ impl<'a, S> ArgumentsBuilder<'a, S> {
         self.manifest
             .libraries
             .iter()
-            .filter(|lib| should_use_library(lib))
+            .filter(|lib| is_library_passes(lib))
             .map(|lib| {
                 (
                     lib.downloads
                         .artifact
                         .as_ref()
                         .and_then(|artifact| artifact.path.as_ref())
-                        .map(|path| self.construct_lib_path(path)),
+                        .map(|path| self.instance.settings.libraries_dir.join(path)),
                     lib.downloads
                         .classifiers
                         .as_ref()
                         .and_then(|natives| match_natives(natives))
                         .and_then(|native_lib| native_lib.path.as_ref())
-                        .map(|path| self.construct_lib_path(path)),
+                        .map(|path| self.instance.settings.libraries_dir.join(path)),
                 )
             })
             .for_each(|(lib, native)| {

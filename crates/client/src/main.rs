@@ -12,10 +12,10 @@ use tracing_subscriber::{
 };
 use utils::Crash;
 
+pub mod client_settings;
 pub mod context;
 pub mod download;
 pub mod utils;
-pub mod client_settings;
 
 fn main() {
     let collector = egui_tracing::EventCollector::default().with_level(Level::INFO);
@@ -31,7 +31,7 @@ fn main() {
     let mut stdout_sub = Layer::new()
         .with_writer(std::io::stdout.with_max_level(Level::INFO))
         .pretty();
-    stdout_sub.set_ansi(false);
+    // stdout_sub.set_ansi(false);
 
     let subscriber = tracing_subscriber::registry()
         .with(collector.clone())
@@ -94,7 +94,6 @@ impl AppTabs {
 
 impl eframe::App for AppTabs {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        
         egui::TopBottomPanel::top("top_nav_bar").show(ctx, |ui| {
             ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
                 // ui.selectable_value(&mut self.current, Page::Main, "Main");

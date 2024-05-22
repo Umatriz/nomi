@@ -31,14 +31,6 @@ pub struct Instance {
 
 impl Instance {
     pub async fn download(self) -> anyhow::Result<()> {
-        // self.instance
-        //     .download(&self.game_paths.version, &self.version)
-        //     .await?;
-        // self.instance
-        //     .download_libraries(&self.game_paths.libraries)
-        //     .await?;
-        // self.instance.create_json(&self.game_paths.version).await?;
-
         {
             let io = self.instance.get_io_dyn();
             io.io().await?;

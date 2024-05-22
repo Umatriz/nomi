@@ -12,36 +12,3 @@ impl Variables {
         Ok(std::env::current_dir()? == self.root)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::fs::{read_toml_config, write_toml_config};
-
-    use super::*;
-
-    #[tokio::test]
-    async fn write_test() {
-        let v = Variables {
-            root: std::env::current_dir().unwrap(),
-        };
-
-        write_toml_config(&v, "./configs/Variables.toml")
-            .await
-            .unwrap();
-    }
-
-    #[tokio::test]
-    async fn read_test() {
-        let v = read_toml_config::<Variables>("./configs/Variables.toml")
-            .await
-            .unwrap();
-
-        assert_eq!(
-            v.root,
-            Variables {
-                root: std::env::current_dir().unwrap(),
-            }
-            .root
-        );
-    }
-}

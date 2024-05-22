@@ -1,6 +1,6 @@
 use std::env;
 
-use crate::repository::manifest::{Action, Rule, RuleKind};
+use crate::repository::manifest::{Action, Library, Rule, RuleKind};
 
 pub fn is_rule_passes(rule: &Rule) -> bool {
     match rule.action {
@@ -26,7 +26,7 @@ pub fn is_rule_passes(rule: &Rule) -> bool {
     }
 }
 
-pub fn is_all_rules_satisfied(rules: &[Rule]) -> bool {
+pub fn is_all_rules_passed(rules: &[Rule]) -> bool {
     for rule in rules {
         let satisfied = is_rule_passes(rule);
         let use_lib = matches!(rule.action, Action::Allow);
@@ -37,4 +37,11 @@ pub fn is_all_rules_satisfied(rules: &[Rule]) -> bool {
     }
 
     true
+}
+
+pub fn is_library_passes(lib: &Library) -> bool {
+    match lib.rules.as_ref() {
+        Some(rules) => dbg!(is_all_rules_passed(rules)),
+        None => true,
+    }
 }
