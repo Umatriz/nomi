@@ -124,8 +124,8 @@ impl LibrariesMapper<FabricLibrary> for FabricLibrariesMapper {
 impl Downloader for Fabric {
     type Data = DownloadResult;
 
-    fn len(&self) -> u32 {
-        self.libraries_downloader.len()
+    fn total(&self) -> u32 {
+        self.libraries_downloader.total()
     }
 
     async fn download(self: Box<Self>, channel: Sender<Self::Data>) {

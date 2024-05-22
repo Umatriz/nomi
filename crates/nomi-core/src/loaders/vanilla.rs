@@ -148,8 +148,8 @@ impl DownloaderIO for VanillaIO<'_> {
 impl Downloader for Vanilla {
     type Data = DownloadResult;
 
-    fn len(&self) -> u32 {
-        self.queue.len()
+    fn total(&self) -> u32 {
+        self.queue.total()
     }
 
     async fn download(self: Box<Self>, channel: Sender<Self::Data>) {

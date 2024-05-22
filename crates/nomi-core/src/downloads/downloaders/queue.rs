@@ -57,8 +57,8 @@ impl DownloadQueue {
 impl Downloader for DownloadQueue {
     type Data = DownloadResult;
 
-    fn len(&self) -> u32 {
-        self.queue.iter().map(|downloader| downloader.len()).sum()
+    fn total(&self) -> u32 {
+        self.queue.iter().map(|downloader| downloader.total()).sum()
     }
 
     async fn download(self: Box<Self>, channel: Sender<Self::Data>) {

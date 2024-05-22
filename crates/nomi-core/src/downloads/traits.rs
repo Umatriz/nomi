@@ -33,7 +33,7 @@ pub trait Downloader: Send + Sync {
     type Data;
 
     /// Returns the number of items to download
-    fn len(&self) -> u32;
+    fn total(&self) -> u32;
     async fn download(self: Box<Self>, channel: Sender<Self::Data>);
 }
 
@@ -46,7 +46,7 @@ where
 {
     type Data = T::Out;
 
-    fn len(&self) -> u32 {
+    fn total(&self) -> u32 {
         1
     }
 

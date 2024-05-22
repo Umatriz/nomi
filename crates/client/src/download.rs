@@ -1,4 +1,4 @@
-use std::sync::{atomic::AtomicU32, mpsc::Sender, Arc};
+use std::sync::mpsc::Sender;
 
 use nomi_core::{
     configs::profile::{VersionProfile, VersionProfileBuilder, VersionProfilesConfig},
@@ -104,7 +104,7 @@ async fn try_download(
         .with_downloader(assets)
         .with_downloader_dyn(downloader);
 
-    let _ = total_tx.send(downloader.len()).await;
+    let _ = total_tx.send(downloader.total()).await;
 
     Box::new(downloader).download(sender).await;
 

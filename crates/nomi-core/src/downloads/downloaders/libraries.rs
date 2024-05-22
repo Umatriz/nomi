@@ -35,7 +35,7 @@ impl LibrariesDownloader {
 impl Downloader for LibrariesDownloader {
     type Data = DownloadResult;
 
-    fn len(&self) -> u32 {
+    fn total(&self) -> u32 {
         self.downloads.len() as u32
     }
 

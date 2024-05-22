@@ -42,7 +42,7 @@ impl DownloadSet {
 impl Downloader for DownloadSet {
     type Data = DownloadResult;
 
-    fn len(&self) -> u32 {
+    fn total(&self) -> u32 {
         self.set.len() as u32
     }
 

@@ -28,7 +28,7 @@ fn main() {
         .compact();
     file_sub.set_ansi(false);
 
-    let mut stdout_sub = Layer::new()
+    let stdout_sub = Layer::new()
         .with_writer(std::io::stdout.with_max_level(Level::INFO))
         .pretty();
     // stdout_sub.set_ansi(false);
