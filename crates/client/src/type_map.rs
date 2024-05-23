@@ -8,6 +8,12 @@ pub struct TypeMap {
 }
 
 impl TypeMap {
+    pub fn new() -> Self {
+        Self {
+            inner: HashMap::new(),
+        }
+    }
+
     pub fn with<T: Any>(mut self, value: T) -> Self {
         self.inner.insert(TypeId::of::<T>(), Box::new(value));
         self

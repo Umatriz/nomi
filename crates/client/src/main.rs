@@ -1,8 +1,10 @@
+use components::{profiles::ProfilesPage, Component, StorageCreationExt};
 use context::AppContext;
 use eframe::{
-    egui::{self, ScrollArea, ViewportBuilder},
+    egui::{self, Frame, ScrollArea, ViewportBuilder},
     epaint::Vec2,
 };
+use egui_dock::{DockArea, DockState, Style, TabViewer};
 use egui_tracing::EventCollector;
 use std::fmt::Display;
 use tracing::Level;
@@ -10,9 +12,11 @@ use tracing_subscriber::{
     fmt::{writer::MakeWriterExt, Layer},
     prelude::__tracing_subscriber_SubscriberExt,
 };
+use type_map::TypeMap;
 use utils::Crash;
 
 pub mod client_settings;
+pub mod components;
 pub mod context;
 pub mod download;
 pub mod type_map;
@@ -59,10 +63,89 @@ fn main() {
             viewport: ViewportBuilder::default().with_inner_size(Vec2::new(1280.0, 720.0)),
             ..Default::default()
         },
-        Box::new(|_cc| Box::new(AppTabs::new(collector))),
+        Box::new(|_cc| Box::new(MyTabs::new())),
     );
 
     println!("T");
+}
+
+#[derive(Clone)]
+enum Tab {
+    Profiles,
+    Settings,
+}
+
+pub type Storage = TypeMap;
+
+struct MyContext {
+    storage: Storage,
+}
+
+impl MyContext {
+    pub fn new() -> Self {
+        let mut storage = Storage::new();
+
+        // TODO: handle errors properly
+        ProfilesPage::extend(&mut storage).unwrap();
+
+        Self { storage }
+    }
+}
+
+impl TabViewer for MyContext {
+    type Tab = Tab;
+
+    fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
+        match tab {
+            Tab::Profiles => "Profiles".into(),
+            Tab::Settings => "Settings".into(),
+        }
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
+        match tab {
+            Tab::Profiles => ProfilesPage.ui(ui, &mut self.storage),
+            Tab::Settings => {
+                ui.label("Settings ui!");
+            }
+        };
+    }
+}
+
+struct MyTabs {
+    context: MyContext,
+    dock_state: DockState<Tab>,
+}
+
+impl MyTabs {
+    pub fn new() -> Self {
+        let tabs = [Tab::Profiles, Tab::Settings].to_vec();
+
+        let dock_state = DockState::new(tabs);
+
+        Self {
+            context: MyContext::new(),
+            dock_state,
+        }
+    }
+
+    fn ui(&mut self, ui: &mut egui::Ui) {
+        let mut style = Style::from_egui(ui.style().as_ref());
+
+        style.tab.tab_body.stroke.width = 0.0;
+
+        DockArea::new(&mut self.dock_state)
+            .style(style)
+            .show_inside(ui, &mut self.context);
+    }
+}
+
+impl eframe::App for MyTabs {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default()
+            .frame(Frame::central_panel(ctx.style().as_ref()).inner_margin(0.0))
+            .show(ctx, |ui| self.ui(ui));
+    }
 }
 
 #[derive(PartialEq)]
