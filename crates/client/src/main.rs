@@ -15,6 +15,7 @@ use utils::Crash;
 pub mod client_settings;
 pub mod context;
 pub mod download;
+pub mod type_map;
 pub mod utils;
 
 fn main() {
