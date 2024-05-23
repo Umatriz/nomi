@@ -8,6 +8,14 @@ Minecraft launcher powered by Rust
 
 ---
 
+### Downloading
+
+Ways you can download nomi
+
+## Arch
+
+[`nomi`](https://aur.archlinux.org/packages/nomi) is available on the AUR
+
 ### Contributing
 
 Check out the [contributing.md](./CONTRIBUTING.md)
