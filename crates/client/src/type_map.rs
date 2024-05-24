@@ -34,4 +34,11 @@ impl TypeMap {
             .get_mut(&TypeId::of::<T>())
             .and_then(|value| value.downcast_mut())
     }
+
+    pub fn get_boxed<T: Any + Clone>(&self) -> Option<T> {
+        self.inner
+            .get(&TypeId::of::<T>())
+            .and_then(|value| value.downcast_ref())
+            .cloned()
+    }
 }

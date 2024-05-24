@@ -12,7 +12,7 @@ use crate::repository::{
 pub const LAUNCHER_MANIFEST: &str = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
 pub static LAUNCHER_MANIFEST_STATE: OnceCell<LauncherManifest> = OnceCell::const_new();
 
-async fn get_launcher_manifest_internal() -> anyhow::Result<LauncherManifest> {
+pub async fn get_launcher_manifest_owned() -> anyhow::Result<LauncherManifest> {
     tracing::debug!("Calling Launcher Manifest");
     Ok(Client::new()
         .get(LAUNCHER_MANIFEST)
@@ -24,7 +24,7 @@ async fn get_launcher_manifest_internal() -> anyhow::Result<LauncherManifest> {
 
 pub async fn get_launcher_manifest() -> anyhow::Result<&'static LauncherManifest> {
     LAUNCHER_MANIFEST_STATE
-        .get_or_try_init(get_launcher_manifest_internal)
+        .get_or_try_init(get_launcher_manifest_owned)
         .await
 }
 

@@ -1,4 +1,7 @@
-use components::{profiles::ProfilesPage, Component, StorageCreationExt};
+use components::{
+    add_profile_menu::AddProfileMenu, add_tab_menu::AddTab, profiles::ProfilesPage, Component,
+    StorageCreationExt,
+};
 use context::AppContext;
 use eframe::{
     egui::{self, Frame, ScrollArea, ViewportBuilder},
@@ -6,7 +9,14 @@ use eframe::{
 };
 use egui_dock::{DockArea, DockState, Style, TabViewer};
 use egui_tracing::EventCollector;
-use std::fmt::Display;
+use nomi_core::{
+    configs::profile::VersionProfile,
+    downloads::traits::DownloadResult,
+    repository::launcher_manifest::LauncherManifest,
+    state::{get_launcher_manifest, get_launcher_manifest_owned},
+};
+use std::{fmt::Display, ops::Deref};
+use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::Level;
 use tracing_subscriber::{
     fmt::{writer::MakeWriterExt, Layer},
@@ -63,32 +73,86 @@ fn main() {
             viewport: ViewportBuilder::default().with_inner_size(Vec2::new(1280.0, 720.0)),
             ..Default::default()
         },
-        Box::new(|_cc| Box::new(MyTabs::new())),
+        Box::new(|_cc| Box::new(MyTabs::new(collector))),
     );
 
     println!("T");
 }
 
-#[derive(Clone)]
-enum Tab {
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub enum Tab {
     Profiles,
     Settings,
+    Logs,
+}
+
+impl Tab {
+    pub const ALL_TABS: &'static [Tab] = &[Self::Profiles, Self::Settings, Self::Logs];
+
+    pub fn as_str(&self) -> &str {
+        match self {
+            Tab::Profiles => "Profiles",
+            Tab::Settings => "Settings",
+            Tab::Logs => "Logs",
+        }
+    }
 }
 
 pub type Storage = TypeMap;
 
+pub struct Channel<T> {
+    tx: Sender<T>,
+    rx: Receiver<T>,
+}
+
+impl<T> Channel<T> {
+    pub fn new(buffer: usize) -> Self {
+        let (tx, rx) = tokio::sync::mpsc::channel(buffer);
+        Self { tx, rx }
+    }
+
+    pub fn clone_tx(&self) -> Sender<T> {
+        self.tx.clone()
+    }
+}
+
+impl<T> Deref for Channel<T> {
+    type Target = Receiver<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.rx
+    }
+}
+
 struct MyContext {
+    collector: EventCollector,
     storage: Storage,
+    launcher_manifest: &'static LauncherManifest,
+
+    download_result_channel: Channel<VersionProfile>,
+    download_progress_channel: Channel<DownloadResult>,
+    download_total_channel: Channel<u32>,
 }
 
 impl MyContext {
-    pub fn new() -> Self {
-        let mut storage = Storage::new();
+    pub fn new(collector: EventCollector) -> Self {
+        let launcher_manifest = pollster::block_on(get_launcher_manifest_owned()).unwrap();
+        let launcher_manifest_ref = pollster::block_on(get_launcher_manifest()).unwrap();
+
+        let mut storage = Storage::new().with(launcher_manifest);
 
         // TODO: handle errors properly
         ProfilesPage::extend(&mut storage).unwrap();
+        AddProfileMenu::extend(&mut storage).unwrap();
 
-        Self { storage }
+        Self {
+            storage,
+            collector,
+            launcher_manifest: launcher_manifest_ref,
+            download_result_channel: Channel::new(100),
+            download_progress_channel: Channel::new(500),
+            download_total_channel: Channel::new(100),
+        }
     }
 }
 
@@ -96,17 +160,23 @@ impl TabViewer for MyContext {
     type Tab = Tab;
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
-        match tab {
-            Tab::Profiles => "Profiles".into(),
-            Tab::Settings => "Settings".into(),
-        }
+        tab.as_str().into()
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         match tab {
-            Tab::Profiles => ProfilesPage.ui(ui, &mut self.storage),
+            Tab::Profiles => ProfilesPage {
+                storage: &mut self.storage,
+                launcher_manifest: self.launcher_manifest,
+            }
+            .ui(ui),
             Tab::Settings => {
                 ui.label("Settings ui!");
+            }
+            Tab::Logs => {
+                ScrollArea::horizontal().show(ui, |ui| {
+                    ui.add(egui_tracing::Logs::new(self.collector.clone()));
+                });
             }
         };
     }
@@ -118,13 +188,13 @@ struct MyTabs {
 }
 
 impl MyTabs {
-    pub fn new() -> Self {
+    pub fn new(collector: EventCollector) -> Self {
         let tabs = [Tab::Profiles, Tab::Settings].to_vec();
 
         let dock_state = DockState::new(tabs);
 
         Self {
-            context: MyContext::new(),
+            context: MyContext::new(collector),
             dock_state,
         }
     }
@@ -142,9 +212,25 @@ impl MyTabs {
 
 impl eframe::App for MyTabs {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.set_pixels_per_point(1.5);
+
+        let mut added_nodes = Vec::<Tab>::new();
+
+        egui::TopBottomPanel::top("top_panel_id").show(ctx, |ui| {
+            AddTab {
+                dock_state: &self.dock_state,
+                added_tabs: &mut added_nodes,
+            }
+            .ui(ui);
+        });
+
         egui::CentralPanel::default()
             .frame(Frame::central_panel(ctx.style().as_ref()).inner_margin(0.0))
             .show(ctx, |ui| self.ui(ui));
+
+        added_nodes
+            .drain(..)
+            .for_each(|node| self.dock_state.push_to_first_leaf(node))
     }
 }
 

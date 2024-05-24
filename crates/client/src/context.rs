@@ -1,6 +1,5 @@
 use crate::{
     client_settings::{default_pixels_per_point_value, ClientSettings},
-    download::spawn_download,
     utils::{spawn_future, spawn_tokio_future, Crash},
     Loader,
 };
@@ -170,7 +169,7 @@ impl AppContext {
                 .show(ui, |ui| {
                     for profile in self.profiles.profiles.clone() {
                         ui.label(profile.name.to_string());
-                        ui.label(&profile.instance.settings.version);
+                        ui.label(profile.version());
                         if ui.button("Launch").clicked() {
                             let (tx, _rx) = std::sync::mpsc::channel();
                             let username = self.settings_username_buf.clone();
@@ -178,9 +177,9 @@ impl AppContext {
                             let uuid = self.settings.uuid.clone();
                             spawn_tokio_future(tx, async move {
                                 let mut prof = profile;
-                                prof.instance.set_username(Username::new(username).unwrap());
-                                prof.instance.set_access_token(access_token);
-                                prof.instance.set_uuid(uuid);
+                                // prof.instance.set_username(Username::new(username).unwrap());
+                                // prof.instance.set_access_token(access_token);
+                                // prof.instance.set_uuid(uuid);
                                 prof.launch()
                                     .await
                                     .map_err(|err| {
@@ -325,25 +324,25 @@ impl AppContext {
             ui.label("You must install vanilla before Fabric");
 
             if ui.button("Create and download").clicked() {
-                self.download_progress = 0;
+                // self.download_progress = 0;
 
-                let handle = spawn_download(
-                    self.tx.clone(),
-                    // ctx.clone(),
-                    self.profile_name_buf.clone(),
-                    profiles[self.selected_version_buf].id.clone(),
-                    self.loader_buf.clone(),
-                    self.download_progress_tx.clone(),
-                    self.download_total_tx.clone(),
-                );
+                // let handle = spawn_download(
+                //     self.tx.clone(),
+                //     // ctx.clone(),
+                //     self.profile_name_buf.clone(),
+                //     profiles[self.selected_version_buf].id.clone(),
+                //     self.loader_buf.clone(),
+                //     self.download_progress_tx.clone(),
+                //     self.download_total_tx.clone(),
+                // );
 
-                self.tasks.push((
-                    handle,
-                    format!(
-                        "Downloading version {} - {}",
-                        profiles[self.selected_version_buf].id, self.loader_buf
-                    ),
-                ))
+                // self.tasks.push((
+                //     handle,
+                //     format!(
+                //         "Downloading version {} - {}",
+                //         profiles[self.selected_version_buf].id, self.loader_buf
+                //     ),
+                // ))
             }
         }
 

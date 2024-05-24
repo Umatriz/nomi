@@ -1,5 +1,5 @@
 use nomi_core::{
-    configs::profile::{VersionProfileBuilder, VersionProfilesConfig},
+    configs::profile::{ProfileState, VersionProfileBuilder, VersionProfilesConfig},
     downloads::traits::Downloader,
     game_paths::GamePaths,
     instance::{launch::LaunchSettings, InstanceBuilder},
@@ -62,8 +62,7 @@ async fn full_fabric_test() {
     let profile = VersionProfileBuilder::new()
         .id(mock.create_id())
         .name("Full-fabric-test".into())
-        .instance(launch)
-        .is_downloaded(true)
+        .state(ProfileState::downloaded(launch))
         .build();
 
     dbg!(profile).launch().await.unwrap();

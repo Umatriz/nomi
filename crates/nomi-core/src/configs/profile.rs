@@ -1,3 +1,4 @@
+use anyhow::anyhow;
 use const_typed_builder::Builder;
 use serde::{Deserialize, Serialize};
 
@@ -29,18 +30,50 @@ impl VersionProfilesConfig {
 // TODO: fix `into_launch`
 */
 
-#[derive(Serialize, Deserialize, Debug, Default, Builder, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub enum Loader {
+    Vanilla,
+    Fabric,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum ProfileState {
+    Downloaded(Box<LaunchInstance>),
+
+    NotDownloaded { version: String, loader: Loader },
+}
+
+impl ProfileState {
+    pub fn downloaded(instance: LaunchInstance) -> Self {
+        Self::Downloaded(Box::new(instance))
+    }
+
+    pub fn not_downloaded(version: String, loader: Loader) -> Self {
+        Self::NotDownloaded { version, loader }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Builder, Clone)]
 pub struct VersionProfile {
     pub id: i32,
-    pub is_downloaded: bool,
     pub name: String,
 
-    pub instance: LaunchInstance,
+    pub state: ProfileState,
 }
 
 impl VersionProfile {
     pub async fn launch(&self) -> anyhow::Result<()> {
-        self.instance.launch().await
+        match &self.state {
+            ProfileState::Downloaded(instance) => instance.launch().await,
+            ProfileState::NotDownloaded { .. } => Err(anyhow!("This profile is not downloaded!")),
+        }
+    }
+
+    pub fn version(&self) -> &str {
+        match &self.state {
+            ProfileState::Downloaded(instance) => &instance.settings.version,
+            ProfileState::NotDownloaded { version, .. } => version,
+        }
     }
 }
 
@@ -102,8 +135,7 @@ mod tests {
 
         let profile = VersionProfileBuilder::new()
             .id(mock.create_id())
-            .instance(l)
-            .is_downloaded(true)
+            .state(ProfileState::Downloaded(Box::new(l)))
             .name("name".into())
             .build();
 
