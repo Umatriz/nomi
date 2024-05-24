@@ -54,7 +54,7 @@ impl Downloader for DownloadSet {
         }
 
         while let Some(result) = set.join_next().await {
-            let _ = match dbg!(result) {
+            let _ = match result {
                 Ok(download_status) => channel.send(download_status).await,
                 Err(join_error) => {
                     channel

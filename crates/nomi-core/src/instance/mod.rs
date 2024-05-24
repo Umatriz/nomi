@@ -22,14 +22,18 @@ pub struct Undefined;
 
 #[derive(Debug, Builder)]
 pub struct Instance {
-    pub instance: Box<dyn Version>,
-    pub sender: Sender<DownloadResult>,
+    instance: Box<dyn Version>,
+    sender: Sender<DownloadResult>,
     pub game_paths: GamePaths,
     pub version: String,
     pub name: String,
 }
 
 impl Instance {
+    pub fn instance(self) -> Box<dyn Version> {
+        self.instance
+    }
+
     pub async fn download(self) -> anyhow::Result<()> {
         {
             let io = self.instance.get_io_dyn();

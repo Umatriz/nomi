@@ -48,7 +48,7 @@ async fn full_fabric_test() {
         natives_dir: mc_dir.clone().join("versions/Full-fabric-test/natives"),
         version_jar_file: mc_dir.join("versions/Full-fabric-test/1.19.4.jar"),
         version: "1.19.4".to_string(),
-        version_type: "release".to_string(),
+        version_type: nomi_core::repository::manifest::VersionType::Release,
     };
 
     let launch = instance.launch_instance(settings, None);

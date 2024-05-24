@@ -1,6 +1,6 @@
 use components::{
-    add_profile_menu::AddProfileMenu, add_tab_menu::AddTab, profiles::ProfilesPage, Component,
-    StorageCreationExt,
+    add_profile_menu::AddProfileMenu, add_tab_menu::AddTab, download_progress::DownloadProgress,
+    profiles::ProfilesPage, Component, StorageCreationExt,
 };
 use context::AppContext;
 use eframe::{
@@ -84,16 +84,23 @@ pub enum Tab {
     Profiles,
     Settings,
     Logs,
+    DownloadStatus,
 }
 
 impl Tab {
-    pub const ALL_TABS: &'static [Tab] = &[Self::Profiles, Self::Settings, Self::Logs];
+    pub const ALL_TABS: &'static [Tab] = &[
+        Self::Profiles,
+        Self::Settings,
+        Self::Logs,
+        Self::DownloadStatus,
+    ];
 
     pub fn as_str(&self) -> &str {
         match self {
             Tab::Profiles => "Profiles",
             Tab::Settings => "Settings",
             Tab::Logs => "Logs",
+            Tab::DownloadStatus => "Download Status",
         }
     }
 }
@@ -144,6 +151,7 @@ impl MyContext {
         // TODO: handle errors properly
         ProfilesPage::extend(&mut storage).unwrap();
         AddProfileMenu::extend(&mut storage).unwrap();
+        DownloadProgress::extend(&mut storage).unwrap();
 
         Self {
             storage,
@@ -166,6 +174,10 @@ impl TabViewer for MyContext {
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         match tab {
             Tab::Profiles => ProfilesPage {
+                download_result_tx: self.download_result_channel.clone_tx(),
+                download_progress_tx: self.download_progress_channel.clone_tx(),
+                download_total_tx: self.download_total_channel.clone_tx(),
+
                 storage: &mut self.storage,
                 launcher_manifest: self.launcher_manifest,
             }
@@ -177,6 +189,15 @@ impl TabViewer for MyContext {
                 ScrollArea::horizontal().show(ui, |ui| {
                     ui.add(egui_tracing::Logs::new(self.collector.clone()));
                 });
+            }
+            Tab::DownloadStatus => {
+                DownloadProgress {
+                    storage: &mut self.storage,
+                    download_result_rx: &mut self.download_result_channel.rx,
+                    download_progress_rx: &mut self.download_progress_channel.rx,
+                    download_total_rx: &mut self.download_total_channel.rx,
+                }
+                .ui(ui);
             }
         };
     }

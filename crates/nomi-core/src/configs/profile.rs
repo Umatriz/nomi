@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use const_typed_builder::Builder;
 use serde::{Deserialize, Serialize};
 
-use crate::instance::launch::LaunchInstance;
+use crate::{instance::launch::LaunchInstance, repository::manifest::VersionType};
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct VersionProfilesConfig {
@@ -40,7 +40,11 @@ pub enum Loader {
 pub enum ProfileState {
     Downloaded(Box<LaunchInstance>),
 
-    NotDownloaded { version: String, loader: Loader },
+    NotDownloaded {
+        version: String,
+        version_type: VersionType,
+        loader: Loader,
+    },
 }
 
 impl ProfileState {
@@ -48,8 +52,12 @@ impl ProfileState {
         Self::Downloaded(Box::new(instance))
     }
 
-    pub fn not_downloaded(version: String, loader: Loader) -> Self {
-        Self::NotDownloaded { version, loader }
+    pub fn not_downloaded(version: String, version_type: VersionType, loader: Loader) -> Self {
+        Self::NotDownloaded {
+            version,
+            version_type,
+            loader,
+        }
     }
 }
 
@@ -84,7 +92,7 @@ mod tests {
         game_paths::GamePaths,
         instance::{launch::LaunchSettings, InstanceBuilder},
         loaders::fabric::Fabric,
-        repository::{java_runner::JavaRunner, username::Username},
+        repository::{java_runner::JavaRunner, manifest::VersionType, username::Username},
     };
 
     use super::*;
@@ -128,7 +136,7 @@ mod tests {
             natives_dir: mc_dir.clone().join("versions/1.18.2/natives"),
             version_jar_file: mc_dir.join("versions/1.18.2/1.18.2.jar"),
             version: "1.18.2".to_string(),
-            version_type: "release".to_string(),
+            version_type: VersionType::Release,
         };
 
         let l = builder.launch_instance(settings, None);

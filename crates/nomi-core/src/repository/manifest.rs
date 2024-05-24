@@ -17,7 +17,24 @@ pub struct Manifest {
     pub release_time: String,
     pub time: String,
     #[serde(rename = "type")]
-    pub version_type: String,
+    pub version_type: VersionType,
+}
+
+#[derive(PartialEq, Eq, Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum VersionType {
+    #[default]
+    Release,
+    Snapshot,
+}
+
+impl VersionType {
+    pub fn as_str(&self) -> &str {
+        match self {
+            VersionType::Release => "release",
+            VersionType::Snapshot => "snapshot",
+        }
+    }
 }
 
 #[derive(Debug, Deserialize, Serialize)]

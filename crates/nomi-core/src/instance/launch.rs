@@ -10,7 +10,11 @@ use tracing::info;
 
 use crate::{
     fs::read_json_config,
-    repository::{java_runner::JavaRunner, manifest::Manifest, username::Username},
+    repository::{
+        java_runner::JavaRunner,
+        manifest::{Manifest, VersionType},
+        username::Username,
+    },
 };
 
 use self::arguments::ArgumentsBuilder;
@@ -47,7 +51,7 @@ pub struct LaunchSettings {
     pub version_jar_file: PathBuf,
 
     pub version: String,
-    pub version_type: String,
+    pub version_type: VersionType,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
@@ -235,7 +239,7 @@ mod tests {
             natives_dir: mc_dir.clone().join("instances/1.18.2/natives"),
             version_jar_file: mc_dir.join("instances/1.18.2/1.18.2.jar"),
             version: "1.18.2".to_string(),
-            version_type: "release".to_string(),
+            version_type: VersionType::Release,
         };
 
         let fabric = read_json_config::<FabricProfile>(

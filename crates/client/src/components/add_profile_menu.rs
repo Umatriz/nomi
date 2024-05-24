@@ -1,7 +1,10 @@
 use eframe::egui::{self, Color32, RichText};
 use nomi_core::{
     configs::profile::{Loader, ProfileState, VersionProfile},
-    repository::launcher_manifest::{LauncherManifest, Version},
+    repository::{
+        launcher_manifest::{LauncherManifest, Version},
+        manifest::VersionType,
+    },
 };
 
 use crate::Storage;
@@ -15,7 +18,7 @@ pub struct AddProfileMenu<'a> {
 
 #[derive(Clone)]
 struct AddProfileMenuData {
-    selected_version_filter: VersionFilter,
+    selected_version_type: VersionType,
 
     profile_name_buf: String,
     selected_version_buf: Option<Version>,
@@ -25,7 +28,7 @@ struct AddProfileMenuData {
 impl StorageCreationExt for AddProfileMenu<'_> {
     fn extend(storage: &mut crate::Storage) -> anyhow::Result<()> {
         storage.insert(AddProfileMenuData {
-            selected_version_filter: VersionFilter::Release,
+            selected_version_type: VersionType::Release,
 
             profile_name_buf: String::new(),
             selected_version_buf: None,
@@ -33,12 +36,6 @@ impl StorageCreationExt for AddProfileMenu<'_> {
         });
         Ok(())
     }
-}
-
-#[derive(PartialEq, Eq, Debug, Clone)]
-enum VersionFilter {
-    Release,
-    Snapshot,
 }
 
 impl Component for AddProfileMenu<'_> {
@@ -50,26 +47,26 @@ impl Component for AddProfileMenu<'_> {
             ui.text_edit_singleline(&mut profile_data.profile_name_buf);
 
             egui::ComboBox::from_label("Versions Filter")
-                .selected_text(format!("{:?}", profile_data.selected_version_filter))
+                .selected_text(format!("{:?}", profile_data.selected_version_type))
                 .show_ui(ui, |ui| {
                     ui.selectable_value(
-                        &mut profile_data.selected_version_filter,
-                        VersionFilter::Release,
+                        &mut profile_data.selected_version_type,
+                        VersionType::Release,
                         "Release",
                     );
                     ui.selectable_value(
-                        &mut profile_data.selected_version_filter,
-                        VersionFilter::Snapshot,
+                        &mut profile_data.selected_version_type,
+                        VersionType::Snapshot,
                         "Snapshot",
                     );
                 });
 
             let versions_iter = self.launcher_manifest.versions.iter();
-            let versions = match profile_data.selected_version_filter {
-                VersionFilter::Release => versions_iter
+            let versions = match profile_data.selected_version_type {
+                VersionType::Release => versions_iter
                     .filter(|v| v.version_type == "release")
                     .collect::<Vec<_>>(),
-                VersionFilter::Snapshot => versions_iter
+                VersionType::Snapshot => versions_iter
                     .filter(|v| v.version_type == "snapshot")
                     .collect::<Vec<_>>(),
             };
@@ -106,12 +103,13 @@ impl Component for AddProfileMenu<'_> {
         let profile_data = self.storage.get_boxed::<AddProfileMenuData>().unwrap();
         if ui.button("Create").clicked() && profile_data.selected_version_buf.is_some() {
             let profiles = self.storage.get_mut::<ProfilesData>().unwrap();
-            profiles.profiles.add_profile(VersionProfile {
-                id: profiles.profiles.create_id(),
+            profiles.add_profile(VersionProfile {
+                id: profiles.create_id(),
                 name: profile_data.profile_name_buf,
                 state: ProfileState::NotDownloaded {
                     version: profile_data.selected_version_buf.unwrap().id,
                     loader: profile_data.loader_buf,
+                    version_type: profile_data.selected_version_type,
                 },
             });
         }

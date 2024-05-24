@@ -141,7 +141,7 @@ impl<'a> ArgumentsBuilder<'a, Defined> {
                 .clone()
                 .unwrap_or(uuid::Uuid::new_v4().to_string())
                 .as_str(),
-            "${version_type}" => &self.instance.settings.version_type,
+            "${version_type}" => &self.instance.settings.version_type.as_str(),
             "${version_name}" => &self.instance.settings.version,
             "${assets_index_name}" => &self.manifest.asset_index.id,
             "${user_properties}" => "{}",

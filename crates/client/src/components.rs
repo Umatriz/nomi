@@ -4,6 +4,7 @@ use crate::Storage;
 
 pub mod add_profile_menu;
 pub mod add_tab_menu;
+pub mod download_progress;
 pub mod profiles;
 
 pub trait Component: Sized {
