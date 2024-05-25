@@ -96,6 +96,7 @@ impl Component for ProfilesPage<'_> {
                             }
                             ProfileState::NotDownloaded { .. } => {
                                 if ui.button("Download").clicked() {
+                                    // TODO: reset `download_progress.current` each download
                                     spawn_download(
                                         profile,
                                         self.download_result_tx.clone(),

@@ -112,6 +112,7 @@ impl Component for AddProfileMenu<'_> {
                     version_type: profile_data.selected_version_type,
                 },
             });
+            profiles.update_config().unwrap();
         }
     }
 }

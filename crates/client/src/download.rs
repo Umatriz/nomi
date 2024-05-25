@@ -2,18 +2,15 @@ use std::sync::Arc;
 
 use anyhow::anyhow;
 use nomi_core::{
-    configs::profile::{
-        Loader, ProfileState, VersionProfile, VersionProfileBuilder, VersionProfilesConfig,
-    },
+    configs::profile::{Loader, ProfileState, VersionProfile},
     downloads::{
         traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
         DownloadQueue,
     },
-    fs::{read_toml_config, write_toml_config},
     game_paths::GamePaths,
     instance::{launch::LaunchSettings, InstanceBuilder},
     loaders::{fabric::Fabric, vanilla::Vanilla},
-    repository::{java_runner::JavaRunner, manifest::VersionType, username::Username},
+    repository::{java_runner::JavaRunner, username::Username},
 };
 use tokio::sync::mpsc::Sender;
 
@@ -54,7 +51,7 @@ async fn try_download(
     let game_paths = GamePaths {
         game: mc_dir.clone(),
         assets: mc_dir.join("assets"),
-        version: mc_dir.join("versions").join(&profile.version()),
+        version: mc_dir.join("versions").join(profile.version()),
         libraries: mc_dir.join("libraries"),
     };
 

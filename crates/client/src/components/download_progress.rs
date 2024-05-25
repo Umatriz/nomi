@@ -52,6 +52,7 @@ impl Component for DownloadProgress<'_> {
 
         if let Ok(total) = self.download_total_rx.try_recv() {
             progress_data.total = total;
+            progress_data.current = 0;
         }
 
         if let Ok(data) = self.download_progress_rx.try_recv() {

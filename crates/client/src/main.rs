@@ -1,6 +1,6 @@
 use components::{
     add_profile_menu::AddProfileMenu, add_tab_menu::AddTab, download_progress::DownloadProgress,
-    profiles::ProfilesPage, Component, StorageCreationExt,
+    profiles::ProfilesPage, settings::SettingsPage, Component, StorageCreationExt,
 };
 use context::AppContext;
 use eframe::{
@@ -8,6 +8,7 @@ use eframe::{
     epaint::Vec2,
 };
 use egui_dock::{DockArea, DockState, Style, TabViewer};
+use egui_file_dialog::FileDialog;
 use egui_tracing::EventCollector;
 use nomi_core::{
     configs::profile::VersionProfile,
@@ -136,6 +137,8 @@ struct MyContext {
     storage: Storage,
     launcher_manifest: &'static LauncherManifest,
 
+    file_dialog: FileDialog,
+
     download_result_channel: Channel<VersionProfile>,
     download_progress_channel: Channel<DownloadResult>,
     download_total_channel: Channel<u32>,
@@ -143,20 +146,21 @@ struct MyContext {
 
 impl MyContext {
     pub fn new(collector: EventCollector) -> Self {
-        let launcher_manifest = pollster::block_on(get_launcher_manifest_owned()).unwrap();
         let launcher_manifest_ref = pollster::block_on(get_launcher_manifest()).unwrap();
 
-        let mut storage = Storage::new().with(launcher_manifest);
+        let mut storage = Storage::new();
 
         // TODO: handle errors properly
         ProfilesPage::extend(&mut storage).unwrap();
         AddProfileMenu::extend(&mut storage).unwrap();
         DownloadProgress::extend(&mut storage).unwrap();
+        SettingsPage::extend(&mut storage).unwrap();
 
         Self {
             storage,
             collector,
             launcher_manifest: launcher_manifest_ref,
+            file_dialog: FileDialog::new(),
             download_result_channel: Channel::new(100),
             download_progress_channel: Channel::new(500),
             download_total_channel: Channel::new(100),
@@ -182,9 +186,11 @@ impl TabViewer for MyContext {
                 launcher_manifest: self.launcher_manifest,
             }
             .ui(ui),
-            Tab::Settings => {
-                ui.label("Settings ui!");
+            Tab::Settings => SettingsPage {
+                storage: &mut self.storage,
+                file_dialog: &mut self.file_dialog,
             }
+            .ui(ui),
             Tab::Logs => {
                 ScrollArea::horizontal().show(ui, |ui| {
                     ui.add(egui_tracing::Logs::new(self.collector.clone()));

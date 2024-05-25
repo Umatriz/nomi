@@ -18,9 +18,12 @@ nomi-core = { path = "../nomi-core"}
 
 eframe = "0.27.2"
 egui_dock = "0.12"
-pollster = "0.3.0"
-toml = "0.8.0"
-rfd = "0.14.1"
-tracing-appender = "0.2.2"
+egui_form = { version = "0.1.1", features = ["validator_garde"] }
+egui-file-dialog = "0.5.0"
 egui_tracing = "0.2.2"
 egui_extras = "0.27.2"
+garde = { version = "0.18.0", features = ["derive", "regex"] }
+
+pollster = "0.3.0"
+toml = "0.8.0"
+tracing-appender = "0.2.2"

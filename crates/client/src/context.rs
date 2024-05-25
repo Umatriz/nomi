@@ -15,7 +15,6 @@ use nomi_core::{
     repository::{java_runner::JavaRunner, launcher_manifest::Version, username::Username},
     state::get_launcher_manifest,
 };
-use rfd::AsyncFileDialog;
 use std::{
     io::Write,
     path::PathBuf,
@@ -105,7 +104,7 @@ impl AppContext {
             profiles: profiles.unwrap_or_default(),
             settings_username_buf: settings.username.get().to_string(),
             settings_java_buf_content: match &java_bin {
-                JavaRunner::String(_) => PathBuf::new(),
+                JavaRunner::Command(_) => PathBuf::new(),
                 JavaRunner::Path(path) => path.to_path_buf(),
             },
             settings_java_buf: java_bin,
@@ -202,99 +201,99 @@ impl AppContext {
     }
 
     pub fn show_settings(&mut self, ui: &mut Ui) {
-        if let Ok(data) = self.settings_java_buf_rx.try_recv() {
-            self.settings_java_buf_content = data.get().into();
-            self.settings_java_buf = data;
-        }
-        ui.collapsing("User", |ui| {
-            ui.label(
-                egui::RichText::new("This category will be replaced with Microsoft Auth")
-                    .font(egui::FontId::proportional(20.0)),
-            );
-            ui.label("Username");
-            ui.text_edit_singleline(&mut self.settings_username_buf);
-            match Username::new(self.settings_username_buf.clone()) {
-                Err(err) => {
-                    ui.label(format!("{}", err));
-                    self.settings_block_save_button = true;
-                }
-                Ok(data) => {
-                    self.settings_username = data;
-                    self.settings_block_save_button = false;
-                }
-            }
-            ui.label("uuid");
-            ui.text_edit_singleline(&mut self.settings_uuid)
-                .on_hover_text("By default is just a random uuid (hardcoded).");
-        });
-        ui.collapsing("Java", |ui| {
-            ui.label(egui::RichText::new("For legacy versions such 1.0, 1.2 etc you should specify java 8 binary").font(egui::FontId::proportional(16.0)));
-            ui.horizontal(|ui| {
-                ui.radio_value(
-                    &mut self.settings_java_buf,
-                    JavaRunner::Path(self.settings_java_buf_content.clone()),
-                    "Path",
-                ).on_hover_text("Set path directly to your java bin file.");
-                ui.radio_value(
-                    &mut self.settings_java_buf,
-                    JavaRunner::default(),
-                    "Command",
-                )
-                .on_hover_text("All command will be execute using `java` command. You must have java in your PATH.");
-            });
-            if let JavaRunner::Path(_) = self.settings_java_buf {
-                ui.label(self.settings_java_buf.get_string());
-                if ui.button("Select java").clicked() {
-                    spawn_future(self.settings_java_buf_tx.clone(), async {
-                        let file = AsyncFileDialog::new()
-                            .add_filter("bin", &["exe"])
-                            .set_directory("/")
-                            .pick_file()
-                            .await;
+        // if let Ok(data) = self.settings_java_buf_rx.try_recv() {
+        //     self.settings_java_buf_content = data.get().into();
+        //     self.settings_java_buf = data;
+        // }
+        // ui.collapsing("User", |ui| {
+        //     ui.label(
+        //         egui::RichText::new("This category will be replaced with Microsoft Auth")
+        //             .font(egui::FontId::proportional(20.0)),
+        //     );
+        //     ui.label("Username");
+        //     ui.text_edit_singleline(&mut self.settings_username_buf);
+        //     match Username::new(self.settings_username_buf.clone()) {
+        //         Err(err) => {
+        //             ui.label(format!("{}", err));
+        //             self.settings_block_save_button = true;
+        //         }
+        //         Ok(data) => {
+        //             self.settings_username = data;
+        //             self.settings_block_save_button = false;
+        //         }
+        //     }
+        //     ui.label("uuid");
+        //     ui.text_edit_singleline(&mut self.settings_uuid)
+        //         .on_hover_text("By default is just a random uuid (hardcoded).");
+        // });
+        // ui.collapsing("Java", |ui| {
+        //     ui.label(egui::RichText::new("For legacy versions such 1.0, 1.2 etc you should specify java 8 binary").font(egui::FontId::proportional(16.0)));
+        //     ui.horizontal(|ui| {
+        //         ui.radio_value(
+        //             &mut self.settings_java_buf,
+        //             JavaRunner::Path(self.settings_java_buf_content.clone()),
+        //             "Path",
+        //         ).on_hover_text("Set path directly to your java bin file.");
+        //         ui.radio_value(
+        //             &mut self.settings_java_buf,
+        //             JavaRunner::default(),
+        //             "Command",
+        //         )
+        //         .on_hover_text("All command will be execute using `java` command. You must have java in your PATH.");
+        //     });
+        //     if let JavaRunner::Path(_) = self.settings_java_buf {
+        //         ui.label(self.settings_java_buf.get_string());
+        //         if ui.button("Select java").clicked() {
+        //             spawn_future(self.settings_java_buf_tx.clone(), async {
+        //                 let file = AsyncFileDialog::new()
+        //                     .add_filter("bin", &["exe"])
+        //                     .set_directory("/")
+        //                     .pick_file()
+        //                     .await;
 
-                        let Some(binding) = file else {
-                            return JavaRunner::default();
-                        };
-                        let path = binding.path();
+        //                 let Some(binding) = file else {
+        //                     return JavaRunner::default();
+        //                 };
+        //                 let path = binding.path();
 
-                        JavaRunner::path(path.to_path_buf())
-                    });
-                };
-            }
-        });
-        ui.collapsing("Other", |ui| {
-            ui.label(
-                egui::RichText::new("Pixels per point").font(egui::FontId::proportional(16.0)),
-            );
-            ui.add(
-                egui::Slider::new(&mut self.settings_pixels_per_point, 0.6..=5.0)
-                    .text("Pixel per point"),
-            )
-        });
-        match self.settings_block_save_button {
-            true => {
-                ui.add_enabled(false, egui::Button::new("Save"));
-            }
-            false => {
-                if ui.button("Save").clicked() {
-                    let settings = Settings {
-                        username: Username::new(self.settings_username_buf.clone()).crash(),
-                        access_token: None,
-                        java_bin: Some(self.settings_java_buf.clone()),
-                        uuid: Some(self.settings_uuid.clone()),
-                    };
-                    let client_settings = ClientSettings {
-                        pixels_per_point: Some(self.settings_pixels_per_point),
-                    };
-                    let _ = write_toml_config_sync(
-                        &client_settings,
-                        "./.nomi/configs/ClientSettings.gui.toml",
-                    );
-                    self.client_settings = client_settings;
-                    let _ = write_toml_config_sync(&settings, "./.nomi/configs/User.toml");
-                }
-            }
-        }
+        //                 JavaRunner::path(path.to_path_buf())
+        //             });
+        //         };
+        //     }
+        // });
+        // ui.collapsing("Other", |ui| {
+        //     ui.label(
+        //         egui::RichText::new("Pixels per point").font(egui::FontId::proportional(16.0)),
+        //     );
+        //     ui.add(
+        //         egui::Slider::new(&mut self.settings_pixels_per_point, 0.6..=5.0)
+        //             .text("Pixel per point"),
+        //     )
+        // });
+        // match self.settings_block_save_button {
+        //     true => {
+        //         ui.add_enabled(false, egui::Button::new("Save"));
+        //     }
+        //     false => {
+        //         if ui.button("Save").clicked() {
+        //             let settings = Settings {
+        //                 username: Username::new(self.settings_username_buf.clone()).crash(),
+        //                 access_token: None,
+        //                 java_bin: Some(self.settings_java_buf.clone()),
+        //                 uuid: Some(self.settings_uuid.clone()),
+        //             };
+        //             let client_settings = ClientSettings {
+        //                 pixels_per_point: Some(self.settings_pixels_per_point),
+        //             };
+        //             let _ = write_toml_config_sync(
+        //                 &client_settings,
+        //                 "./.nomi/configs/ClientSettings.gui.toml",
+        //             );
+        //             self.client_settings = client_settings;
+        //             let _ = write_toml_config_sync(&settings, "./.nomi/configs/User.toml");
+        //         }
+        //     }
+        // }
     }
 
     pub fn show_profiles(&mut self, ui: &mut Ui) {
