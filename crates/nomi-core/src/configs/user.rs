@@ -13,8 +13,6 @@ pub struct Settings {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
-
     use crate::fs::{read_toml_config, write_toml_config};
 
     use super::*;

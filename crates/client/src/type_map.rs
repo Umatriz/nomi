@@ -3,15 +3,14 @@ use std::{
     collections::HashMap,
 };
 
+#[derive(Default)]
 pub struct TypeMap {
     inner: HashMap<TypeId, Box<dyn Any>>,
 }
 
 impl TypeMap {
     pub fn new() -> Self {
-        Self {
-            inner: HashMap::new(),
-        }
+        Self::default()
     }
 
     pub fn with<T: Any>(mut self, value: T) -> Self {

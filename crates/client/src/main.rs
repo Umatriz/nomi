@@ -3,10 +3,9 @@ use components::{
     add_tab_menu::AddTab,
     download_progress::DownloadProgress,
     profiles::ProfilesPage,
-    settings::{ClientSettings, SettingsData, SettingsPage},
+    settings::{ClientSettings, SettingsPage},
     Component, StorageCreationExt,
 };
-use context::AppContext;
 use eframe::{
     egui::{self, Frame, ScrollArea, ViewportBuilder},
     epaint::Vec2,
@@ -15,12 +14,10 @@ use egui_dock::{DockArea, DockState, Style, TabViewer};
 use egui_file_dialog::FileDialog;
 use egui_tracing::EventCollector;
 use nomi_core::{
-    configs::profile::VersionProfile,
-    downloads::traits::DownloadResult,
-    repository::launcher_manifest::LauncherManifest,
-    state::{get_launcher_manifest, get_launcher_manifest_owned},
+    configs::profile::VersionProfile, downloads::traits::DownloadResult,
+    repository::launcher_manifest::LauncherManifest, state::get_launcher_manifest,
 };
-use std::{fmt::Display, ops::Deref};
+use std::ops::Deref;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::Level;
 use tracing_subscriber::{
@@ -28,11 +25,8 @@ use tracing_subscriber::{
     prelude::__tracing_subscriber_SubscriberExt,
 };
 use type_map::TypeMap;
-use utils::Crash;
 
-pub mod client_settings;
 pub mod components;
-pub mod context;
 pub mod download;
 pub mod type_map;
 pub mod utils;
@@ -146,8 +140,6 @@ struct MyContext {
     download_result_channel: Channel<VersionProfile>,
     download_progress_channel: Channel<DownloadResult>,
     download_total_channel: Channel<u32>,
-
-    launch_result_channel: Channel<anyhow::Result<()>>,
 }
 
 impl MyContext {
@@ -170,7 +162,6 @@ impl MyContext {
             download_result_channel: Channel::new(100),
             download_progress_channel: Channel::new(500),
             download_total_channel: Channel::new(100),
-            launch_result_channel: Channel::new(100),
         }
     }
 }
@@ -271,92 +262,5 @@ impl eframe::App for MyTabs {
         added_nodes
             .drain(..)
             .for_each(|node| self.dock_state.push_to_first_leaf(node))
-    }
-}
-
-#[derive(PartialEq)]
-pub enum Page {
-    Main,
-}
-
-struct AppTabs {
-    current: Page,
-    profile_window: bool,
-    settings_window: bool,
-    logs_window: bool,
-
-    context: AppContext,
-}
-
-impl AppTabs {
-    pub fn new(collector: EventCollector) -> Self {
-        Self {
-            context: AppContext::new(collector).crash(),
-
-            current: Page::Main,
-
-            profile_window: Default::default(),
-            settings_window: Default::default(),
-            logs_window: Default::default(),
-        }
-    }
-}
-
-impl eframe::App for AppTabs {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::TopBottomPanel::top("top_nav_bar").show(ctx, |ui| {
-            ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                // ui.selectable_value(&mut self.current, Page::Main, "Main");
-                ui.toggle_value(&mut self.profile_window, "Profile");
-
-                // ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                ui.toggle_value(&mut self.settings_window, "Settings");
-
-                ui.toggle_value(&mut self.logs_window, "Logs");
-                // });
-            });
-        });
-
-        egui::Window::new("Profile")
-            .open(&mut self.profile_window)
-            .resizable(false)
-            .show(ctx, |ui| {
-                self.context.show_profiles(ui);
-            });
-
-        egui::Window::new("Settings")
-            .open(&mut self.settings_window)
-            .resizable(false)
-            .show(ctx, |ui| {
-                self.context.show_settings(ui);
-            });
-
-        egui::Window::new("Logs")
-            .open(&mut self.logs_window)
-            .resizable(true)
-            .show(ctx, |ui| {
-                ScrollArea::horizontal().show(ui, |ui| {
-                    ui.add(egui_tracing::Logs::new(self.context.collector.clone()));
-                });
-            });
-
-        egui::CentralPanel::default().show(ctx, |ui| match self.current {
-            Page::Main => self.context.show_main(ui),
-        });
-    }
-}
-
-#[derive(PartialEq, Clone)]
-pub enum Loader {
-    Vanilla,
-    Fabric,
-}
-
-impl Display for Loader {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Loader::Vanilla => f.write_str("Vanilla"),
-            Loader::Fabric => f.write_str("Fabric"),
-        }
     }
 }

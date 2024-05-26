@@ -50,11 +50,11 @@ where
 {
     tokio::spawn(async move {
         let data = fut.await;
-        let _ = tx.send(data);
+        let _ = tx.send(data).await;
     })
 }
 
-pub fn spawn_future<T, Fut>(tx: Sender<T>, fut: Fut) -> std::thread::JoinHandle<()>
+pub fn spawn_future<T, Fut>(tx: std::sync::mpsc::Sender<T>, fut: Fut) -> std::thread::JoinHandle<()>
 where
     T: 'static + Send,
     Fut: Future<Output = T> + Send + 'static,

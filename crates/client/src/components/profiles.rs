@@ -10,6 +10,7 @@ use nomi_core::{
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
+use tracing::error;
 
 use crate::{download::spawn_download, utils::spawn_tokio_future, Storage};
 
@@ -94,7 +95,11 @@ impl Component for ProfilesPage<'_> {
                                     let instance = instance.clone();
                                     let (tx, _rx) = tokio::sync::mpsc::channel(100);
                                     spawn_tokio_future(tx, async move {
-                                        instance.launch().await.unwrap()
+                                        instance
+                                            .launch()
+                                            .await
+                                            .inspect_err(|e| error!("{}", e))
+                                            .unwrap()
                                     });
                                 }
                             }
