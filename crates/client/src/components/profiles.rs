@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use eframe::egui::{self, Ui};
+use eframe::egui::{self, Align2, Pos2, Ui};
 use egui_extras::{Column, TableBuilder};
 use nomi_core::{
     configs::profile::{ProfileState, VersionProfile},
@@ -20,6 +20,8 @@ pub struct ProfilesPage<'a> {
     pub download_result_tx: Sender<VersionProfile>,
     pub download_progress_tx: Sender<DownloadResult>,
     pub download_total_tx: Sender<u32>,
+
+    pub is_profile_window_open: &'a mut bool,
 
     pub storage: &'a mut Storage,
     pub launcher_manifest: &'static LauncherManifest,
@@ -62,6 +64,39 @@ impl StorageCreationExt for ProfilesPage<'_> {
 
 impl Component for ProfilesPage<'_> {
     fn ui(self, ui: &mut Ui) {
+        {
+            ui.toggle_value(self.is_profile_window_open, "Add new profile");
+
+            egui::Window::new("Create new profile")
+                .title_bar(true)
+                .collapsible(false)
+                .resizable(false)
+                .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
+                .movable(false)
+                .open(self.is_profile_window_open)
+                .show(ui.ctx(), |ui| {
+                    AddProfileMenu {
+                        storage: self.storage,
+                        launcher_manifest: self.launcher_manifest,
+                        // is_profile_window_open: self.is_profile_window_open,
+                    }
+                    .ui(ui);
+                });
+        }
+
+        // {
+        //     let mut state = false;
+
+        //     egui::Window::new("title")
+        //         .open(&mut state)
+        //         .show(ui.ctx(), |ui| {
+        //             ui.label("Some text");
+        //             if ui.button("Close").clicked() {
+        //                 state = false
+        //             }
+        //         });
+        // }
+
         let profiles = self
             .storage
             .get::<ProfilesData>()
@@ -105,7 +140,6 @@ impl Component for ProfilesPage<'_> {
                             }
                             ProfileState::NotDownloaded { .. } => {
                                 if ui.button("Download").clicked() {
-                                    // TODO: reset `download_progress.current` each download
                                     spawn_download(
                                         profile,
                                         self.download_result_tx.clone(),
@@ -118,11 +152,5 @@ impl Component for ProfilesPage<'_> {
                     });
                 }
             });
-
-        AddProfileMenu {
-            storage: self.storage,
-            launcher_manifest: self.launcher_manifest,
-        }
-        .ui(ui);
     }
 }

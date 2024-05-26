@@ -14,6 +14,7 @@ use super::{profiles::ProfilesData, Component, StorageCreationExt};
 pub struct AddProfileMenu<'a> {
     pub storage: &'a mut Storage,
     pub launcher_manifest: &'a LauncherManifest,
+    // pub is_profile_window_open: &'a mut bool,
 }
 
 #[derive(Clone)]
@@ -96,7 +97,7 @@ impl Component for AddProfileMenu<'_> {
                 ui.radio_value(&mut profile_data.loader_buf, Loader::Fabric, "Fabric")
             });
             ui.label(
-                RichText::new("You must install vanilla before Fabric").color(Color32::YELLOW),
+                RichText::new("You must install Vanilla before Fabric").color(Color32::YELLOW),
             );
         }
 

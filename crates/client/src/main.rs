@@ -137,6 +137,8 @@ struct MyContext {
 
     file_dialog: FileDialog,
 
+    is_profile_window_open: bool,
+
     download_result_channel: Channel<VersionProfile>,
     download_progress_channel: Channel<DownloadResult>,
     download_total_channel: Channel<u32>,
@@ -159,6 +161,7 @@ impl MyContext {
             collector,
             launcher_manifest: launcher_manifest_ref,
             file_dialog: FileDialog::new(),
+            is_profile_window_open: false,
             download_result_channel: Channel::new(100),
             download_progress_channel: Channel::new(500),
             download_total_channel: Channel::new(100),
@@ -182,6 +185,7 @@ impl TabViewer for MyContext {
 
                 storage: &mut self.storage,
                 launcher_manifest: self.launcher_manifest,
+                is_profile_window_open: &mut self.is_profile_window_open,
             }
             .ui(ui),
             Tab::Settings => SettingsPage {
