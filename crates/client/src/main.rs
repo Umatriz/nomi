@@ -1,6 +1,10 @@
 use components::{
-    add_profile_menu::AddProfileMenu, add_tab_menu::AddTab, download_progress::DownloadProgress,
-    profiles::ProfilesPage, settings::SettingsPage, Component, StorageCreationExt,
+    add_profile_menu::AddProfileMenu,
+    add_tab_menu::AddTab,
+    download_progress::DownloadProgress,
+    profiles::ProfilesPage,
+    settings::{ClientSettings, SettingsData, SettingsPage},
+    Component, StorageCreationExt,
 };
 use context::AppContext;
 use eframe::{
@@ -239,7 +243,13 @@ impl MyTabs {
 
 impl eframe::App for MyTabs {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.set_pixels_per_point(1.5);
+        let pixels_per_point = self
+            .context
+            .storage
+            .get::<ClientSettings>()
+            .unwrap()
+            .pixels_per_point;
+        ctx.set_pixels_per_point(pixels_per_point);
 
         let mut added_nodes = Vec::<Tab>::new();
 

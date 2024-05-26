@@ -22,7 +22,7 @@ pub struct SettingsPage<'a> {
     pub file_dialog: &'a mut FileDialog,
 }
 
-#[derive(Debug, Validate, Serialize, Deserialize)]
+#[derive(Debug, Validate, Serialize, Deserialize, Clone)]
 pub(crate) struct SettingsData {
     #[garde(custom(check_username))]
     username: String,
@@ -32,7 +32,7 @@ pub(crate) struct SettingsData {
     java: JavaRunner,
 
     #[garde(skip)]
-    client_settings: ClientSettings,
+    pub client_settings: ClientSettings,
 }
 
 impl Default for SettingsData {
@@ -46,9 +46,9 @@ impl Default for SettingsData {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct ClientSettings {
-    pixels_per_point: f32,
+    pub pixels_per_point: f32,
 }
 
 impl Default for ClientSettings {
@@ -101,6 +101,7 @@ impl StorageCreationExt for SettingsPage<'_> {
             }
         };
 
+        storage.insert(data.client_settings.clone());
         storage.insert(data);
 
         Ok(())
@@ -109,73 +110,79 @@ impl StorageCreationExt for SettingsPage<'_> {
 
 impl Component for SettingsPage<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
-        let settings_data = self.storage.get_mut::<SettingsData>().unwrap();
+        let settings_data = self.storage.get_owned::<SettingsData>().unwrap();
 
         let mut form = Form::new().add_report(egui_form::garde::GardeReport::new(
             settings_data.validate(&()),
         ));
 
-        if let Some(path) = self.file_dialog.update(ui.ctx()).selected() {
-            if let JavaRunner::Path(java_path) = &mut settings_data.java {
-                if java_path != path {
-                    *java_path = dbg!(path).to_path_buf();
+        {
+            let settings_data = self.storage.get_mut::<SettingsData>().unwrap();
+
+            if let Some(path) = self.file_dialog.update(ui.ctx()).selected() {
+                if let JavaRunner::Path(java_path) = &mut settings_data.java {
+                    if java_path != path {
+                        *java_path = dbg!(path).to_path_buf();
+                    }
                 }
             }
+
+            ui.collapsing("User", |ui| {
+                FormField::new(&mut form, field_path!("username"))
+                    .label("Username")
+                    .ui(ui, egui::TextEdit::singleline(&mut settings_data.username));
+
+                FormField::new(&mut form, field_path!("uuid"))
+                    .label("UUID")
+                    .ui(ui, egui::TextEdit::singleline(&mut settings_data.uuid));
+            });
+
+            ui.collapsing("Java", |ui| {
+                FormField::new(&mut form, field_path!("java"))
+                    .label("Java")
+                    .ui(ui, |ui: &mut egui::Ui| {
+                        ui.radio_value(
+                            &mut settings_data.java,
+                            JavaRunner::command("java"),
+                            "Command",
+                        );
+
+                        ui.radio_value(
+                            &mut settings_data.java,
+                            JavaRunner::path(PathBuf::new()),
+                            "Custom path",
+                        );
+
+                        if matches!(settings_data.java, JavaRunner::Path(_))
+                            && ui.button("Select custom java binary").clicked()
+                        {
+                            self.file_dialog.select_file();
+                        }
+
+                        ui.label(format!(
+                            "Java will be run using {}",
+                            match &settings_data.java {
+                                JavaRunner::Command(command) => format!("{} command", command),
+                                JavaRunner::Path(path) => format!("{} executable", path.display()),
+                            }
+                        ))
+                    });
+            });
+
+            ui.collapsing("Client", |ui| {
+                ui.add(
+                    egui::Slider::new(
+                        &mut settings_data.client_settings.pixels_per_point,
+                        0.5..=5.0,
+                    )
+                    .text("Pixels per point"),
+                )
+            });
         }
 
-        ui.collapsing("User", |ui| {
-            FormField::new(&mut form, field_path!("username"))
-                .label("Username")
-                .ui(ui, egui::TextEdit::singleline(&mut settings_data.username));
-
-            FormField::new(&mut form, field_path!("uuid"))
-                .label("UUID")
-                .ui(ui, egui::TextEdit::singleline(&mut settings_data.uuid));
-        });
-
-        ui.collapsing("Java", |ui| {
-            FormField::new(&mut form, field_path!("java"))
-                .label("Java")
-                .ui(ui, |ui: &mut egui::Ui| {
-                    ui.radio_value(
-                        &mut settings_data.java,
-                        JavaRunner::command("java"),
-                        "Command",
-                    );
-
-                    ui.radio_value(
-                        &mut settings_data.java,
-                        JavaRunner::path(PathBuf::new()),
-                        "Custom path",
-                    );
-
-                    if matches!(settings_data.java, JavaRunner::Path(_))
-                        && ui.button("Select custom java binary").clicked()
-                    {
-                        self.file_dialog.select_file();
-                    }
-
-                    ui.label(format!(
-                        "Java will be run using {}",
-                        match &settings_data.java {
-                            JavaRunner::Command(command) => format!("{} command", command),
-                            JavaRunner::Path(path) => format!("{} executable", path.display()),
-                        }
-                    ))
-                });
-        });
-
-        ui.collapsing("Client", |ui| {
-            ui.add(
-                egui::Slider::new(
-                    &mut settings_data.client_settings.pixels_per_point,
-                    0.5..=5.0,
-                )
-                .text("Pixels per point"),
-            )
-        });
-
         if let Some(Ok(())) = form.handle_submit(&ui.button("Save"), ui) {
+            let client_settings = self.storage.get_mut::<ClientSettings>().unwrap();
+            *client_settings = settings_data.client_settings.clone();
             write_toml_config_sync(&settings_data, "./.nomi/configs/Settings.toml").unwrap();
         }
     }

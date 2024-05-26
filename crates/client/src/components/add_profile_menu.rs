@@ -100,7 +100,7 @@ impl Component for AddProfileMenu<'_> {
             );
         }
 
-        let profile_data = self.storage.get_boxed::<AddProfileMenuData>().unwrap();
+        let profile_data = self.storage.get_owned::<AddProfileMenuData>().unwrap();
         if ui.button("Create").clicked() && profile_data.selected_version_buf.is_some() {
             let profiles = self.storage.get_mut::<ProfilesData>().unwrap();
             profiles.add_profile(VersionProfile {
