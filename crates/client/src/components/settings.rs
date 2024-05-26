@@ -1,16 +1,17 @@
-use std::{path::PathBuf, str::FromStr};
+use std::path::PathBuf;
 
 use eframe::egui;
 use egui_file_dialog::FileDialog;
 use egui_form::{garde::field_path, Form, FormField};
 use garde::{Error, Validate};
 use nomi_core::{
-    configs::user::Settings,
-    fs::write_toml_config_sync,
+    fs::{read_toml_config_sync, write_toml_config_sync},
     regex::Regex,
-    repository::{java_runner::JavaRunner, username::Username},
+    repository::java_runner::JavaRunner,
     Uuid,
 };
+use serde::{Deserialize, Serialize};
+use tracing::error;
 
 use crate::Storage;
 
@@ -21,7 +22,7 @@ pub struct SettingsPage<'a> {
     pub file_dialog: &'a mut FileDialog,
 }
 
-#[derive(Debug, Validate)]
+#[derive(Debug, Validate, Serialize, Deserialize)]
 pub(crate) struct SettingsData {
     #[garde(custom(check_username))]
     username: String,
@@ -29,6 +30,33 @@ pub(crate) struct SettingsData {
     uuid: String,
     #[garde(skip)]
     java: JavaRunner,
+
+    #[garde(skip)]
+    client_settings: ClientSettings,
+}
+
+impl Default for SettingsData {
+    fn default() -> Self {
+        SettingsData {
+            username: "Nomi".to_owned(),
+            uuid: Uuid::new_v4().to_string(),
+            java: JavaRunner::command("java"),
+            client_settings: ClientSettings::default(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct ClientSettings {
+    pixels_per_point: f32,
+}
+
+impl Default for ClientSettings {
+    fn default() -> Self {
+        Self {
+            pixels_per_point: 1.5,
+        }
+    }
 }
 
 fn check_username(value: &str, _context: &()) -> garde::Result {
@@ -64,23 +92,16 @@ fn check_uuid(value: &str, _context: &()) -> garde::Result {
 
 impl StorageCreationExt for SettingsPage<'_> {
     fn extend(storage: &mut Storage) -> anyhow::Result<()> {
-        let uuid = Uuid::new_v4().to_string();
-        storage.insert(SettingsData {
-            username: "Nomi".to_owned(),
-            uuid: uuid.clone(),
-            java: JavaRunner::command("java"),
-        });
+        let data = match read_toml_config_sync::<SettingsData>("./.nomi/configs/Settings.toml") {
+            Ok(data) => data,
+            Err(e) => {
+                error!("{}", e);
+                write_toml_config_sync(&SettingsData::default(), "./.nomi/configs/Settings.toml")?;
+                SettingsData::default()
+            }
+        };
 
-        write_toml_config_sync(
-            &Settings {
-                username: Username::new("Nomi").unwrap(),
-                access_token: None,
-                java_bin: Some(JavaRunner::Command("java".to_owned())),
-                uuid: Some(uuid),
-            },
-            "./.nomi/configs/Settings.toml",
-        )
-        .unwrap();
+        storage.insert(data);
 
         Ok(())
     }
@@ -102,55 +123,60 @@ impl Component for SettingsPage<'_> {
             }
         }
 
-        FormField::new(&mut form, field_path!("username"))
-            .label("Username")
-            .ui(ui, egui::TextEdit::singleline(&mut settings_data.username));
+        ui.collapsing("User", |ui| {
+            FormField::new(&mut form, field_path!("username"))
+                .label("Username")
+                .ui(ui, egui::TextEdit::singleline(&mut settings_data.username));
 
-        FormField::new(&mut form, field_path!("uuid"))
-            .label("UUID")
-            .ui(ui, egui::TextEdit::singleline(&mut settings_data.uuid));
+            FormField::new(&mut form, field_path!("uuid"))
+                .label("UUID")
+                .ui(ui, egui::TextEdit::singleline(&mut settings_data.uuid));
+        });
 
-        FormField::new(&mut form, field_path!("java"))
-            .label("Java")
-            .ui(ui, |ui: &mut egui::Ui| {
-                ui.radio_value(
-                    &mut settings_data.java,
-                    JavaRunner::command("java"),
-                    "Command",
-                );
+        ui.collapsing("Java", |ui| {
+            FormField::new(&mut form, field_path!("java"))
+                .label("Java")
+                .ui(ui, |ui: &mut egui::Ui| {
+                    ui.radio_value(
+                        &mut settings_data.java,
+                        JavaRunner::command("java"),
+                        "Command",
+                    );
 
-                ui.radio_value(
-                    &mut settings_data.java,
-                    JavaRunner::path(PathBuf::new()),
-                    "Custom path",
-                );
+                    ui.radio_value(
+                        &mut settings_data.java,
+                        JavaRunner::path(PathBuf::new()),
+                        "Custom path",
+                    );
 
-                if matches!(settings_data.java, JavaRunner::Path(_))
-                    && ui.button("Select custom java binary").clicked()
-                {
-                    self.file_dialog.select_file();
-                }
-
-                ui.label(format!(
-                    "Java will be run using {}",
-                    match &settings_data.java {
-                        JavaRunner::Command(command) => format!("{} command", command),
-                        JavaRunner::Path(path) => format!("{} executable", path.display()),
+                    if matches!(settings_data.java, JavaRunner::Path(_))
+                        && ui.button("Select custom java binary").clicked()
+                    {
+                        self.file_dialog.select_file();
                     }
-                ))
-            });
+
+                    ui.label(format!(
+                        "Java will be run using {}",
+                        match &settings_data.java {
+                            JavaRunner::Command(command) => format!("{} command", command),
+                            JavaRunner::Path(path) => format!("{} executable", path.display()),
+                        }
+                    ))
+                });
+        });
+
+        ui.collapsing("Client", |ui| {
+            ui.add(
+                egui::Slider::new(
+                    &mut settings_data.client_settings.pixels_per_point,
+                    0.5..=5.0,
+                )
+                .text("Pixels per point"),
+            )
+        });
 
         if let Some(Ok(())) = form.handle_submit(&ui.button("Save"), ui) {
-            write_toml_config_sync(
-                &Settings {
-                    username: Username::new(&settings_data.username).unwrap(),
-                    access_token: None,
-                    java_bin: Some(settings_data.java.clone()),
-                    uuid: Some(settings_data.uuid.to_owned()),
-                },
-                "./.nomi/configs/Settings.toml",
-            )
-            .unwrap();
+            write_toml_config_sync(&settings_data, "./.nomi/configs/Settings.toml").unwrap();
         }
     }
 }

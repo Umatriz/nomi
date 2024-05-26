@@ -19,17 +19,6 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn path_test() {
-        let p1 = Path::new("E:/programming/code/nomi/crates/nomi-core");
-        dbg!(&p1);
-        let p2 = Path::new("minecraft");
-        dbg!(&p2);
-
-        let p3 = p1.join(p2);
-        dbg!(p3);
-    }
-
     #[tokio::test]
     async fn write_test() {
         let mock = Settings {
