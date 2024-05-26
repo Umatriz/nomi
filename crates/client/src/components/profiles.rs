@@ -11,7 +11,7 @@ use nomi_core::{
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 
-use crate::{download::spawn_download, Storage};
+use crate::{download::spawn_download, utils::spawn_tokio_future, Storage};
 
 use super::{add_profile_menu::AddProfileMenu, Component, StorageCreationExt};
 
@@ -89,9 +89,13 @@ impl Component for ProfilesPage<'_> {
                             ui.label(profile.version());
                         });
                         row.col(|ui| match &profile.state {
-                            ProfileState::Downloaded(_) => {
+                            ProfileState::Downloaded(instance) => {
                                 if ui.button("Launch").clicked() {
-                                    println!("Clicked!")
+                                    let instance = instance.clone();
+                                    let (tx, _rx) = tokio::sync::mpsc::channel(100);
+                                    spawn_tokio_future(tx, async move {
+                                        instance.launch().await.unwrap()
+                                    });
                                 }
                             }
                             ProfileState::NotDownloaded { .. } => {

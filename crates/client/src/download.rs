@@ -101,8 +101,10 @@ async fn try_download(
 
     assets.get_io().io().await?;
 
-    let downloader: Box<dyn Downloader<Data = DownloadResult>> =
-        instance.instance().into_downloader();
+    let instance = instance.instance();
+    instance.get_io_dyn().io().await?;
+
+    let downloader: Box<dyn Downloader<Data = DownloadResult>> = instance.into_downloader();
 
     let downloader = DownloadQueue::new()
         .with_downloader(assets)
@@ -115,7 +117,7 @@ async fn try_download(
     let profile = VersionProfile {
         id: profile.id,
         name: profile.name.clone(),
-        state: ProfileState::Downloaded(Box::new(launch_instance)),
+        state: ProfileState::downloaded(launch_instance),
     };
 
     Ok(profile)

@@ -146,6 +146,8 @@ struct MyContext {
     download_result_channel: Channel<VersionProfile>,
     download_progress_channel: Channel<DownloadResult>,
     download_total_channel: Channel<u32>,
+
+    launch_result_channel: Channel<anyhow::Result<()>>,
 }
 
 impl MyContext {
@@ -168,6 +170,7 @@ impl MyContext {
             download_result_channel: Channel::new(100),
             download_progress_channel: Channel::new(500),
             download_total_channel: Channel::new(100),
+            launch_result_channel: Channel::new(100),
         }
     }
 }

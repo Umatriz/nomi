@@ -170,29 +170,29 @@ impl AppContext {
                         ui.label(profile.name.to_string());
                         ui.label(profile.version());
                         if ui.button("Launch").clicked() {
-                            let (tx, _rx) = std::sync::mpsc::channel();
+                            // let (tx, _rx) = std::sync::mpsc::channel();
                             let username = self.settings_username_buf.clone();
                             let access_token = self.settings.access_token.clone();
                             let uuid = self.settings.uuid.clone();
-                            spawn_tokio_future(tx, async move {
-                                let mut prof = profile;
-                                // prof.instance.set_username(Username::new(username).unwrap());
-                                // prof.instance.set_access_token(access_token);
-                                // prof.instance.set_uuid(uuid);
-                                prof.launch()
-                                    .await
-                                    .map_err(|err| {
-                                        let mut file = std::fs::File::create("./CRASH_REPORT.txt")
-                                            .expect("Cannot create CRASH_REPORT.txt");
-                                        file.write_all(
-                                            "Nomi paniced with following error: ".as_bytes(),
-                                        )
-                                        .unwrap();
-                                        file.write_all(format!("{:#?}", &err).as_bytes()).unwrap();
-                                        err
-                                    })
-                                    .unwrap();
-                            });
+                            // spawn_tokio_future(tx, async move {
+                            //     let mut prof = profile;
+                            //     // prof.instance.set_username(Username::new(username).unwrap());
+                            //     // prof.instance.set_access_token(access_token);
+                            //     // prof.instance.set_uuid(uuid);
+                            //     prof.launch()
+                            //         .await
+                            //         .map_err(|err| {
+                            //             let mut file = std::fs::File::create("./CRASH_REPORT.txt")
+                            //                 .expect("Cannot create CRASH_REPORT.txt");
+                            //             file.write_all(
+                            //                 "Nomi paniced with following error: ".as_bytes(),
+                            //             )
+                            //             .unwrap();
+                            //             file.write_all(format!("{:#?}", &err).as_bytes()).unwrap();
+                            //             err
+                            //         })
+                            //         .unwrap();
+                            // });
                         }
                         ui.end_row();
                     }

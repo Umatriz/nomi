@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::anyhow;
 use const_typed_builder::Builder;
 use serde::{Deserialize, Serialize};
@@ -38,7 +40,7 @@ pub enum Loader {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ProfileState {
-    Downloaded(Box<LaunchInstance>),
+    Downloaded(Arc<LaunchInstance>),
 
     NotDownloaded {
         version: String,
@@ -49,7 +51,7 @@ pub enum ProfileState {
 
 impl ProfileState {
     pub fn downloaded(instance: LaunchInstance) -> Self {
-        Self::Downloaded(Box::new(instance))
+        Self::Downloaded(Arc::new(instance))
     }
 
     pub fn not_downloaded(version: String, version_type: VersionType, loader: Loader) -> Self {
@@ -143,7 +145,7 @@ mod tests {
 
         let profile = VersionProfileBuilder::new()
             .id(mock.create_id())
-            .state(ProfileState::Downloaded(Box::new(l)))
+            .state(ProfileState::downloaded(l))
             .name("name".into())
             .build();
 

@@ -1,5 +1,6 @@
-use std::{fmt::Display, future::Future, io::Write, sync::mpsc::Sender};
+use std::{fmt::Display, future::Future, io::Write};
 
+use tokio::sync::mpsc::Sender;
 use tracing::error;
 
 pub trait Crash<T> {
