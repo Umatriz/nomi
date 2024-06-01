@@ -53,7 +53,7 @@ impl<'a> ArgumentsBuilder<'a, Undefined> {
     }
 
     pub fn finish(&self) -> ArgumentsBuilder<'a, Defined> {
-        let (classpath, native_libs) = self.classpath();
+        let (classpath, native_libs) = dbg!(self.classpath());
         ArgumentsBuilder {
             instance: self.instance,
             manifest: self.manifest,
@@ -145,7 +145,7 @@ impl<'a> ArgumentsBuilder<'a, Defined> {
             "${version_name}" => &self.instance.settings.version,
             "${assets_index_name}" => &self.manifest.asset_index.id,
             "${user_properties}" => "{}",
-            "${classpath}" => dbg!(&self.classpath)
+            "${classpath}" => &self.classpath
         )
     }
 

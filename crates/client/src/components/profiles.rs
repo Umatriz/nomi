@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use eframe::egui::{self, Align2, Pos2, Ui};
+use eframe::egui::{self, Align2, Ui};
 use egui_extras::{Column, TableBuilder};
 use nomi_core::{
     configs::profile::{ProfileState, VersionProfile},
@@ -83,19 +83,6 @@ impl Component for ProfilesPage<'_> {
                     .ui(ui);
                 });
         }
-
-        // {
-        //     let mut state = false;
-
-        //     egui::Window::new("title")
-        //         .open(&mut state)
-        //         .show(ui.ctx(), |ui| {
-        //             ui.label("Some text");
-        //             if ui.button("Close").clicked() {
-        //                 state = false
-        //             }
-        //         });
-        // }
 
         let profiles = self
             .storage

@@ -7,7 +7,7 @@ use components::{
     Component, StorageCreationExt,
 };
 use eframe::{
-    egui::{self, Frame, ScrollArea, ViewportBuilder},
+    egui::{self, Align, Frame, Layout, ScrollArea, ViewportBuilder},
     epaint::Vec2,
 };
 use egui_dock::{DockArea, DockState, Style, TabViewer};
@@ -252,11 +252,14 @@ impl eframe::App for MyTabs {
         let mut added_nodes = Vec::<Tab>::new();
 
         egui::TopBottomPanel::top("top_panel_id").show(ctx, |ui| {
-            AddTab {
-                dock_state: &self.dock_state,
-                added_tabs: &mut added_nodes,
-            }
-            .ui(ui);
+            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                AddTab {
+                    dock_state: &self.dock_state,
+                    added_tabs: &mut added_nodes,
+                }
+                .ui(ui);
+                egui::warn_if_debug_build(ui);
+            });
         });
 
         egui::CentralPanel::default()
