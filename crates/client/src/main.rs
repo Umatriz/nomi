@@ -1,8 +1,8 @@
 use components::{
-    add_profile_menu::AddProfileMenu,
-    add_tab_menu::AddTab,
+    add_profile_menu::{AddProfileMenu, AddProfileMenuState},
+    add_tab_menu::{AddTab, TabsState},
     download_progress::DownloadProgress,
-    profiles::ProfilesPage,
+    profiles::{ProfilesPage, ProfilesState},
     settings::{ClientSettings, SettingsPage},
     Component, StorageCreationExt,
 };
@@ -17,7 +17,7 @@ use nomi_core::{
     configs::profile::VersionProfile, downloads::traits::DownloadResult,
     repository::launcher_manifest::LauncherManifest, state::get_launcher_manifest,
 };
-use std::ops::Deref;
+use std::{collections::HashSet, ops::Deref};
 use tokio::sync::mpsc::{Receiver, Sender};
 use tracing::Level;
 use tracing_subscriber::{
@@ -78,29 +78,67 @@ fn main() {
     println!("T");
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(PartialEq, Eq, Hash, Clone)]
+pub struct TabId(&'static str);
+
+impl TabId {
+    pub const PROFILES: Self = Self("Profiles");
+    pub const SETTINGS: Self = Self("Settings");
+    pub const LOGS: Self = Self("Logs");
+    pub const DOWNLOAD_STATUS: Self = Self("Download Status");
+}
+
 pub enum Tab {
-    Profiles,
+    Profiles {
+        profiles_state: ProfilesState,
+        menu_state: AddProfileMenuState,
+    },
     Settings,
     Logs,
     DownloadStatus,
 }
 
+impl PartialEq for Tab {
+    fn eq(&self, other: &Self) -> bool {
+        core::mem::discriminant(self) == core::mem::discriminant(other)
+    }
+}
+
 impl Tab {
-    pub const ALL_TABS: &'static [Tab] = &[
-        Self::Profiles,
+    pub const AVAILABLE_TABS: &'static [Tab] = &[
+        Self::Profiles {
+            profiles_state: ProfilesState::default_const(),
+            menu_state: AddProfileMenuState::default_const(),
+        },
         Self::Settings,
         Self::Logs,
         Self::DownloadStatus,
     ];
 
-    pub fn as_str(&self) -> &str {
-        match self {
-            Tab::Profiles => "Profiles",
-            Tab::Settings => "Settings",
-            Tab::Logs => "Logs",
-            Tab::DownloadStatus => "Download Status",
+    pub fn from_id(id: TabId) -> Self {
+        match id {
+            TabId::PROFILES => Tab::Profiles {
+                profiles_state: Default::default(),
+                menu_state: Default::default(),
+            },
+            TabId::SETTINGS => Tab::Settings,
+            TabId::LOGS => Tab::Logs,
+            TabId::DOWNLOAD_STATUS => Tab::DownloadStatus,
+            _ => unreachable!(),
         }
+    }
+
+    pub fn id(&self) -> TabId {
+        match self {
+            Tab::Profiles { .. } => TabId::PROFILES,
+            Tab::Settings => TabId::SETTINGS,
+            Tab::Logs => TabId::LOGS,
+            Tab::DownloadStatus => TabId::DOWNLOAD_STATUS,
+        }
+    }
+
+    pub fn name(&self) -> &'static str {
+        self.id().0
     }
 }
 
@@ -135,6 +173,8 @@ struct MyContext {
     storage: Storage,
     launcher_manifest: &'static LauncherManifest,
 
+    tabs_state: TabsState,
+
     file_dialog: FileDialog,
 
     is_profile_window_open: bool,
@@ -156,6 +196,11 @@ impl MyContext {
         DownloadProgress::extend(&mut storage).unwrap();
         SettingsPage::extend(&mut storage).unwrap();
 
+        let mut tabs = HashSet::new();
+
+        tabs.insert(TabId::PROFILES);
+        tabs.insert(TabId::SETTINGS);
+
         Self {
             storage,
             collector,
@@ -165,6 +210,7 @@ impl MyContext {
             download_result_channel: Channel::new(100),
             download_progress_channel: Channel::new(500),
             download_total_channel: Channel::new(100),
+            tabs_state: TabsState(tabs),
         }
     }
 }
@@ -173,17 +219,22 @@ impl TabViewer for MyContext {
     type Tab = Tab;
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
-        tab.as_str().into()
+        tab.name().into()
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         match tab {
-            Tab::Profiles => ProfilesPage {
+            Tab::Profiles {
+                profiles_state,
+                menu_state,
+            } => ProfilesPage {
                 download_result_tx: self.download_result_channel.clone_tx(),
                 download_progress_tx: self.download_progress_channel.clone_tx(),
                 download_total_tx: self.download_total_channel.clone_tx(),
 
-                storage: &mut self.storage,
+                state: profiles_state,
+                menu_state,
+
                 launcher_manifest: self.launcher_manifest,
                 is_profile_window_open: &mut self.is_profile_window_open,
             }
@@ -218,7 +269,13 @@ struct MyTabs {
 
 impl MyTabs {
     pub fn new(collector: EventCollector) -> Self {
-        let tabs = [Tab::Profiles, Tab::Settings].to_vec();
+        let tabs = vec![
+            Tab::Profiles {
+                profiles_state: ProfilesState::default(),
+                menu_state: AddProfileMenuState::default(),
+            },
+            Tab::Settings,
+        ];
 
         let dock_state = DockState::new(tabs);
 
@@ -256,6 +313,7 @@ impl eframe::App for MyTabs {
                 AddTab {
                     dock_state: &self.dock_state,
                     added_tabs: &mut added_nodes,
+                    tabs_state: &mut self.context.tabs_state,
                 }
                 .ui(ui);
                 egui::warn_if_debug_build(ui);
@@ -268,6 +326,20 @@ impl eframe::App for MyTabs {
 
         added_nodes
             .drain(..)
-            .for_each(|node| self.dock_state.push_to_first_leaf(node))
+            .for_each(|node| self.dock_state.push_to_first_leaf(node));
+
+        let opened_tabs = self
+            .dock_state
+            .iter_all_tabs()
+            .map(|(_, tab)| tab)
+            .map(Tab::id)
+            .collect::<Vec<_>>();
+
+        for tab_id in &self.context.tabs_state.0 {
+            if !opened_tabs.contains(tab_id) {
+                self.dock_state
+                    .push_to_first_leaf(Tab::from_id(tab_id.to_owned()))
+            }
+        }
     }
 }

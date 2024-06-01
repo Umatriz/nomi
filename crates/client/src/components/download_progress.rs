@@ -6,7 +6,7 @@ use tokio::sync::mpsc::Receiver;
 
 use crate::Storage;
 
-use super::{profiles::ProfilesData, Component, StorageCreationExt};
+use super::{profiles::ProfilesState, Component, StorageCreationExt};
 
 pub struct DownloadProgress<'a> {
     pub storage: &'a mut Storage,
@@ -34,7 +34,7 @@ impl StorageCreationExt for DownloadProgress<'_> {
 impl Component for DownloadProgress<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
         {
-            let profiles = self.storage.get_mut::<ProfilesData>().unwrap();
+            let profiles = self.storage.get_mut::<ProfilesState>().unwrap();
 
             if let Ok(profile) = self.download_result_rx.try_recv() {
                 let prof = profiles

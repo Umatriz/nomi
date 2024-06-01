@@ -1,47 +1,38 @@
+use std::collections::HashSet;
+
 use egui_dock::DockState;
 
-use crate::Tab;
+use crate::{Tab, TabId};
 
 use super::Component;
 
 pub struct AddTab<'a> {
     pub dock_state: &'a DockState<Tab>,
     pub added_tabs: &'a mut Vec<Tab>,
+    pub tabs_state: &'a mut TabsState,
+}
+
+pub struct TabsState(pub HashSet<TabId>);
+
+fn set_open(open: &mut HashSet<TabId>, key: &TabId, is_open: bool) {
+    if is_open {
+        if !open.contains(key) {
+            open.insert(key.to_owned());
+        }
+    } else {
+        open.remove(key);
+    }
 }
 
 impl Component for AddTab<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
-        let opened_tabs = self
-            .dock_state
-            .iter_all_tabs()
-            .map(|(_, tab)| tab.clone())
-            .collect::<Vec<_>>();
-
         ui.menu_button("View", |ui| {
-            let unopened_tabs = Tab::ALL_TABS
-                .iter()
-                .filter(|tab| !opened_tabs.contains(tab))
-                .collect::<Vec<_>>();
-
-            match unopened_tabs.len() {
-                0 => {
-                    ui.label("All tabs are already open");
-                }
-                _ => {
-                    for unopened_tab in unopened_tabs {
-                        if ui.button(unopened_tab.as_str()).clicked() {
-                            self.added_tabs.push(unopened_tab.clone());
-                        }
-                    }
-                }
+            let tabs_state = &mut self.tabs_state.0;
+            for tab in Tab::AVAILABLE_TABS {
+                let mut is_open = tabs_state.contains(&tab.id());
+                ui.toggle_value(&mut is_open, tab.name());
+                set_open(tabs_state, &tab.id(), is_open)
             }
         });
-
-        // egui::popup_below_widget(ui, popup_id, &button_response, |ui| {
-        //     ui.set_min_width(200.0);
-        //     ui.vertical(|ui| {
-        //         ui.label("Unopened tabs");
-        //     });
-        // });
     }
 }

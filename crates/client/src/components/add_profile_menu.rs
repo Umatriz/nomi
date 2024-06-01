@@ -9,16 +9,16 @@ use nomi_core::{
 
 use crate::Storage;
 
-use super::{profiles::ProfilesData, Component, StorageCreationExt};
+use super::{profiles::ProfilesState, Component, StorageCreationExt};
 
 pub struct AddProfileMenu<'a> {
-    pub storage: &'a mut Storage,
     pub launcher_manifest: &'a LauncherManifest,
-    // pub is_profile_window_open: &'a mut bool,
+    pub state: &'a mut AddProfileMenuState,
+    pub profiles_state: &'a mut ProfilesState,
 }
 
 #[derive(Clone)]
-struct AddProfileMenuData {
+pub struct AddProfileMenuState {
     selected_version_type: VersionType,
 
     profile_name_buf: String,
@@ -26,15 +26,27 @@ struct AddProfileMenuData {
     loader_buf: Loader,
 }
 
-impl StorageCreationExt for AddProfileMenu<'_> {
-    fn extend(storage: &mut crate::Storage) -> anyhow::Result<()> {
-        storage.insert(AddProfileMenuData {
+impl Default for AddProfileMenuState {
+    fn default() -> Self {
+        Self::default_const()
+    }
+}
+
+impl AddProfileMenuState {
+    pub const fn default_const() -> Self {
+        Self {
             selected_version_type: VersionType::Release,
 
             profile_name_buf: String::new(),
             selected_version_buf: None,
             loader_buf: Loader::Vanilla,
-        });
+        }
+    }
+}
+
+impl StorageCreationExt for AddProfileMenu<'_> {
+    fn extend(storage: &mut crate::Storage) -> anyhow::Result<()> {
+        storage.insert(AddProfileMenuState::default());
         Ok(())
     }
 }
@@ -42,28 +54,26 @@ impl StorageCreationExt for AddProfileMenu<'_> {
 impl Component for AddProfileMenu<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
         {
-            let profile_data = self.storage.get_mut::<AddProfileMenuData>().unwrap();
-
             ui.label("Profile name:");
-            ui.text_edit_singleline(&mut profile_data.profile_name_buf);
+            ui.text_edit_singleline(&mut self.state.profile_name_buf);
 
             egui::ComboBox::from_label("Versions Filter")
-                .selected_text(format!("{:?}", profile_data.selected_version_type))
+                .selected_text(format!("{:?}", self.state.selected_version_type))
                 .show_ui(ui, |ui| {
                     ui.selectable_value(
-                        &mut profile_data.selected_version_type,
+                        &mut self.state.selected_version_type,
                         VersionType::Release,
                         "Release",
                     );
                     ui.selectable_value(
-                        &mut profile_data.selected_version_type,
+                        &mut self.state.selected_version_type,
                         VersionType::Snapshot,
                         "Snapshot",
                     );
                 });
 
             let versions_iter = self.launcher_manifest.versions.iter();
-            let versions = match profile_data.selected_version_type {
+            let versions = match self.state.selected_version_type {
                 VersionType::Release => versions_iter
                     .filter(|v| v.version_type == "release")
                     .collect::<Vec<_>>(),
@@ -74,7 +84,7 @@ impl Component for AddProfileMenu<'_> {
 
             egui::ComboBox::from_label("Select version")
                 .selected_text(
-                    profile_data
+                    self.state
                         .selected_version_buf
                         .as_ref()
                         .map_or("No version selcted", |v| &v.id),
@@ -82,38 +92,36 @@ impl Component for AddProfileMenu<'_> {
                 .show_ui(ui, |ui| {
                     for version in versions {
                         let value = ui.selectable_value(
-                            &mut profile_data.selected_version_buf.as_ref(),
+                            &mut self.state.selected_version_buf.as_ref(),
                             Some(version),
                             &version.id,
                         );
                         if value.clicked() {
-                            profile_data.selected_version_buf = Some(version.clone())
+                            self.state.selected_version_buf = Some(version.clone())
                         }
                     }
                 });
 
             ui.horizontal(|ui| {
-                ui.radio_value(&mut profile_data.loader_buf, Loader::Vanilla, "Vanilla");
-                ui.radio_value(&mut profile_data.loader_buf, Loader::Fabric, "Fabric")
+                ui.radio_value(&mut self.state.loader_buf, Loader::Vanilla, "Vanilla");
+                ui.radio_value(&mut self.state.loader_buf, Loader::Fabric, "Fabric")
             });
             ui.label(
                 RichText::new("You must install Vanilla before Fabric").color(Color32::YELLOW),
             );
         }
 
-        let profile_data = self.storage.get_owned::<AddProfileMenuData>().unwrap();
-        if ui.button("Create").clicked() && profile_data.selected_version_buf.is_some() {
-            let profiles = self.storage.get_mut::<ProfilesData>().unwrap();
-            profiles.add_profile(VersionProfile {
-                id: profiles.create_id(),
-                name: profile_data.profile_name_buf,
+        if ui.button("Create").clicked() && self.state.selected_version_buf.is_some() {
+            self.profiles_state.add_profile(VersionProfile {
+                id: self.profiles_state.create_id(),
+                name: self.state.profile_name_buf.clone(),
                 state: ProfileState::NotDownloaded {
-                    version: profile_data.selected_version_buf.unwrap().id,
-                    loader: profile_data.loader_buf,
-                    version_type: profile_data.selected_version_type,
+                    version: self.state.selected_version_buf.clone().unwrap().id,
+                    loader: self.state.loader_buf.clone(),
+                    version_type: self.state.selected_version_type.clone(),
                 },
             });
-            profiles.update_config().unwrap();
+            self.profiles_state.update_config().unwrap();
         }
     }
 }

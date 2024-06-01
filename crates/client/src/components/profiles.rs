@@ -14,7 +14,10 @@ use tracing::error;
 
 use crate::{download::spawn_download, utils::spawn_tokio_future, Storage};
 
-use super::{add_profile_menu::AddProfileMenu, Component, StorageCreationExt};
+use super::{
+    add_profile_menu::{AddProfileMenu, AddProfileMenuState},
+    Component, StorageCreationExt,
+};
 
 pub struct ProfilesPage<'a> {
     pub download_result_tx: Sender<VersionProfile>,
@@ -23,16 +26,24 @@ pub struct ProfilesPage<'a> {
 
     pub is_profile_window_open: &'a mut bool,
 
-    pub storage: &'a mut Storage,
+    pub state: &'a mut ProfilesState,
+    pub menu_state: &'a mut AddProfileMenuState,
+
     pub launcher_manifest: &'static LauncherManifest,
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub(super) struct ProfilesData {
-    pub(super) profiles: Vec<Arc<VersionProfile>>,
+pub struct ProfilesState {
+    pub profiles: Vec<Arc<VersionProfile>>,
 }
 
-impl ProfilesData {
+impl ProfilesState {
+    pub const fn default_const() -> Self {
+        Self {
+            profiles: Vec::new(),
+        }
+    }
+
     pub fn add_profile(&mut self, profile: VersionProfile) {
         self.profiles.push(profile.into());
     }
@@ -53,7 +64,7 @@ impl ProfilesData {
 
 impl StorageCreationExt for ProfilesPage<'_> {
     fn extend(storage: &mut Storage) -> anyhow::Result<()> {
-        let profiles = read_toml_config_sync::<ProfilesData>("./.nomi/configs/Profiles.toml")
+        let profiles = read_toml_config_sync::<ProfilesState>("./.nomi/configs/Profiles.toml")
             .unwrap_or_default();
 
         storage.insert(profiles);
@@ -76,18 +87,14 @@ impl Component for ProfilesPage<'_> {
                 .open(self.is_profile_window_open)
                 .show(ui.ctx(), |ui| {
                     AddProfileMenu {
-                        storage: self.storage,
+                        state: self.menu_state,
+                        profiles_state: self.state,
                         launcher_manifest: self.launcher_manifest,
                         // is_profile_window_open: self.is_profile_window_open,
                     }
                     .ui(ui);
                 });
         }
-
-        let profiles = self
-            .storage
-            .get::<ProfilesData>()
-            .expect("`ProfilesData::extend` must be called in the `Context::new`");
 
         ui.style_mut().wrap = Some(false);
 
@@ -103,7 +110,7 @@ impl Component for ProfilesPage<'_> {
                 });
             })
             .body(|mut body| {
-                for profile in profiles.profiles.iter().cloned() {
+                for profile in self.state.profiles.iter().cloned() {
                     body.row(30.0, |mut row| {
                         row.col(|ui| {
                             ui.add(egui::Label::new(&profile.name).truncate(true));
