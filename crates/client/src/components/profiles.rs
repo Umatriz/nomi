@@ -4,25 +4,22 @@ use eframe::egui::{self, Align2, Ui};
 use egui_extras::{Column, TableBuilder};
 use nomi_core::{
     configs::profile::{ProfileState, VersionProfile},
-    downloads::traits::DownloadResult,
     fs::write_toml_config_sync,
     repository::launcher_manifest::LauncherManifest,
 };
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc::Sender;
 use tracing::error;
 
-use crate::{download::spawn_download, utils::spawn_tokio_future};
+use crate::{download::spawn_download, errors_pool::ErrorPoolExt, utils::spawn_tokio_future};
 
 use super::{
     add_profile_menu::{AddProfileMenu, AddProfileMenuState},
+    download_progress::{AssetsExtra, DownloadProgressState, Task},
     Component,
 };
 
 pub struct ProfilesPage<'a> {
-    pub download_result_tx: Sender<VersionProfile>,
-    pub download_progress_tx: Sender<DownloadResult>,
-    pub download_total_tx: Sender<u32>,
+    pub download_progress: &'a mut DownloadProgressState,
 
     pub is_profile_window_open: &'a mut bool,
 
@@ -50,7 +47,7 @@ impl ProfilesState {
 
     /// Create an id for the profile
     /// depends on the last id in the vector
-    pub fn create_id(&self) -> i32 {
+    pub fn create_id(&self) -> u32 {
         match &self.profiles.iter().max_by_key(|x| x.id) {
             Some(v) => v.id + 1,
             None => 0,
@@ -117,18 +114,37 @@ impl Component for ProfilesPage<'_> {
                                             .launch()
                                             .await
                                             .inspect_err(|e| error!("{}", e))
-                                            .unwrap()
+                                            .report_error()
                                     });
                                 }
                             }
                             ProfileState::NotDownloaded { .. } => {
                                 if ui.button("Download").clicked() {
+                                    let version_task = Task::new(profile.version().to_owned());
+                                    let id = profile.id;
+
+                                    self.download_progress.assets_to_download.push(
+                                        Task::new(format!("Assets ({})", profile.version()))
+                                            .with_extra(AssetsExtra {
+                                                version: profile.version().to_owned(),
+                                                assets_dir: std::env::current_dir()
+                                                    .report_error_with_context(
+                                                        "Unable to get current directory",
+                                                    )
+                                                    .unwrap()
+                                                    .join("minecraft")
+                                                    .join("assets"),
+                                            }),
+                                    );
+
                                     spawn_download(
                                         profile,
-                                        self.download_result_tx.clone(),
-                                        self.download_progress_tx.clone(),
-                                        self.download_total_tx.clone(),
+                                        version_task.result_channel().clone_tx(),
+                                        version_task.progress_channel().clone_tx(),
+                                        version_task.total_channel().clone_tx(),
                                     );
+
+                                    self.download_progress.tasks.insert(id, version_task);
                                 }
                             }
                         });

@@ -1,4 +1,4 @@
-use eframe::egui::{self, Color32, RichText};
+use eframe::egui::{self, RichText};
 use nomi_core::{
     configs::profile::{Loader, ProfileState, VersionProfile},
     repository::{
@@ -6,6 +6,8 @@ use nomi_core::{
         manifest::VersionType,
     },
 };
+
+use crate::errors_pool::ErrorPoolExt;
 
 use super::{profiles::ProfilesState, Component};
 
@@ -97,22 +99,39 @@ impl Component for AddProfileMenu<'_> {
                 ui.radio_value(&mut self.state.loader_buf, Loader::Vanilla, "Vanilla");
                 ui.radio_value(&mut self.state.loader_buf, Loader::Fabric, "Fabric")
             });
-            ui.label(
-                RichText::new("You must install Vanilla before Fabric").color(Color32::YELLOW),
-            );
+
+            if matches!(self.state.loader_buf, Loader::Fabric) {
+                ui.label(
+                    RichText::new("You must install Vanilla before Fabric")
+                        .color(ui.visuals().warn_fg_color),
+                );
+            }
         }
 
-        if ui.button("Create").clicked() && self.state.selected_version_buf.is_some() {
+        if self.state.selected_version_buf.is_none() {
+            ui.label(
+                RichText::new("You must select the version").color(ui.visuals().warn_fg_color),
+            );
+        }
+        if ui
+            .add_enabled(
+                self.state.selected_version_buf.is_some(),
+                egui::Button::new("Create"),
+            )
+            .clicked()
+        {
             self.profiles_state.add_profile(VersionProfile {
                 id: self.profiles_state.create_id(),
                 name: self.state.profile_name_buf.clone(),
                 state: ProfileState::NotDownloaded {
+                    // PANICS: It will never panic because it's
+                    // unreachable if `selected_version_buf` is `None`
                     version: self.state.selected_version_buf.clone().unwrap().id,
                     loader: self.state.loader_buf.clone(),
                     version_type: self.state.selected_version_type.clone(),
                 },
             });
-            self.profiles_state.update_config().unwrap();
+            self.profiles_state.update_config().report_error();
         }
     }
 }

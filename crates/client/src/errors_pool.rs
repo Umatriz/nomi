@@ -55,6 +55,9 @@ pub struct ErrorsPoolState {
 
 pub trait ErrorPoolExt<T> {
     fn report_error(self) -> Option<T>;
+    fn report_error_with_context<C>(self, context: C) -> Option<T>
+    where
+        C: Display + Send + Sync + 'static;
 }
 
 impl<T, E> ErrorPoolExt<T> for Result<T, E>
@@ -71,6 +74,25 @@ where
                     .inspect_err(|err| error!("Unable to write into the `ERRORS_POOL`\n{}", err))
                 {
                     pool.push_error(error);
+                }
+                None
+            }
+        }
+    }
+
+    fn report_error_with_context<C>(self, context: C) -> Option<T>
+    where
+        C: Display + Send + Sync + 'static,
+    {
+        match self {
+            Ok(value) => Some(value),
+            Err(error) => {
+                if let Ok(mut pool) = ERRORS_POOL
+                    .clone()
+                    .write()
+                    .inspect_err(|err| error!("Unable to write into the `ERRORS_POOL`\n{}", err))
+                {
+                    pool.push_error(anyhow::Error::msg(error).context(context));
                 }
                 None
             }

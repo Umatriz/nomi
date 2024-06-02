@@ -9,6 +9,8 @@ use nomi_core::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::errors_pool::ErrorPoolExt;
+
 use super::Component;
 
 pub struct SettingsPage<'a> {
@@ -191,7 +193,7 @@ impl Component for SettingsPage<'_> {
 
         if let Some(Ok(())) = form.handle_submit(&ui.button("Save"), ui) {
             *self.client_settings_state = settings_data.client_settings.clone();
-            write_toml_config_sync(&settings_data, "./.nomi/configs/Settings.toml").unwrap();
+            write_toml_config_sync(&settings_data, "./.nomi/configs/Settings.toml").report_error();
         }
     }
 }

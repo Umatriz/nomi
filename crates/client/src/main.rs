@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use components::{add_profile_menu::AddProfileMenuState, add_tab_menu::AddTab, Component};
 use context::MyContext;
 use eframe::{
@@ -119,9 +118,6 @@ impl eframe::App for MyTabs {
                 }
                 .ui(ui);
                 egui::warn_if_debug_build(ui);
-                if ui.button("Make an error!").clicked() {
-                    ERRORS_POOL.write().unwrap().push_error(anyhow!("Error!"));
-                }
             });
         });
 

@@ -1,20 +1,21 @@
-use std::sync::Arc;
+use std::{path::PathBuf, sync::Arc};
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use nomi_core::{
     configs::profile::{Loader, ProfileState, VersionProfile},
     downloads::{
         traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
-        DownloadQueue,
+        AssetsDownloader, DownloadQueue,
     },
     game_paths::GamePaths,
     instance::{launch::LaunchSettings, InstanceBuilder},
     loaders::{fabric::Fabric, vanilla::Vanilla},
     repository::{java_runner::JavaRunner, username::Username},
+    state::get_launcher_manifest,
 };
 use tokio::sync::mpsc::Sender;
 
-use crate::utils::Crash;
+use crate::errors_pool::ErrorPoolExt;
 
 pub fn spawn_download(
     profile: Arc<VersionProfile>,
@@ -23,11 +24,12 @@ pub fn spawn_download(
     total_tx: tokio::sync::mpsc::Sender<u32>,
 ) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
-        let data = try_download(profile, progress_tx.clone(), total_tx)
+        if let Some(data) = try_download(profile, progress_tx.clone(), total_tx)
             .await
-            .crash();
-
-        let _ = result_tx.send(data).await;
+            .report_error()
+        {
+            let _ = result_tx.send(data).await;
+        };
     })
 }
 
@@ -97,18 +99,16 @@ async fn try_download(
         Some(vec!["-Xms2G".to_string(), "-Xmx4G".to_string()]),
     );
 
-    let assets = instance.assets().await?;
+    // let assets = instance.assets().await?;
 
-    assets.get_io().io().await?;
+    // assets.get_io().io().await?;
 
     let instance = instance.instance();
     instance.get_io_dyn().io().await?;
 
     let downloader: Box<dyn Downloader<Data = DownloadResult>> = instance.into_downloader();
 
-    let downloader = DownloadQueue::new()
-        .with_downloader(assets)
-        .with_downloader_dyn(downloader);
+    let downloader = DownloadQueue::new().with_downloader_dyn(downloader);
 
     let _ = total_tx.send(downloader.total()).await;
 
@@ -121,4 +121,50 @@ async fn try_download(
     };
 
     Ok(profile)
+}
+
+pub fn spawn_assets(
+    version: String,
+    assets_dir: PathBuf,
+    result_tx: Sender<()>,
+    progress_tx: Sender<DownloadResult>,
+    total_tx: Sender<u32>,
+) {
+    tokio::spawn(async move {
+        let _ = try_assets(version, assets_dir, result_tx, progress_tx, total_tx)
+            .await
+            .report_error_with_context("Assets downloading error");
+    });
+}
+
+async fn try_assets(
+    version: String,
+    assets_dir: PathBuf,
+    result_tx: Sender<()>,
+    progress_tx: Sender<DownloadResult>,
+    total_tx: Sender<u32>,
+) -> anyhow::Result<()> {
+    let manifest = get_launcher_manifest().await?;
+    let version_manifest = manifest.get_version_manifest(version).await?;
+
+    let downloader = AssetsDownloader::new(
+        version_manifest.asset_index.url,
+        version_manifest.asset_index.id,
+        assets_dir.join("objects"),
+        assets_dir.join("indexes"),
+    )
+    .await?;
+
+    downloader.get_io().io().await.context("`io` error")?;
+
+    total_tx
+        .send(downloader.total())
+        .await
+        .context("unable to send the `total` value")?;
+
+    Box::new(downloader).download(progress_tx).await;
+
+    let _ = result_tx.send(()).await;
+
+    Ok(())
 }

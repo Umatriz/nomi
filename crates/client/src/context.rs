@@ -1,9 +1,9 @@
 use crate::{
-    channel::Channel,
     components::{
         download_progress::DownloadProgress, profiles::ProfilesPage, settings::SettingsPage,
         Component,
     },
+    errors_pool::ErrorPoolExt,
     states::States,
     Tab, TabKind,
 };
@@ -12,8 +12,8 @@ use egui_dock::TabViewer;
 use egui_file_dialog::FileDialog;
 use egui_tracing::EventCollector;
 use nomi_core::{
-    configs::profile::VersionProfile, downloads::traits::DownloadResult,
-    repository::launcher_manifest::LauncherManifest, state::get_launcher_manifest,
+    repository::launcher_manifest::{Latest, LauncherManifest},
+    state::get_launcher_manifest,
 };
 
 pub struct MyContext {
@@ -24,24 +24,27 @@ pub struct MyContext {
     pub states: States,
 
     pub is_profile_window_open: bool,
-
-    pub download_result_channel: Channel<VersionProfile>,
-    pub download_progress_channel: Channel<DownloadResult>,
-    pub download_total_channel: Channel<u32>,
 }
 
 impl MyContext {
     pub fn new(collector: EventCollector) -> Self {
-        let launcher_manifest_ref = pollster::block_on(get_launcher_manifest()).unwrap();
+        const EMPTY_MANIFEST: &LauncherManifest = &LauncherManifest {
+            latest: Latest {
+                release: String::new(),
+                snapshot: String::new(),
+            },
+            versions: Vec::new(),
+        };
+
+        let launcher_manifest_ref = pollster::block_on(get_launcher_manifest())
+            .report_error()
+            .unwrap_or(EMPTY_MANIFEST);
 
         Self {
             collector,
             launcher_manifest: launcher_manifest_ref,
             file_dialog: FileDialog::new(),
             is_profile_window_open: false,
-            download_result_channel: Channel::new(100),
-            download_progress_channel: Channel::new(500),
-            download_total_channel: Channel::new(100),
 
             states: States::new(),
         }
@@ -58,10 +61,7 @@ impl TabViewer for MyContext {
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         match &mut tab.kind_mut() {
             TabKind::Profiles { menu_state } => ProfilesPage {
-                download_result_tx: self.download_result_channel.clone_tx(),
-                download_progress_tx: self.download_progress_channel.clone_tx(),
-                download_total_tx: self.download_total_channel.clone_tx(),
-
+                download_progress: &mut self.states.download_progress,
                 state: &mut self.states.profiles,
                 menu_state,
 
@@ -84,10 +84,6 @@ impl TabViewer for MyContext {
                 DownloadProgress {
                     download_progress_state: &mut self.states.download_progress,
                     profiles_state: &mut self.states.profiles,
-
-                    download_result_rx: &mut self.download_result_channel,
-                    download_progress_rx: &mut self.download_progress_channel,
-                    download_total_rx: &mut self.download_total_channel,
                 }
                 .ui(ui);
             }

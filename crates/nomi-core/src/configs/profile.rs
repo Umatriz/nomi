@@ -18,7 +18,7 @@ impl VersionProfilesConfig {
 
     /// Create an id for the profile
     /// depends on the last id in the vector
-    pub fn create_id(&self) -> i32 {
+    pub fn create_id(&self) -> u32 {
         match &self.profiles.iter().max_by_key(|x| x.id) {
             Some(v) => v.id + 1,
             None => 0,
@@ -65,7 +65,7 @@ impl ProfileState {
 
 #[derive(Serialize, Deserialize, Debug, Builder, Clone)]
 pub struct VersionProfile {
-    pub id: i32,
+    pub id: u32,
     pub name: String,
 
     pub state: ProfileState,
