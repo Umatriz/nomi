@@ -43,7 +43,7 @@ impl MyContext {
             download_progress_channel: Channel::new(500),
             download_total_channel: Channel::new(100),
 
-            states: States::new().unwrap(),
+            states: States::new(),
         }
     }
 }

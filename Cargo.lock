@@ -794,6 +794,7 @@ dependencies = [
  "egui_tracing",
  "garde",
  "nomi-core",
+ "once_cell",
  "pollster",
  "serde",
  "tokio",

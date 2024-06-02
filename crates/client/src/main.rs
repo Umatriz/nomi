@@ -1,12 +1,14 @@
+use anyhow::anyhow;
 use components::{add_profile_menu::AddProfileMenuState, add_tab_menu::AddTab, Component};
 use context::MyContext;
 use eframe::{
-    egui::{self, Align, Frame, Layout, ViewportBuilder},
+    egui::{self, Align, Align2, Frame, Layout, ViewportBuilder},
     epaint::Vec2,
 };
 use egui_dock::{DockArea, DockState, Style};
 use egui_tracing::EventCollector;
 
+use errors_pool::ERRORS_POOL;
 use tracing::{info, Level};
 use tracing_subscriber::{
     fmt::{writer::MakeWriterExt, Layer},
@@ -15,6 +17,7 @@ use tracing_subscriber::{
 
 pub mod components;
 pub mod download;
+pub mod errors_pool;
 pub mod utils;
 
 pub mod channel;
@@ -116,8 +119,46 @@ impl eframe::App for MyTabs {
                 }
                 .ui(ui);
                 egui::warn_if_debug_build(ui);
+                if ui.button("Make an error!").clicked() {
+                    ERRORS_POOL.write().unwrap().push_error(anyhow!("Error!"));
+                }
             });
         });
+
+        if let Ok(len) = ERRORS_POOL.try_read().map(|pool| pool.len()) {
+            if self.context.states.errors_pool.number_of_errors != len {
+                self.context.states.errors_pool.number_of_errors = len;
+                self.context.states.errors_pool.is_window_open = true;
+            }
+        }
+
+        egui::Window::new("Errors")
+            .id("error_window".into())
+            .open(&mut self.context.states.errors_pool.is_window_open)
+            .resizable(false)
+            .movable(false)
+            .anchor(Align2::RIGHT_BOTTOM, [0.0, 0.0])
+            .show(ctx, |ui| {
+                {
+                    match ERRORS_POOL.try_read() {
+                        Ok(pool) => {
+                            if pool.is_empty() {
+                                ui.label("No errors");
+                            }
+                            for error in pool.iter_errors() {
+                                ui.label(format!("{}", error));
+                            }
+                        }
+                        Err(_) => {
+                            ui.spinner();
+                        }
+                    }
+                }
+
+                if ui.button("Clear").clicked() {
+                    ERRORS_POOL.write().unwrap().clear()
+                }
+            });
 
         egui::CentralPanel::default()
             .frame(Frame::central_panel(ctx.style().as_ref()).inner_margin(0.0))
