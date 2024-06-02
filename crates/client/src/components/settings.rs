@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use eframe::egui;
+use eframe::egui::{self, RichText};
 use egui_file_dialog::FileDialog;
 use egui_form::{garde::field_path, Form, FormField};
 use garde::{Error, Validate};
@@ -87,6 +87,34 @@ fn check_uuid(value: &str, _context: &()) -> garde::Result {
 
 impl Component for SettingsPage<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
+        ui.collapsing("Utils", |ui| {
+            let launcher_path = PathBuf::from("./.nomi/logs");
+
+            if launcher_path.exists() {
+                if ui.button("Delete launcher's logs").clicked() {
+                    let _ = std::fs::remove_dir_all(launcher_path);
+                }
+            } else {
+                ui.label(
+                    RichText::new("The launcher log's directory is already deleted")
+                        .color(ui.visuals().warn_fg_color),
+                );
+            }
+
+            let game_path = PathBuf::from("./logs");
+
+            if game_path.exists() {
+                if ui.button("Delete game's logs").clicked() {
+                    let _ = std::fs::remove_dir_all(game_path);
+                }
+            } else {
+                ui.label(
+                    RichText::new("The games log's directory is already deleted")
+                        .color(ui.visuals().warn_fg_color),
+                );
+            }
+        });
+
         let settings_data = self.settings_state.clone();
 
         let mut form = Form::new().add_report(egui_form::garde::GardeReport::new(
