@@ -85,24 +85,6 @@ fn check_uuid(value: &str, _context: &()) -> garde::Result {
         .map_or_else(|| Err(Error::new("Invalid UUID")), |_| Ok(()))
 }
 
-// impl StorageCreationExt for SettingsPage<'_> {
-//     fn extend(storage: &mut Storage) -> anyhow::Result<()> {
-//         let data = match read_toml_config_sync::<SettingsState>("./.nomi/configs/Settings.toml") {
-//             Ok(data) => data,
-//             Err(e) => {
-//                 error!("{}", e);
-//                 write_toml_config_sync(&SettingsState::default(), "./.nomi/configs/Settings.toml")?;
-//                 SettingsState::default()
-//             }
-//         };
-
-//         storage.insert(data.client_settings.clone());
-//         storage.insert(data);
-
-//         Ok(())
-//     }
-// }
-
 impl Component for SettingsPage<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
         let settings_data = self.settings_state.clone();

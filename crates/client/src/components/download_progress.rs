@@ -21,16 +21,6 @@ pub struct DownloadProgressState {
     current: u32,
 }
 
-// impl StorageCreationExt for DownloadProgress<'_> {
-//     fn extend(storage: &mut Storage) -> anyhow::Result<()> {
-//         storage.insert(DownloadProgressState {
-//             total: 0,
-//             current: 0,
-//         });
-//         Ok(())
-//     }
-// }
-
 impl Component for DownloadProgress<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
         {

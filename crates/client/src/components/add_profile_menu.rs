@@ -42,13 +42,6 @@ impl AddProfileMenuState {
     }
 }
 
-// impl StorageCreationExt for AddProfileMenu<'_> {
-//     fn extend(storage: &mut crate::Storage) -> anyhow::Result<()> {
-//         storage.insert(AddProfileMenuState::default());
-//         Ok(())
-//     }
-// }
-
 impl Component for AddProfileMenu<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
         {
