@@ -97,6 +97,7 @@ impl Component for AddProfileMenu<'_> {
 
             ui.horizontal(|ui| {
                 ui.radio_value(&mut self.state.loader_buf, Loader::Vanilla, "Vanilla");
+                // TODO: Add check for old versions to not display this variant
                 ui.radio_value(&mut self.state.loader_buf, Loader::Fabric, "Fabric")
             });
 

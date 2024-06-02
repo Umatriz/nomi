@@ -57,6 +57,10 @@ impl Fabric {
             .json()
             .await?;
 
+        if versions.is_empty() {
+            return Err(crate::error::Error::NoSuchVersion.into());
+        }
+
         let profile_version = loader_version
             .map(Into::into)
             .and_then(|loader| versions.iter().find(|i| i.loader.version == loader))
