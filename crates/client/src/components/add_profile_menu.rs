@@ -7,7 +7,7 @@ use nomi_core::{
     },
 };
 
-use super::{profiles::ProfilesState, Component, StorageCreationExt};
+use super::{profiles::ProfilesState, Component};
 
 pub struct AddProfileMenu<'a> {
     pub launcher_manifest: &'a LauncherManifest,
@@ -42,12 +42,12 @@ impl AddProfileMenuState {
     }
 }
 
-impl StorageCreationExt for AddProfileMenu<'_> {
-    fn extend(storage: &mut crate::Storage) -> anyhow::Result<()> {
-        storage.insert(AddProfileMenuState::default());
-        Ok(())
-    }
-}
+// impl StorageCreationExt for AddProfileMenu<'_> {
+//     fn extend(storage: &mut crate::Storage) -> anyhow::Result<()> {
+//         storage.insert(AddProfileMenuState::default());
+//         Ok(())
+//     }
+// }
 
 impl Component for AddProfileMenu<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {

@@ -5,18 +5,18 @@ use egui_extras::{Column, TableBuilder};
 use nomi_core::{
     configs::profile::{ProfileState, VersionProfile},
     downloads::traits::DownloadResult,
-    fs::{read_toml_config_sync, write_toml_config_sync},
+    fs::write_toml_config_sync,
     repository::launcher_manifest::LauncherManifest,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc::Sender;
 use tracing::error;
 
-use crate::{download::spawn_download, utils::spawn_tokio_future, Storage};
+use crate::{download::spawn_download, utils::spawn_tokio_future};
 
 use super::{
     add_profile_menu::{AddProfileMenu, AddProfileMenuState},
-    Component, StorageCreationExt,
+    Component,
 };
 
 pub struct ProfilesPage<'a> {
@@ -59,17 +59,6 @@ impl ProfilesState {
 
     pub fn update_config(&self) -> anyhow::Result<()> {
         write_toml_config_sync(&self, "./.nomi/configs/Profiles.toml")
-    }
-}
-
-impl StorageCreationExt for ProfilesPage<'_> {
-    fn extend(storage: &mut Storage) -> anyhow::Result<()> {
-        let profiles = read_toml_config_sync::<ProfilesState>("./.nomi/configs/Profiles.toml")
-            .unwrap_or_default();
-
-        storage.insert(profiles);
-
-        Ok(())
     }
 }
 

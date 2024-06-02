@@ -5,25 +5,20 @@ use egui_file_dialog::FileDialog;
 use egui_form::{garde::field_path, Form, FormField};
 use garde::{Error, Validate};
 use nomi_core::{
-    fs::{read_toml_config_sync, write_toml_config_sync},
-    regex::Regex,
-    repository::java_runner::JavaRunner,
-    Uuid,
+    fs::write_toml_config_sync, regex::Regex, repository::java_runner::JavaRunner, Uuid,
 };
 use serde::{Deserialize, Serialize};
-use tracing::error;
 
-use crate::Storage;
-
-use super::{Component, StorageCreationExt};
+use super::Component;
 
 pub struct SettingsPage<'a> {
-    pub storage: &'a mut Storage,
+    pub settings_state: &'a mut SettingsState,
+    pub client_settings_state: &'a mut ClientSettingsState,
     pub file_dialog: &'a mut FileDialog,
 }
 
 #[derive(Debug, Validate, Serialize, Deserialize, Clone)]
-pub(crate) struct SettingsData {
+pub struct SettingsState {
     #[garde(custom(check_username))]
     username: String,
     #[garde(custom(check_uuid))]
@@ -32,26 +27,26 @@ pub(crate) struct SettingsData {
     java: JavaRunner,
 
     #[garde(skip)]
-    pub client_settings: ClientSettings,
+    pub client_settings: ClientSettingsState,
 }
 
-impl Default for SettingsData {
+impl Default for SettingsState {
     fn default() -> Self {
-        SettingsData {
+        SettingsState {
             username: "Nomi".to_owned(),
             uuid: Uuid::new_v4().to_string(),
             java: JavaRunner::command("java"),
-            client_settings: ClientSettings::default(),
+            client_settings: ClientSettingsState::default(),
         }
     }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub(crate) struct ClientSettings {
+pub struct ClientSettingsState {
     pub pixels_per_point: f32,
 }
 
-impl Default for ClientSettings {
+impl Default for ClientSettingsState {
     fn default() -> Self {
         Self {
             pixels_per_point: 1.5,
@@ -90,37 +85,35 @@ fn check_uuid(value: &str, _context: &()) -> garde::Result {
         .map_or_else(|| Err(Error::new("Invalid UUID")), |_| Ok(()))
 }
 
-impl StorageCreationExt for SettingsPage<'_> {
-    fn extend(storage: &mut Storage) -> anyhow::Result<()> {
-        let data = match read_toml_config_sync::<SettingsData>("./.nomi/configs/Settings.toml") {
-            Ok(data) => data,
-            Err(e) => {
-                error!("{}", e);
-                write_toml_config_sync(&SettingsData::default(), "./.nomi/configs/Settings.toml")?;
-                SettingsData::default()
-            }
-        };
+// impl StorageCreationExt for SettingsPage<'_> {
+//     fn extend(storage: &mut Storage) -> anyhow::Result<()> {
+//         let data = match read_toml_config_sync::<SettingsState>("./.nomi/configs/Settings.toml") {
+//             Ok(data) => data,
+//             Err(e) => {
+//                 error!("{}", e);
+//                 write_toml_config_sync(&SettingsState::default(), "./.nomi/configs/Settings.toml")?;
+//                 SettingsState::default()
+//             }
+//         };
 
-        storage.insert(data.client_settings.clone());
-        storage.insert(data);
+//         storage.insert(data.client_settings.clone());
+//         storage.insert(data);
 
-        Ok(())
-    }
-}
+//         Ok(())
+//     }
+// }
 
 impl Component for SettingsPage<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
-        let settings_data = self.storage.get_owned::<SettingsData>().unwrap();
+        let settings_data = self.settings_state.clone();
 
         let mut form = Form::new().add_report(egui_form::garde::GardeReport::new(
             settings_data.validate(&()),
         ));
 
         {
-            let settings_data = self.storage.get_mut::<SettingsData>().unwrap();
-
             if let Some(path) = self.file_dialog.update(ui.ctx()).selected() {
-                if let JavaRunner::Path(java_path) = &mut settings_data.java {
+                if let JavaRunner::Path(java_path) = &mut self.settings_state.java {
                     if java_path != path {
                         *java_path = dbg!(path).to_path_buf();
                     }
@@ -130,11 +123,17 @@ impl Component for SettingsPage<'_> {
             ui.collapsing("User", |ui| {
                 FormField::new(&mut form, field_path!("username"))
                     .label("Username")
-                    .ui(ui, egui::TextEdit::singleline(&mut settings_data.username));
+                    .ui(
+                        ui,
+                        egui::TextEdit::singleline(&mut self.settings_state.username),
+                    );
 
                 FormField::new(&mut form, field_path!("uuid"))
                     .label("UUID")
-                    .ui(ui, egui::TextEdit::singleline(&mut settings_data.uuid));
+                    .ui(
+                        ui,
+                        egui::TextEdit::singleline(&mut self.settings_state.uuid),
+                    );
             });
 
             ui.collapsing("Java", |ui| {
@@ -142,13 +141,13 @@ impl Component for SettingsPage<'_> {
                     .label("Java")
                     .ui(ui, |ui: &mut egui::Ui| {
                         ui.radio_value(
-                            &mut settings_data.java,
+                            &mut self.settings_state.java,
                             JavaRunner::command("java"),
                             "Command",
                         );
 
                         ui.radio_value(
-                            &mut settings_data.java,
+                            &mut self.settings_state.java,
                             JavaRunner::path(PathBuf::new()),
                             "Custom path",
                         );
@@ -172,7 +171,7 @@ impl Component for SettingsPage<'_> {
             ui.collapsing("Client", |ui| {
                 ui.add(
                     egui::Slider::new(
-                        &mut settings_data.client_settings.pixels_per_point,
+                        &mut self.settings_state.client_settings.pixels_per_point,
                         0.5..=5.0,
                     )
                     .text("Pixels per point"),
@@ -181,8 +180,7 @@ impl Component for SettingsPage<'_> {
         }
 
         if let Some(Ok(())) = form.handle_submit(&ui.button("Save"), ui) {
-            let client_settings = self.storage.get_mut::<ClientSettings>().unwrap();
-            *client_settings = settings_data.client_settings.clone();
+            *self.client_settings_state = settings_data.client_settings.clone();
             write_toml_config_sync(&settings_data, "./.nomi/configs/Settings.toml").unwrap();
         }
     }
