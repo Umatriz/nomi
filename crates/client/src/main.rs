@@ -88,7 +88,22 @@ impl TabId {
     pub const DOWNLOAD_STATUS: Self = Self("Download Status");
 }
 
-pub enum Tab {
+#[derive(PartialEq)]
+pub struct Tab {
+    id: TabId,
+    tab: TabKind,
+}
+
+impl Tab {
+    pub fn from_tab_kind(kind: TabKind) -> Self {
+        Self {
+            id: kind.id(),
+            tab: kind,
+        }
+    }
+}
+
+pub enum TabKind {
     Profiles {
         profiles_state: ProfilesState,
         menu_state: AddProfileMenuState,
@@ -98,14 +113,14 @@ pub enum Tab {
     DownloadStatus,
 }
 
-impl PartialEq for Tab {
+impl PartialEq for TabKind {
     fn eq(&self, other: &Self) -> bool {
         core::mem::discriminant(self) == core::mem::discriminant(other)
     }
 }
 
-impl Tab {
-    pub const AVAILABLE_TABS: &'static [Tab] = &[
+impl TabKind {
+    pub const AVAILABLE_TABS: &'static [Self] = &[
         Self::Profiles {
             profiles_state: ProfilesState::default_const(),
             menu_state: AddProfileMenuState::default_const(),
@@ -117,23 +132,23 @@ impl Tab {
 
     pub fn from_id(id: TabId) -> Self {
         match id {
-            TabId::PROFILES => Tab::Profiles {
+            TabId::PROFILES => TabKind::Profiles {
                 profiles_state: Default::default(),
                 menu_state: Default::default(),
             },
-            TabId::SETTINGS => Tab::Settings,
-            TabId::LOGS => Tab::Logs,
-            TabId::DOWNLOAD_STATUS => Tab::DownloadStatus,
+            TabId::SETTINGS => TabKind::Settings,
+            TabId::LOGS => TabKind::Logs,
+            TabId::DOWNLOAD_STATUS => TabKind::DownloadStatus,
             _ => unreachable!(),
         }
     }
 
     pub fn id(&self) -> TabId {
         match self {
-            Tab::Profiles { .. } => TabId::PROFILES,
-            Tab::Settings => TabId::SETTINGS,
-            Tab::Logs => TabId::LOGS,
-            Tab::DownloadStatus => TabId::DOWNLOAD_STATUS,
+            TabKind::Profiles { .. } => TabId::PROFILES,
+            TabKind::Settings => TabId::SETTINGS,
+            TabKind::Logs => TabId::LOGS,
+            TabKind::DownloadStatus => TabId::DOWNLOAD_STATUS,
         }
     }
 
@@ -219,12 +234,12 @@ impl TabViewer for MyContext {
     type Tab = Tab;
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
-        tab.name().into()
+        tab.tab.name().into()
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
-        match tab {
-            Tab::Profiles {
+        match &mut tab.tab {
+            TabKind::Profiles {
                 profiles_state,
                 menu_state,
             } => ProfilesPage {
@@ -239,17 +254,17 @@ impl TabViewer for MyContext {
                 is_profile_window_open: &mut self.is_profile_window_open,
             }
             .ui(ui),
-            Tab::Settings => SettingsPage {
+            TabKind::Settings => SettingsPage {
                 storage: &mut self.storage,
                 file_dialog: &mut self.file_dialog,
             }
             .ui(ui),
-            Tab::Logs => {
+            TabKind::Logs => {
                 ScrollArea::horizontal().show(ui, |ui| {
                     ui.add(egui_tracing::Logs::new(self.collector.clone()));
                 });
             }
-            Tab::DownloadStatus => {
+            TabKind::DownloadStatus => {
                 DownloadProgress {
                     storage: &mut self.storage,
                     download_result_rx: &mut self.download_result_channel.rx,
@@ -259,6 +274,11 @@ impl TabViewer for MyContext {
                 .ui(ui);
             }
         };
+    }
+
+    fn on_close(&mut self, tab: &mut Self::Tab) -> bool {
+        self.tabs_state.0.remove(&tab.id);
+        true
     }
 }
 
@@ -270,11 +290,11 @@ struct MyTabs {
 impl MyTabs {
     pub fn new(collector: EventCollector) -> Self {
         let tabs = vec![
-            Tab::Profiles {
+            Tab::from_tab_kind(TabKind::Profiles {
                 profiles_state: ProfilesState::default(),
                 menu_state: AddProfileMenuState::default(),
-            },
-            Tab::Settings,
+            }),
+            Tab::from_tab_kind(TabKind::Settings),
         ];
 
         let dock_state = DockState::new(tabs);
@@ -331,14 +351,21 @@ impl eframe::App for MyTabs {
         let opened_tabs = self
             .dock_state
             .iter_all_tabs()
-            .map(|(_, tab)| tab)
-            .map(Tab::id)
+            .map(|(_, tab)| tab.id.clone())
             .collect::<Vec<_>>();
 
         for tab_id in &self.context.tabs_state.0 {
             if !opened_tabs.contains(tab_id) {
                 self.dock_state
-                    .push_to_first_leaf(Tab::from_id(tab_id.to_owned()))
+                    .push_to_first_leaf(Tab::from_tab_kind(TabKind::from_id(tab_id.to_owned())))
+            }
+        }
+
+        for tab_id in &opened_tabs {
+            if !self.context.tabs_state.0.contains(tab_id) {
+                self.dock_state
+                    .find_tab(&Tab::from_tab_kind(TabKind::from_id(tab_id.clone())))
+                    .and_then(|tab_info| self.dock_state.remove_tab(tab_info));
             }
         }
     }

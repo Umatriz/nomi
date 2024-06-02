@@ -7,8 +7,6 @@ use nomi_core::{
     },
 };
 
-use crate::Storage;
-
 use super::{profiles::ProfilesState, Component, StorageCreationExt};
 
 pub struct AddProfileMenu<'a> {
