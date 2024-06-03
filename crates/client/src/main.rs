@@ -1,7 +1,7 @@
 use components::{add_profile_menu::AddProfileMenuState, add_tab_menu::AddTab, Component};
 use context::MyContext;
 use eframe::{
-    egui::{self, Align, Align2, Frame, Layout, ViewportBuilder},
+    egui::{self, Align, Align2, Frame, Id, Layout, RichText, ViewportBuilder},
     epaint::Vec2,
 };
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
@@ -119,14 +119,50 @@ impl eframe::App for MyTabs {
         ctx.set_pixels_per_point(self.context.states.client_settings.pixels_per_point);
 
         egui::TopBottomPanel::top("top_panel_id").show(ctx, |ui| {
-            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
-                AddTab {
-                    dock_state: &self.dock_state,
-                    tabs_state: &mut self.context.states.tabs,
-                }
-                .ui(ui);
-                egui::warn_if_debug_build(ui);
-            });
+            ui.with_layout(
+                Layout::left_to_right(Align::Center).with_cross_align(Align::Center),
+                |ui| {
+                    // The way to calculate the target size is captured from the
+                    // https://github.com/emilk/egui/discussions/3908 big thanks ^_^
+                    let id_cal_target_size = Id::new("cal_target_size");
+                    let this_init_max_width = ui.max_rect().width();
+                    let last_others_width = ui.data(|data| {
+                        data.get_temp(id_cal_target_size)
+                            .unwrap_or(this_init_max_width)
+                    });
+                    let this_target_width = this_init_max_width - last_others_width;
+
+                    AddTab {
+                        dock_state: &self.dock_state,
+                        tabs_state: &mut self.context.states.tabs,
+                    }
+                    .ui(ui);
+
+                    ui.add_space(this_target_width);
+                    ui.horizontal(|ui| {
+                        egui::warn_if_debug_build(ui);
+                        ui.hyperlink_to(
+                            RichText::new(format!(
+                                "{} Nomi on GitHub",
+                                egui::special_emojis::GITHUB
+                            ))
+                            .small(),
+                            "https://github.com/Umatriz/nomi",
+                        );
+                        ui.hyperlink_to(
+                            RichText::new("Nomi's Discord server").small(),
+                            "https://discord.gg/qRD5XEJKc4",
+                        );
+                    });
+
+                    ui.data_mut(|data| {
+                        data.insert_temp(
+                            id_cal_target_size,
+                            ui.min_rect().width() - this_target_width,
+                        )
+                    });
+                },
+            );
         });
 
         if let Ok(len) = ERRORS_POOL.try_read().map(|pool| pool.len()) {
