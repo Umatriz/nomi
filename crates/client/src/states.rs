@@ -28,7 +28,9 @@ impl Default for States {
         let mut tabs = HashSet::new();
 
         tabs.insert(TabId::PROFILES);
+        tabs.insert(TabId::LOGS);
         tabs.insert(TabId::SETTINGS);
+        tabs.insert(TabId::DOWNLOAD_PROGRESS);
 
         let settings = read_toml_config_sync::<SettingsState>("./.nomi/configs/Settings.toml")
             .unwrap_or_default();

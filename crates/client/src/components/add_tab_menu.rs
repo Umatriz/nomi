@@ -32,6 +32,8 @@ impl Component for AddTab<'_> {
                 ui.toggle_value(&mut is_open, tab.name());
                 set_open(tabs_state, &tab.id(), is_open)
             }
-        });
+        })
+        .response
+        .on_hover_text("Add additional tabs");
     }
 }

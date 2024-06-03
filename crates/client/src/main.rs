@@ -4,7 +4,7 @@ use eframe::{
     egui::{self, Align, Align2, Frame, Layout, ViewportBuilder},
     epaint::Vec2,
 };
-use egui_dock::{DockArea, DockState, Style};
+use egui_dock::{DockArea, DockState, NodeIndex, Style};
 use egui_tracing::EventCollector;
 
 use errors_pool::ERRORS_POOL;
@@ -84,10 +84,18 @@ impl MyTabs {
             Tab::from_tab_kind(TabKind::Profiles {
                 menu_state: AddProfileMenuState::default(),
             }),
+            Tab::from_tab_kind(TabKind::Logs),
             Tab::from_tab_kind(TabKind::Settings),
         ];
 
-        let dock_state = DockState::new(tabs);
+        let mut dock_state = DockState::new(tabs);
+
+        let surface = dock_state.main_surface_mut();
+        surface.split_right(
+            NodeIndex::root(),
+            0.60,
+            vec![Tab::from_tab_kind(TabKind::DownloadProgress)],
+        );
 
         Self {
             context: MyContext::new(collector),
