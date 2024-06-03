@@ -12,11 +12,23 @@ pub struct DownloadProgress<'a> {
     pub profiles_state: &'a mut ProfilesState,
 }
 
-#[derive(Default)]
 pub struct DownloadProgressState {
+    pub is_allowed_to_take_action: bool,
+
     pub assets_task: Option<Task<(), AssetsExtra>>,
     pub assets_to_download: Vec<Task<(), AssetsExtra>>,
     pub tasks: HashMap<u32, Task<VersionProfile>>,
+}
+
+impl Default for DownloadProgressState {
+    fn default() -> Self {
+        Self {
+            is_allowed_to_take_action: true,
+            assets_task: None,
+            assets_to_download: Vec::new(),
+            tasks: HashMap::new(),
+        }
+    }
 }
 
 pub struct AssetsExtra {

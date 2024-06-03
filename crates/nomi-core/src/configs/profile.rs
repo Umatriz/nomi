@@ -32,10 +32,16 @@ impl VersionProfilesConfig {
 // TODO: fix `into_launch`
 */
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum Loader {
     Vanilla,
-    Fabric,
+    Fabric { version: Option<String> },
+}
+
+impl PartialEq for Loader {
+    fn eq(&self, other: &Self) -> bool {
+        core::mem::discriminant(self) == core::mem::discriminant(other)
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

@@ -67,8 +67,8 @@ async fn try_download(
         Loader::Vanilla => builder.instance(Box::new(
             Vanilla::new(profile.version(), game_paths.clone()).await?,
         )),
-        Loader::Fabric => builder.instance(Box::new(
-            Fabric::new(profile.version(), None::<String>, game_paths.clone()).await?,
+        Loader::Fabric { version } => builder.instance(Box::new(
+            Fabric::new(profile.version(), version.as_ref(), game_paths.clone()).await?,
         )),
     }
     .build();

@@ -180,5 +180,18 @@ impl eframe::App for MyTabs {
                     .and_then(|tab_info| self.dock_state.remove_tab(tab_info));
             }
         }
+
+        self.context
+            .states
+            .download_progress
+            .is_allowed_to_take_action =
+            self.context.states.download_progress.assets_task.is_none()
+                && self
+                    .context
+                    .states
+                    .download_progress
+                    .assets_to_download
+                    .is_empty()
+                && self.context.states.download_progress.tasks.is_empty();
     }
 }

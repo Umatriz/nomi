@@ -26,7 +26,6 @@ pub struct AddProfileMenuState {
     selected_loader_buf: Loader,
 
     task: Option<Task<FabricVersions>>,
-    selected_fabric_version: Option<String>,
     fabric_versions: FabricVersions,
 }
 
@@ -69,7 +68,6 @@ impl AddProfileMenuState {
             selected_version_buf: None,
             selected_loader_buf: Loader::Vanilla,
             task: None,
-            selected_fabric_version: None,
             fabric_versions: Vec::new(),
         }
     }
@@ -77,6 +75,18 @@ impl AddProfileMenuState {
 
 impl Component for AddProfileMenu<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
+        fn fabric_version_is(
+            selected_loader: &Loader,
+            loader_is: impl Fn(Loader) -> bool,
+            func: impl Fn(Option<&String>) -> bool,
+        ) -> bool {
+            loader_is(Loader::Fabric { version: None })
+                && match selected_loader {
+                    Loader::Fabric { version } => func(version.as_ref()),
+                    Loader::Vanilla => unreachable!(),
+                }
+        }
+
         if let Some(Ok(versiosn)) = self
             .menu_state
             .task
@@ -135,7 +145,8 @@ impl Component for AddProfileMenu<'_> {
                         );
                         if value.clicked() {
                             self.menu_state.selected_version_buf = Some(version.clone());
-                            if matches!(self.menu_state.selected_loader_buf, Loader::Fabric) {
+                            if matches!(self.menu_state.selected_loader_buf, Loader::Fabric { .. })
+                            {
                                 self.menu_state.request_fabric_versions()
                             }
                         }
@@ -153,7 +164,7 @@ impl Component for AddProfileMenu<'_> {
                         );
                         let fabric = ui.selectable_value(
                             &mut self.menu_state.selected_loader_buf,
-                            Loader::Fabric,
+                            Loader::Fabric { version: None },
                             "Fabric",
                         );
 
@@ -164,43 +175,40 @@ impl Component for AddProfileMenu<'_> {
                     });
             });
 
-            if matches!(self.menu_state.selected_loader_buf, Loader::Fabric) {
+            if matches!(self.menu_state.selected_loader_buf, Loader::Fabric { .. }) {
                 ui.label(
                     RichText::new("Warn: Fabric version will not run if you have not installed Vanilla version previously")
                         .color(ui.visuals().warn_fg_color),
                 );
 
                 if !self.menu_state.fabric_versions.is_empty() {
-                    egui::ComboBox::from_label("Select Fabric version")
-                        .selected_text(
-                            self.menu_state
-                                .selected_fabric_version
-                                .as_deref()
-                                .unwrap_or("No version selected"),
-                        )
-                        .show_ui(ui, |ui| {
-                            for version in &self.menu_state.fabric_versions {
-                                let stability_text = match version.loader.stable {
-                                    true => "stable",
-                                    false => "unstable",
-                                };
+                    if let Loader::Fabric { version } = &mut self.menu_state.selected_loader_buf {
+                        egui::ComboBox::from_label("Select Fabric version")
+                            .selected_text(version.as_deref().unwrap_or("No version selected"))
+                            .show_ui(ui, |ui| {
+                                for fabric_version in &self.menu_state.fabric_versions {
+                                    let stability_text = match fabric_version.loader.stable {
+                                        true => "stable",
+                                        false => "unstable",
+                                    };
 
-                                let stability_color = match version.loader.stable {
-                                    true => Color32::GREEN,
-                                    false => ui.visuals().warn_fg_color,
-                                };
-                                ui.horizontal(|ui| {
-                                    ui.selectable_value(
-                                        &mut self.menu_state.selected_fabric_version,
-                                        Some(version.loader.version.clone()),
-                                        RichText::new(&version.loader.version)
-                                            .color(stability_color),
-                                    );
-                                    ui.label(RichText::new("❓").color(stability_color))
-                                        .on_hover_text(stability_text);
-                                });
-                            }
-                        });
+                                    let stability_color = match fabric_version.loader.stable {
+                                        true => Color32::GREEN,
+                                        false => ui.visuals().warn_fg_color,
+                                    };
+                                    ui.horizontal(|ui| {
+                                        ui.selectable_value(
+                                            version,
+                                            Some(fabric_version.loader.version.clone()),
+                                            RichText::new(&fabric_version.loader.version)
+                                                .color(stability_color),
+                                        );
+                                        ui.label(RichText::new("❓").color(stability_color))
+                                            .on_hover_text(stability_text);
+                                    });
+                                }
+                            });
+                    }
                 } else if self
                     .menu_state
                     .task
@@ -222,7 +230,22 @@ impl Component for AddProfileMenu<'_> {
 
         let some_version_buf = || self.menu_state.selected_version_buf.is_some();
         let loader_is = |kind| self.menu_state.selected_loader_buf == kind;
-        let some_fabric_version = || self.menu_state.selected_fabric_version.is_some();
+
+        let fabric_version_is_some = || {
+            fabric_version_is(
+                &self.menu_state.selected_loader_buf,
+                loader_is,
+                |opt: Option<&String>| opt.is_some(),
+            )
+        };
+        let fabric_version_is_none = || {
+            fabric_version_is(
+                &self.menu_state.selected_loader_buf,
+                loader_is,
+                |opt: Option<&String>| opt.is_none(),
+            )
+        };
+
         let fabric_versions_non_empty = || !self.menu_state.fabric_versions.is_empty();
 
         if self.menu_state.selected_version_buf.is_none() {
@@ -231,7 +254,7 @@ impl Component for AddProfileMenu<'_> {
             );
         }
 
-        if self.menu_state.selected_fabric_version.is_none() && loader_is(Loader::Fabric) {
+        if fabric_version_is_none() {
             ui.label(
                 RichText::new("You must select the Fabric Version")
                     .color(ui.visuals().error_fg_color),
@@ -242,9 +265,7 @@ impl Component for AddProfileMenu<'_> {
             .add_enabled(
                 some_version_buf()
                     && (loader_is(Loader::Vanilla)
-                        || (loader_is(Loader::Fabric)
-                            && some_fabric_version()
-                            && fabric_versions_non_empty())),
+                        || (fabric_version_is_some() && fabric_versions_non_empty())),
                 egui::Button::new("Create"),
             )
             .clicked()
@@ -263,4 +284,13 @@ impl Component for AddProfileMenu<'_> {
             self.profiles_state.update_config().report_error();
         }
     }
+}
+
+#[test]
+fn feature() {
+    let ver = Loader::Fabric {
+        version: Some("123".into()),
+    };
+
+    assert!(matches!(ver, Loader::Fabric { .. }))
 }

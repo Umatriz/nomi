@@ -8,7 +8,6 @@ use nomi_core::{
     repository::launcher_manifest::LauncherManifest,
 };
 use serde::{Deserialize, Serialize};
-use tracing::error;
 
 use crate::{download::spawn_download, errors_pool::ErrorPoolExt, utils::spawn_tokio_future};
 
@@ -106,21 +105,30 @@ impl Component for ProfilesPage<'_> {
                         });
                         row.col(|ui| match &profile.state {
                             ProfileState::Downloaded(instance) => {
-                                if ui.button("Launch").clicked() {
+                                if ui
+                                    .add_enabled(
+                                        self.download_progress.is_allowed_to_take_action,
+                                        egui::Button::new("Launch"),
+                                    )
+                                    .clicked()
+                                {
                                     let instance = instance.clone();
                                     let (tx, _rx) = tokio::sync::mpsc::channel(100);
                                     spawn_tokio_future(tx, async move {
-                                        instance
-                                            .launch()
-                                            .await
-                                            .inspect_err(|e| error!("{}", e))
-                                            .report_error()
+                                        instance.launch().await.report_error()
                                     });
                                 }
                             }
                             ProfileState::NotDownloaded { .. } => {
-                                if ui.button("Download").clicked() {
-                                    let version_task = Task::new(profile.version().to_owned());
+                                if ui
+                                    .add_enabled(
+                                        !self.download_progress.tasks.contains_key(&profile.id),
+                                        egui::Button::new("Download"),
+                                    )
+                                    .clicked()
+                                {
+                                    let version_task =
+                                        Task::new(profile.version().to_owned()).with_running(true);
                                     let id = profile.id;
 
                                     self.download_progress.assets_to_download.push(
