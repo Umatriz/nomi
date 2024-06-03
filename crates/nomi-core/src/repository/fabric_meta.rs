@@ -1,6 +1,17 @@
+use reqwest::get;
 use serde::{Deserialize, Serialize};
 
 pub type FabricVersions = Vec<Version>;
+
+pub async fn get_fabric_versions(game_version: String) -> anyhow::Result<FabricVersions> {
+    get(format!(
+        "https://meta.fabricmc.net/v2/versions/loader/{game_version}"
+    ))
+    .await?
+    .json()
+    .await
+    .map_err(Into::into)
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Version {

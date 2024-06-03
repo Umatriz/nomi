@@ -73,7 +73,7 @@ impl Component for ProfilesPage<'_> {
                 .open(self.is_profile_window_open)
                 .show(ui.ctx(), |ui| {
                     AddProfileMenu {
-                        state: self.menu_state,
+                        menu_state: self.menu_state,
                         profiles_state: self.state,
                         launcher_manifest: self.launcher_manifest,
                         // is_profile_window_open: self.is_profile_window_open,

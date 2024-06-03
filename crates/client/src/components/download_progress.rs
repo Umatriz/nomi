@@ -29,6 +29,7 @@ pub struct Task<R, Extra = ()> {
     total: u32,
     current: u32,
     is_finished: bool,
+    is_running: bool,
     extra: Extra,
     download_result_channel: Channel<R>,
     download_progress_channel: Channel<DownloadResult>,
@@ -42,6 +43,7 @@ impl<R> Task<R> {
             total: 0,
             current: 0,
             is_finished: false,
+            is_running: false,
             extra: (),
             download_result_channel: Channel::new(100),
             download_progress_channel: Channel::new(500),
@@ -56,6 +58,7 @@ impl<R> Task<R> {
             total: self.total,
             current: self.current,
             is_finished: self.is_finished,
+            is_running: self.is_running,
             download_result_channel: self.download_result_channel,
             download_progress_channel: self.download_progress_channel,
             download_total_channel: self.download_total_channel,
@@ -66,6 +69,19 @@ impl<R> Task<R> {
 impl<R, Extra> Task<R, Extra> {
     pub fn extra(&self) -> &Extra {
         &self.extra
+    }
+
+    pub fn set_running(&mut self, state: bool) {
+        self.is_running = state;
+    }
+
+    pub fn with_running(mut self, state: bool) -> Self {
+        self.is_running = state;
+        self
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.is_running
     }
 
     pub fn result_channel(&self) -> &Channel<R> {
