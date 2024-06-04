@@ -61,6 +61,12 @@ pub struct JavaDownloader {
     target_directory: PathBuf,
 }
 
+impl JavaDownloader {
+    pub fn new(target_directory: PathBuf) -> Self {
+        Self { target_directory }
+    }
+}
+
 #[async_trait::async_trait]
 impl Downloader for JavaDownloader {
     type Data = DownloadResult;
@@ -228,6 +234,50 @@ mod tests {
         }
 
         tokio::fs::remove_dir_all("./java_downloader_test")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn tarball_structure_test() {
+        fn extract_tarball(archive: std::fs::File, target_path: &Path) -> anyhow::Result<()> {
+            use flate2::read::GzDecoder;
+            use tar::Archive;
+
+            let tar = GzDecoder::new(archive);
+            let mut archive = Archive::new(tar);
+            archive.unpack(target_path).map_err(Into::into)
+        }
+
+        let downloader = FileDownloader::new(
+            consts3::PORTABLE_URL.to_owned(),
+            PathBuf::from("./").join(consts3::ARCHIVE_FILENAME),
+        );
+
+        let (tx, mut rx) = tokio::sync::mpsc::channel(5);
+
+        Box::new(downloader).download(tx).await;
+
+        dbg!(rx.recv().await);
+
+        if !check_hash(
+            PathBuf::from("./").join(consts3::ARCHIVE_FILENAME),
+            consts3::SHA256,
+        )
+        .unwrap()
+        {
+            panic!("Hashes does not match");
+        }
+
+        let file = File::open(consts3::ARCHIVE_FILENAME).unwrap();
+
+        extract_tarball(file, &PathBuf::from("./java_test")).unwrap();
+
+        tokio::fs::remove_file(PathBuf::from("./").join(consts3::ARCHIVE_FILENAME))
+            .await
+            .unwrap();
+
+        tokio::fs::remove_dir_all(PathBuf::from("./java_test"))
             .await
             .unwrap();
     }

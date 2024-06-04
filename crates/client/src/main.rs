@@ -1,4 +1,11 @@
-use components::{add_profile_menu::AddProfileMenuState, add_tab_menu::AddTab, Component};
+use std::path::PathBuf;
+
+use components::{
+    add_profile_menu::AddProfileMenuState,
+    add_tab_menu::AddTab,
+    download_progress::{DownloadProgressState, Task},
+    Component,
+};
 use context::MyContext;
 use eframe::{
     egui::{self, Align, Align2, Frame, Id, Layout, RichText, ViewportBuilder},
@@ -7,7 +14,12 @@ use eframe::{
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
 use egui_tracing::EventCollector;
 
-use errors_pool::ERRORS_POOL;
+use errors_pool::{ErrorPoolExt, ERRORS_POOL};
+use nomi_core::downloads::{
+    java::JavaDownloader,
+    traits::{Downloader, DownloaderIO, DownloaderIOExt},
+};
+use states::JavaState;
 use tracing::{info, Level};
 use tracing_subscriber::{
     fmt::{writer::MakeWriterExt, Layer},
@@ -114,9 +126,43 @@ impl MyTabs {
     }
 }
 
+fn download_java(java_state: &mut JavaState, download_progress_state: &mut DownloadProgressState) {
+    info!("Downloading Java");
+
+    java_state.is_downloaded = true;
+
+    let task = Task::new("Downloading Java".to_owned());
+
+    let progress_channel = task.progress_channel().clone_tx();
+    let result_channel = task.result_channel().clone_tx();
+    let total_channel = task.total_channel().clone_tx();
+    tokio::spawn(async move {
+        let downloader = JavaDownloader::new(PathBuf::from("./.nomi/java"));
+
+        total_channel.send(downloader.total()).await.report_error();
+
+        let io = downloader.get_io();
+
+        Box::new(downloader).download(progress_channel).await;
+
+        io.io().await.report_error();
+
+        result_channel.send(()).await.report_error();
+    });
+
+    download_progress_state.java_downloading_task = Some(task);
+}
+
 impl eframe::App for MyTabs {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         ctx.set_pixels_per_point(self.context.states.client_settings.pixels_per_point);
+
+        if !self.context.states.java.is_downloaded {
+            download_java(
+                &mut self.context.states.java,
+                &mut self.context.states.download_progress,
+            );
+        }
 
         egui::TopBottomPanel::top("top_panel_id").show(ctx, |ui| {
             ui.with_layout(
@@ -234,8 +280,19 @@ impl eframe::App for MyTabs {
                     .context
                     .states
                     .download_progress
+                    .java_downloading_task
+                    .is_none()
+                && self
+                    .context
+                    .states
+                    .download_progress
                     .assets_to_download
                     .is_empty()
-                && self.context.states.download_progress.tasks.is_empty();
+                && self
+                    .context
+                    .states
+                    .download_progress
+                    .profile_tasks
+                    .is_empty();
     }
 }

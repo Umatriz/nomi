@@ -17,6 +17,7 @@ pub struct States {
     pub tabs: TabsState,
     pub errors_pool: ErrorsPoolState,
 
+    pub java: JavaState,
     pub profiles: ProfilesState,
     pub settings: SettingsState,
     pub client_settings: ClientSettingsState,
@@ -37,6 +38,7 @@ impl Default for States {
 
         Self {
             tabs: TabsState(tabs),
+            java: JavaState::new(),
             errors_pool: ErrorsPoolState::default(),
             profiles: read_toml_config_sync::<ProfilesState>("./.nomi/configs/Profiles.toml")
                 .unwrap_or_default(),
@@ -50,5 +52,19 @@ impl Default for States {
 impl States {
     pub fn new() -> Self {
         Self::default()
+    }
+}
+
+#[derive(Default)]
+pub struct JavaState {
+    pub is_downloaded: bool,
+}
+
+impl JavaState {
+    pub fn new() -> Self {
+        let res = std::process::Command::new("java").arg("--version").spawn();
+        Self {
+            is_downloaded: res.is_ok(),
+        }
     }
 }
