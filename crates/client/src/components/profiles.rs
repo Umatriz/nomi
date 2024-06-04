@@ -84,7 +84,7 @@ impl Component for ProfilesPage<'_> {
         ui.style_mut().wrap = Some(false);
 
         TableBuilder::new(ui)
-            .column(Column::auto().at_least(60.0).at_most(120.0))
+            .column(Column::auto().at_least(120.0).at_most(240.0))
             .columns(Column::auto(), 3)
             .header(20.0, |mut header| {
                 header.col(|ui| {
