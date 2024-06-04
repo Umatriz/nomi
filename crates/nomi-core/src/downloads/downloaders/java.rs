@@ -272,5 +272,13 @@ mod tests {
         let file = File::open(consts3::ARCHIVE_FILENAME).unwrap();
 
         extract_tarball(file, &PathBuf::from("./java_test")).unwrap();
+
+        tokio::fs::remove_file(PathBuf::from("./").join(consts3::ARCHIVE_FILENAME))
+            .await
+            .unwrap();
+
+        tokio::fs::remove_dir_all(PathBuf::from("./java_test"))
+            .await
+            .unwrap();
     }
 }
