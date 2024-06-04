@@ -78,7 +78,7 @@ impl Downloader for JavaDownloader {
     async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
         let downloader = FileDownloader::new(
             consts::PORTABLE_URL.to_string(),
-            PathBuf::from("./").join(consts::ARCHIVE_FILENAME),
+            PathBuf::from("./temp").join(consts::ARCHIVE_FILENAME),
         );
 
         Box::new(downloader).download(channel).await;
@@ -129,7 +129,7 @@ impl DownloaderIO for JavaDownloaderIO {
 
         extract(file, &self.target_directory)?;
 
-        tokio::fs::remove_file(PathBuf::from("./").join(consts::ARCHIVE_FILENAME)).await?;
+        tokio::fs::remove_file(PathBuf::from("./temp").join(consts::ARCHIVE_FILENAME)).await?;
 
         Ok(())
     }
@@ -272,13 +272,5 @@ mod tests {
         let file = File::open(consts3::ARCHIVE_FILENAME).unwrap();
 
         extract_tarball(file, &PathBuf::from("./java_test")).unwrap();
-
-        tokio::fs::remove_file(PathBuf::from("./").join(consts3::ARCHIVE_FILENAME))
-            .await
-            .unwrap();
-
-        tokio::fs::remove_dir_all(PathBuf::from("./java_test"))
-            .await
-            .unwrap();
     }
 }
