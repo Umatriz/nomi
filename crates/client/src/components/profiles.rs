@@ -146,7 +146,10 @@ impl Component for ProfilesPage<'_> {
                             ProfileState::NotDownloaded { .. } => {
                                 if ui
                                     .add_enabled(
-                                        !self.download_progress.tasks.contains_key(&profile.id),
+                                        !self
+                                            .download_progress
+                                            .profile_tasks
+                                            .contains_key(&profile.id),
                                         egui::Button::new("Download"),
                                     )
                                     .clicked()
@@ -176,7 +179,9 @@ impl Component for ProfilesPage<'_> {
                                         version_task.total_channel().clone_tx(),
                                     );
 
-                                    self.download_progress.tasks.insert(id, version_task);
+                                    self.download_progress
+                                        .profile_tasks
+                                        .insert(id, version_task);
                                 }
                             }
                         });

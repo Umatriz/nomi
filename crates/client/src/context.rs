@@ -71,6 +71,8 @@ impl TabViewer for MyContext {
             }
             .ui(ui),
             TabKind::Settings => SettingsPage {
+                java_state: &mut self.states.java,
+                download_progress_state: &mut self.states.download_progress,
                 settings_state: &mut self.states.settings,
                 client_settings_state: &mut self.states.client_settings,
                 file_dialog: &mut self.file_dialog,

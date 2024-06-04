@@ -15,18 +15,21 @@ pub struct DownloadProgress<'a> {
 pub struct DownloadProgressState {
     pub is_allowed_to_take_action: bool,
 
+    pub java_downloading_task: Option<Task<()>>,
+
     pub assets_task: Option<Task<(), AssetsExtra>>,
     pub assets_to_download: Vec<Task<(), AssetsExtra>>,
-    pub tasks: HashMap<u32, Task<VersionProfile>>,
+    pub profile_tasks: HashMap<u32, Task<VersionProfile>>,
 }
 
 impl Default for DownloadProgressState {
     fn default() -> Self {
         Self {
             is_allowed_to_take_action: true,
+            java_downloading_task: None,
             assets_task: None,
             assets_to_download: Vec::new(),
-            tasks: HashMap::new(),
+            profile_tasks: HashMap::new(),
         }
     }
 }
@@ -119,32 +122,21 @@ impl<R, Extra> Task<R, Extra> {
 
 impl Component for DownloadProgress<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
-        if let Some(task) = &mut self.download_progress_state.assets_task {
-            if task.result_channel_mut().try_recv().is_ok() {
-                task.is_finished = true;
-            }
+        if let Some(task) = self.download_progress_state.java_downloading_task.as_mut() {
+            show_task(ui, task, |_| ())
+        }
 
-            if let Ok(total) = task.total_channel_mut().try_recv() {
-                task.total = total;
-                task.current = 0;
-            }
+        if self
+            .download_progress_state
+            .java_downloading_task
+            .as_ref()
+            .is_some_and(|task| task.is_finished)
+        {
+            self.download_progress_state.java_downloading_task = None
+        }
 
-            if let Ok(data) = task.progress_channel_mut().try_recv() {
-                task.current += data.map_or(0, |_| 1);
-            }
-
-            ui.label(format!("Name: {}", task.name));
-            if task.current != task.total {
-                ui.add(
-                    egui::ProgressBar::new(task.current as f32 / task.total as f32).animate(true),
-                );
-                ui.label(format!("{}/{} downloaded", task.current, task.total));
-            } else {
-                ui.horizontal(|ui| {
-                    ui.spinner();
-                    ui.label("Waiting for the progress data...");
-                });
-            }
+        if let Some(task) = self.download_progress_state.assets_task.as_mut() {
+            show_task(ui, task, |_| ())
         }
 
         if self
@@ -169,56 +161,68 @@ impl Component for DownloadProgress<'_> {
             }
         }
 
-        for task in self.download_progress_state.tasks.values_mut() {
-            {
-                if let Ok(profile) = task.result_channel_mut().try_recv() {
-                    // PANICS: It will never panic because the profile
-                    // cannot be downloaded if it doesn't exists
-                    let prof = self
-                        .profiles_state
-                        .profiles
-                        .iter_mut()
-                        .find(|prof| prof.id == profile.id)
-                        .unwrap();
-
-                    *prof = Arc::new(profile);
-                    self.profiles_state.update_config().report_error();
-
-                    task.is_finished = true;
-                }
-            }
-
-            if let Ok(total) = task.total_channel_mut().try_recv() {
-                task.total = total;
-                task.current = 0;
-            }
-
-            if let Ok(data) = task.progress_channel_mut().try_recv() {
-                task.current += data.map_or(0, |_| 1);
-            }
-
-            ui.label(format!("Name: {}", task.name));
-            if task.current != task.total {
-                ui.add(
-                    egui::ProgressBar::new(task.current as f32 / task.total as f32).animate(true),
-                );
-                ui.label(format!("{}/{} downloaded", task.current, task.total));
-            } else {
-                ui.label("Nothing to download");
-            }
+        for task in self.download_progress_state.profile_tasks.values_mut() {
+            show_task(ui, task, |profile| {
+                profile_callback(profile, self.profiles_state)
+            });
         }
 
         for (id, state) in self
             .download_progress_state
-            .tasks
+            .profile_tasks
             .iter()
             .map(|(id, task)| (*id, task.is_finished))
             .filter(|(_, state)| *state)
             .collect::<Vec<_>>()
         {
             if state {
-                self.download_progress_state.tasks.remove(&id);
+                self.download_progress_state.profile_tasks.remove(&id);
             }
         }
+    }
+}
+
+fn profile_callback(profile: VersionProfile, profile_state: &mut ProfilesState) {
+    // PANICS: It will never panic because the profile
+    // cannot be downloaded if it doesn't exists
+    let prof = profile_state
+        .profiles
+        .iter_mut()
+        .find(|prof| prof.id == profile.id)
+        .unwrap();
+
+    *prof = Arc::new(profile);
+    profile_state.update_config().report_error();
+}
+
+fn show_task<T, Extra>(
+    ui: &mut egui::Ui,
+    task: &mut Task<T, Extra>,
+    mut result_callback: impl FnMut(T),
+) {
+    if let Ok(value) = task.result_channel_mut().try_recv() {
+        result_callback(value);
+
+        task.is_finished = true;
+    }
+
+    if let Ok(total) = task.total_channel_mut().try_recv() {
+        task.total = total;
+        task.current = 0;
+    }
+
+    if let Ok(data) = task.progress_channel_mut().try_recv() {
+        task.current += data.map_or(0, |_| 1);
+    }
+
+    ui.label(format!("Name: {}", task.name));
+    if task.current != task.total {
+        ui.add(egui::ProgressBar::new(task.current as f32 / task.total as f32).animate(true));
+        ui.label(format!("{}/{} downloaded", task.current, task.total));
+    } else {
+        ui.horizontal(|ui| {
+            ui.spinner();
+            ui.label("Waiting for the progress data...");
+        });
     }
 }

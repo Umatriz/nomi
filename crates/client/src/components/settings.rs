@@ -9,11 +9,14 @@ use nomi_core::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::errors_pool::ErrorPoolExt;
+use crate::{download_java, errors_pool::ErrorPoolExt, states::JavaState};
 
-use super::Component;
+use super::{download_progress::DownloadProgressState, Component};
 
 pub struct SettingsPage<'a> {
+    pub java_state: &'a mut JavaState,
+    pub download_progress_state: &'a mut DownloadProgressState,
+
     pub settings_state: &'a mut SettingsState,
     pub client_settings_state: &'a mut ClientSettingsState,
     pub file_dialog: &'a mut FileDialog,
@@ -149,6 +152,10 @@ impl Component for SettingsPage<'_> {
             });
 
             ui.collapsing("Java", |ui| {
+                if ui.add_enabled(self.download_progress_state.java_downloading_task.is_none(), egui::Button::new("Download Java")).on_hover_text("Pressing this button will start the Java downloading process and add the downloaded binary as selected").clicked() {
+                    download_java(self.java_state, self.download_progress_state);
+                    self.settings_state.java = JavaRunner::path(PathBuf::from("./.nomi/java/jdk-22.0.1/bin/java"));
+                }
                 FormField::new(&mut form, field_path!("java"))
                     .label("Java")
                     .ui(ui, |ui: &mut egui::Ui| {
