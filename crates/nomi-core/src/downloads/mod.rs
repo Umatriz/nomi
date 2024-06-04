@@ -1,9 +1,3 @@
-#[cfg(target_os = "windows")]
-pub mod jvm_dowload;
-
-pub mod downloaders;
-pub mod traits;
-
 pub use downloaders::*;
 
 use std::path::{Path, PathBuf};
@@ -12,6 +6,9 @@ use futures_util::stream::StreamExt;
 use reqwest::Client;
 use tokio::{io::AsyncWriteExt, task::JoinError};
 use tracing::{debug, error};
+
+pub mod downloaders;
+pub mod traits;
 
 #[derive(Debug, thiserror::Error)]
 pub enum DownloadError {
