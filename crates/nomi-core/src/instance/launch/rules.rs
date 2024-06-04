@@ -11,7 +11,10 @@ pub fn is_rule_passes(rule: &Rule) -> bool {
                 // TODO: Make this check based on the settings
                 let custom_res = features.has_custom_resolution.unwrap_or(false);
                 let demo = features.is_demo_user.unwrap_or(false);
-                let quick_realms = features.is_quick_play_realms.unwrap_or(false);
+                // let quick_realms = features.is_quick_play_realms.unwrap_or(false);
+
+                // It turns off the quick play
+                let quick_realms = true;
 
                 !(custom_res || demo || quick_realms)
             }
