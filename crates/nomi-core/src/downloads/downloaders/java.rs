@@ -118,18 +118,16 @@ fn extract(archive: std::fs::File, target_path: &Path) -> anyhow::Result<()> {
 #[async_trait::async_trait]
 impl DownloaderIO for JavaDownloaderIO {
     async fn io(&self) -> anyhow::Result<()> {
-        if !check_hash(
-            PathBuf::from("./").join(consts::ARCHIVE_FILENAME),
-            consts::SHA256,
-        )? {
+        let path = PathBuf::from("./temp").join(consts::ARCHIVE_FILENAME);
+        if !check_hash(path.clone(), consts::SHA256)? {
             return Err(JavaDownloaderError::HashDoesNotMatch.into());
         }
 
-        let file = File::open(consts::ARCHIVE_FILENAME)?;
+        let file = File::open(&path)?;
 
         extract(file, &self.target_directory)?;
 
-        tokio::fs::remove_file(PathBuf::from("./temp").join(consts::ARCHIVE_FILENAME)).await?;
+        tokio::fs::remove_file(&path).await?;
 
         Ok(())
     }

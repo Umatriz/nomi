@@ -154,7 +154,7 @@ impl Component for SettingsPage<'_> {
             ui.collapsing("Java", |ui| {
                 if ui.add_enabled(self.download_progress_state.java_downloading_task.is_none(), egui::Button::new("Download Java")).on_hover_text("Pressing this button will start the Java downloading process and add the downloaded binary as selected").clicked() {
                     download_java(self.java_state, self.download_progress_state);
-                    // self.settings_state.java = JavaRunner::path(PathBuf::from(value))
+                    self.settings_state.java = JavaRunner::path(PathBuf::from("./.nomi/java/jdk-22.0.1/bin/java"));
                 }
                 FormField::new(&mut form, field_path!("java"))
                     .label("Java")

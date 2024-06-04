@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, path::PathBuf};
 
 use nomi_core::fs::read_toml_config_sync;
 
@@ -64,7 +64,8 @@ impl JavaState {
     pub fn new() -> Self {
         let res = std::process::Command::new("java").arg("--version").spawn();
         Self {
-            is_downloaded: res.is_ok(),
+            is_downloaded: res.is_ok()
+                || PathBuf::from("./.nomi/java/jdk-22.0.1/bin/java").exists(),
         }
     }
 }
