@@ -30,9 +30,6 @@ const CLASSPATH_SEPARATOR: &str = ";";
 #[cfg(not(windows))]
 const CLASSPATH_SEPARATOR: &str = ":";
 
-const LAUNCHER_NAME: &str = "nomi";
-const LAUNCHER_VERSION: &str = "0.1.0";
-
 #[derive(Serialize, Deserialize, Default, PartialEq, Debug, Clone)]
 pub struct LaunchSettings {
     pub assets: PathBuf,

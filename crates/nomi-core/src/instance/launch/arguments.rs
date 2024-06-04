@@ -2,7 +2,7 @@ use std::{marker::PhantomData, path::PathBuf};
 
 use crate::{
     instance::{
-        launch::{macros::replace, rules::is_library_passes, LAUNCHER_NAME, LAUNCHER_VERSION},
+        launch::{macros::replace, rules::is_library_passes},
         profile::LoaderProfile,
     },
     repository::{
@@ -10,6 +10,7 @@ use crate::{
         username::Username,
     },
     utils::path_to_string,
+    NOMI_NAME, NOMI_VERSION,
 };
 
 use super::{rules::is_rule_passes, LaunchInstance, CLASSPATH_SEPARATOR};
@@ -141,8 +142,8 @@ impl<'a> ArgumentsBuilder<'a, Defined> {
             "${game_assets}" => &path_to_string(&self.instance.settings.assets),
             "${game_directory}" => &path_to_string(&self.instance.settings.game_dir),
             "${natives_directory}" => &path_to_string(&self.instance.settings.natives_dir),
-            "${launcher_name}" => LAUNCHER_NAME,
-            "${launcher_version}" => LAUNCHER_VERSION,
+            "${launcher_name}" => NOMI_NAME,
+            "${launcher_version}" => NOMI_VERSION,
             "${auth_access_token}" => self.user_data
                 .access_token
                 .clone()
