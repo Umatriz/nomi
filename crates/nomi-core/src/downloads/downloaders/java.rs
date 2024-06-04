@@ -6,6 +6,8 @@ use thiserror::Error;
 use tokio::sync::mpsc::Sender;
 use tracing::error;
 
+use crate::DOT_NOMI_TEMP_DIR;
+
 use super::{
     super::traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
     FileDownloader,
@@ -78,7 +80,7 @@ impl Downloader for JavaDownloader {
     async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
         let downloader = FileDownloader::new(
             consts::PORTABLE_URL.to_string(),
-            PathBuf::from("./temp").join(consts::ARCHIVE_FILENAME),
+            PathBuf::from(DOT_NOMI_TEMP_DIR).join(consts::ARCHIVE_FILENAME),
         );
 
         Box::new(downloader).download(channel).await;
@@ -118,7 +120,7 @@ fn extract(archive: std::fs::File, target_path: &Path) -> anyhow::Result<()> {
 #[async_trait::async_trait]
 impl DownloaderIO for JavaDownloaderIO {
     async fn io(&self) -> anyhow::Result<()> {
-        let path = PathBuf::from("./temp").join(consts::ARCHIVE_FILENAME);
+        let path = PathBuf::from(DOT_NOMI_TEMP_DIR).join(consts::ARCHIVE_FILENAME);
         if !check_hash(path.clone(), consts::SHA256)? {
             return Err(JavaDownloaderError::HashDoesNotMatch.into());
         }

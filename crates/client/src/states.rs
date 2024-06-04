@@ -1,6 +1,9 @@
 use std::{collections::HashSet, path::PathBuf};
 
-use nomi_core::fs::read_toml_config_sync;
+use nomi_core::{
+    fs::read_toml_config_sync, DOT_NOMI_JAVA_EXECUTABLE, DOT_NOMI_PROFILES_CONFIG,
+    DOT_NOMI_SETTINGS_CONFIG,
+};
 
 use crate::{
     components::{
@@ -33,14 +36,14 @@ impl Default for States {
         tabs.insert(TabId::SETTINGS);
         tabs.insert(TabId::DOWNLOAD_PROGRESS);
 
-        let settings = read_toml_config_sync::<SettingsState>("./.nomi/configs/Settings.toml")
-            .unwrap_or_default();
+        let settings =
+            read_toml_config_sync::<SettingsState>(DOT_NOMI_SETTINGS_CONFIG).unwrap_or_default();
 
         Self {
             tabs: TabsState(tabs),
             java: JavaState::new(),
             errors_pool: ErrorsPoolState::default(),
-            profiles: read_toml_config_sync::<ProfilesState>("./.nomi/configs/Profiles.toml")
+            profiles: read_toml_config_sync::<ProfilesState>(DOT_NOMI_PROFILES_CONFIG)
                 .unwrap_or_default(),
             client_settings: settings.client_settings.clone(),
             settings,
@@ -64,8 +67,7 @@ impl JavaState {
     pub fn new() -> Self {
         let res = std::process::Command::new("java").arg("--version").spawn();
         Self {
-            is_downloaded: res.is_ok()
-                || PathBuf::from("./.nomi/java/jdk-22.0.1/bin/java").exists(),
+            is_downloaded: res.is_ok() || PathBuf::from(DOT_NOMI_JAVA_EXECUTABLE).exists(),
         }
     }
 }

@@ -7,6 +7,7 @@ use nomi_core::{
     fs::write_toml_config_sync,
     instance::launch::arguments::UserData,
     repository::{launcher_manifest::LauncherManifest, username::Username},
+    DOT_NOMI_PROFILES_CONFIG,
 };
 use serde::{Deserialize, Serialize};
 
@@ -57,7 +58,7 @@ impl ProfilesState {
     }
 
     pub fn update_config(&self) -> anyhow::Result<()> {
-        write_toml_config_sync(&self, "./.nomi/configs/Profiles.toml")
+        write_toml_config_sync(&self, DOT_NOMI_PROFILES_CONFIG)
     }
 }
 

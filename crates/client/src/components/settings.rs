@@ -6,6 +6,7 @@ use egui_form::{garde::field_path, Form, FormField};
 use garde::{Error, Validate};
 use nomi_core::{
     fs::write_toml_config_sync, regex::Regex, repository::java_runner::JavaRunner, Uuid,
+    DOT_NOMI_JAVA_EXECUTABLE, DOT_NOMI_LOGS_DIR, DOT_NOMI_SETTINGS_CONFIG,
 };
 use serde::{Deserialize, Serialize};
 
@@ -33,6 +34,12 @@ pub struct SettingsState {
 
     #[garde(skip)]
     pub client_settings: ClientSettingsState,
+}
+
+impl SettingsState {
+    pub fn update_config(&self) {
+        write_toml_config_sync(&self, DOT_NOMI_SETTINGS_CONFIG).report_error();
+    }
 }
 
 impl Default for SettingsState {
@@ -93,7 +100,7 @@ fn check_uuid(value: &str, _context: &()) -> garde::Result {
 impl Component for SettingsPage<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
         ui.collapsing("Utils", |ui| {
-            let launcher_path = PathBuf::from("./.nomi/logs");
+            let launcher_path = PathBuf::from(DOT_NOMI_LOGS_DIR);
 
             if launcher_path.exists() {
                 if ui.button("Delete launcher's logs").clicked() {
@@ -154,7 +161,8 @@ impl Component for SettingsPage<'_> {
             ui.collapsing("Java", |ui| {
                 if ui.add_enabled(self.download_progress_state.java_downloading_task.is_none(), egui::Button::new("Download Java")).on_hover_text("Pressing this button will start the Java downloading process and add the downloaded binary as selected").clicked() {
                     download_java(self.java_state, self.download_progress_state);
-                    self.settings_state.java = JavaRunner::path(PathBuf::from("./.nomi/java/jdk-22.0.1/bin/java"));
+                    self.settings_state.java = JavaRunner::path(PathBuf::from(DOT_NOMI_JAVA_EXECUTABLE));
+                    self.settings_state.update_config();
                 }
                 FormField::new(&mut form, field_path!("java"))
                     .label("Java")
@@ -200,7 +208,7 @@ impl Component for SettingsPage<'_> {
 
         if let Some(Ok(())) = form.handle_submit(&ui.button("Save"), ui) {
             *self.client_settings_state = settings_data.client_settings.clone();
-            write_toml_config_sync(&settings_data, "./.nomi/configs/Settings.toml").report_error();
+            settings_data.update_config();
         }
     }
 }

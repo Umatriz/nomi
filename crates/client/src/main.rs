@@ -15,9 +15,12 @@ use egui_dock::{DockArea, DockState, NodeIndex, Style};
 use egui_tracing::EventCollector;
 
 use errors_pool::{ErrorPoolExt, ERRORS_POOL};
-use nomi_core::downloads::{
-    java::JavaDownloader,
-    traits::{Downloader, DownloaderIO, DownloaderIOExt},
+use nomi_core::{
+    downloads::{
+        java::JavaDownloader,
+        traits::{Downloader, DownloaderIO, DownloaderIOExt},
+    },
+    DOT_NOMI_JAVA_DIR, DOT_NOMI_LOGS_DIR,
 };
 use states::JavaState;
 use tracing::{info, Level};
@@ -40,7 +43,7 @@ pub mod states;
 fn main() {
     let collector = egui_tracing::EventCollector::default().with_level(Level::INFO);
 
-    let appender = tracing_appender::rolling::hourly("./.nomi/logs", "nomi.log");
+    let appender = tracing_appender::rolling::hourly(DOT_NOMI_LOGS_DIR, "nomi.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(appender);
 
     let mut file_sub = Layer::new()
@@ -137,7 +140,7 @@ fn download_java(java_state: &mut JavaState, download_progress_state: &mut Downl
     let result_channel = task.result_channel().clone_tx();
     let total_channel = task.total_channel().clone_tx();
     tokio::spawn(async move {
-        let downloader = JavaDownloader::new(PathBuf::from("./.nomi/java"));
+        let downloader = JavaDownloader::new(PathBuf::from(DOT_NOMI_JAVA_DIR));
 
         total_channel.send(downloader.total()).await.report_error();
 
