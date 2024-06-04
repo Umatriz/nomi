@@ -62,6 +62,7 @@ impl TabViewer for MyContext {
         match &mut tab.kind_mut() {
             TabKind::Profiles { menu_state } => ProfilesPage {
                 download_progress: &mut self.states.download_progress,
+                settings_state: &self.states.settings,
                 state: &mut self.states.profiles,
                 menu_state,
 

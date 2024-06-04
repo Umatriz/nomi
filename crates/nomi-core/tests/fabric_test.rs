@@ -1,8 +1,11 @@
 use nomi_core::{
     game_paths::GamePaths,
-    instance::{launch::LaunchSettings, InstanceBuilder},
+    instance::{
+        launch::{arguments::UserData, LaunchSettings},
+        InstanceBuilder,
+    },
     loaders::fabric::Fabric,
-    repository::{java_runner::JavaRunner, username::Username},
+    repository::java_runner::JavaRunner,
 };
 
 #[tokio::test]
@@ -43,9 +46,6 @@ async fn vanilla_test() {
     let mc_dir = std::env::current_dir().unwrap().join("minecraft");
 
     let settings = LaunchSettings {
-        access_token: None,
-        username: Username::new("ItWorks").unwrap(),
-        uuid: None,
         assets: mc_dir.join("assets"),
         game_dir: mc_dir.clone(),
         java_bin: JavaRunner::default(),
@@ -58,5 +58,7 @@ async fn vanilla_test() {
     };
 
     let l = builder.launch_instance(settings, None);
-    l.launch().await.unwrap();
+    l.launch(UserData::default(), &JavaRunner::default())
+        .await
+        .unwrap();
 }

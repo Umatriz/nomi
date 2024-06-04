@@ -5,7 +5,10 @@ use crate::{
         launch::{macros::replace, rules::is_library_passes, LAUNCHER_NAME, LAUNCHER_VERSION},
         profile::LoaderProfile,
     },
-    repository::manifest::{Argument, Arguments, Classifiers, DownloadFile, Manifest, Value},
+    repository::{
+        manifest::{Argument, Arguments, Classifiers, DownloadFile, Manifest, Value},
+        username::Username,
+    },
     utils::path_to_string,
 };
 
@@ -19,8 +22,16 @@ pub struct ArgumentsBuilder<'a, S = Undefined> {
     manifest: &'a Manifest,
     classpath: String,
     native_libs: Vec<PathBuf>,
+    user_data: UserData,
 
     _marker: PhantomData<S>,
+}
+
+#[derive(Default)]
+pub struct UserData {
+    pub username: Username,
+    pub uuid: Option<String>,
+    pub access_token: Option<String>,
 }
 
 struct JvmArguments(Vec<Argument>);
@@ -42,21 +53,24 @@ impl<'a> ArgumentsBuilder<'a, Undefined> {
     pub fn new(
         instance: &'a LaunchInstance,
         manifest: &'a Manifest,
+        user_data: UserData,
     ) -> ArgumentsBuilder<'a, Undefined> {
         ArgumentsBuilder {
             instance,
             manifest,
             classpath: String::new(),
             native_libs: Vec::new(),
+            user_data,
             _marker: PhantomData,
         }
     }
 
-    pub fn finish(&self) -> ArgumentsBuilder<'a, Defined> {
+    pub fn finish(self) -> ArgumentsBuilder<'a, Defined> {
         let (classpath, native_libs) = dbg!(self.classpath());
         ArgumentsBuilder {
             instance: self.instance,
             manifest: self.manifest,
+            user_data: self.user_data,
             classpath,
             native_libs,
             _marker: PhantomData,
@@ -129,14 +143,14 @@ impl<'a> ArgumentsBuilder<'a, Defined> {
             "${natives_directory}" => &path_to_string(&self.instance.settings.natives_dir),
             "${launcher_name}" => LAUNCHER_NAME,
             "${launcher_version}" => LAUNCHER_VERSION,
-            "${auth_access_token}" => self.instance.settings
+            "${auth_access_token}" => self.user_data
                 .access_token
                 .clone()
                 .unwrap_or("null".to_string())
                 .as_str(),
             "${auth_session}" => "null",
-            "${auth_player_name}" => self.instance.settings.username.get(),
-            "${auth_uuid}" => self.instance.settings
+            "${auth_player_name}" => self.user_data.username.get(),
+            "${auth_uuid}" => self.user_data
                 .uuid
                 .clone()
                 .unwrap_or(uuid::Uuid::new_v4().to_string())

@@ -2,9 +2,12 @@ use nomi_core::{
     configs::profile::{ProfileState, VersionProfileBuilder, VersionProfilesConfig},
     downloads::traits::Downloader,
     game_paths::GamePaths,
-    instance::{launch::LaunchSettings, InstanceBuilder},
+    instance::{
+        launch::{arguments::UserData, LaunchSettings},
+        InstanceBuilder,
+    },
     loaders::fabric::Fabric,
-    repository::{java_runner::JavaRunner, username::Username},
+    repository::java_runner::JavaRunner,
 };
 
 #[tokio::test]
@@ -37,9 +40,6 @@ async fn full_fabric_test() {
     let mc_dir = current.join("minecraft");
 
     let settings = LaunchSettings {
-        access_token: None,
-        username: Username::new("ItWorks").unwrap(),
-        uuid: None,
         assets: mc_dir.join("assets"),
         game_dir: mc_dir.clone(),
         java_bin: JavaRunner::default(),
@@ -65,5 +65,8 @@ async fn full_fabric_test() {
         .state(ProfileState::downloaded(launch))
         .build();
 
-    dbg!(profile).launch().await.unwrap();
+    dbg!(profile)
+        .launch(UserData::default(), &JavaRunner::default())
+        .await
+        .unwrap();
 }

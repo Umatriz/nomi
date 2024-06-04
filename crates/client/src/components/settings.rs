@@ -22,11 +22,11 @@ pub struct SettingsPage<'a> {
 #[derive(Debug, Validate, Serialize, Deserialize, Clone)]
 pub struct SettingsState {
     #[garde(custom(check_username))]
-    username: String,
+    pub username: String,
     #[garde(custom(check_uuid))]
-    uuid: String,
+    pub uuid: String,
     #[garde(skip)]
-    java: JavaRunner,
+    pub java: JavaRunner,
 
     #[garde(skip)]
     pub client_settings: ClientSettingsState,

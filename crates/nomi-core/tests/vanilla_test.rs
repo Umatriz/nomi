@@ -1,7 +1,4 @@
-use nomi_core::{
-    instance::launch::LaunchSettings,
-    repository::{java_runner::JavaRunner, username::Username},
-};
+use nomi_core::{instance::launch::LaunchSettings, repository::java_runner::JavaRunner};
 
 #[tokio::test]
 async fn vanilla_test() {
@@ -36,9 +33,6 @@ async fn vanilla_test() {
     let mc_dir = std::env::current_dir().unwrap().join("minecraft");
 
     let _settings = LaunchSettings {
-        access_token: None,
-        username: Username::new("ItWorks").unwrap(),
-        uuid: None,
         assets: mc_dir.join("assets"),
         game_dir: mc_dir.clone(),
         java_bin: JavaRunner::default(),

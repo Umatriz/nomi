@@ -5,7 +5,8 @@ use egui_extras::{Column, TableBuilder};
 use nomi_core::{
     configs::profile::{ProfileState, VersionProfile},
     fs::write_toml_config_sync,
-    repository::launcher_manifest::LauncherManifest,
+    instance::launch::arguments::UserData,
+    repository::{launcher_manifest::LauncherManifest, username::Username},
 };
 use serde::{Deserialize, Serialize};
 
@@ -14,11 +15,13 @@ use crate::{download::spawn_download, errors_pool::ErrorPoolExt, utils::spawn_to
 use super::{
     add_profile_menu::{AddProfileMenu, AddProfileMenuState},
     download_progress::{AssetsExtra, DownloadProgressState, Task},
+    settings::SettingsState,
     Component,
 };
 
 pub struct ProfilesPage<'a> {
     pub download_progress: &'a mut DownloadProgressState,
+    pub settings_state: &'a SettingsState,
 
     pub is_profile_window_open: &'a mut bool,
 
@@ -120,8 +123,23 @@ impl Component for ProfilesPage<'_> {
                                 {
                                     let instance = instance.clone();
                                     let (tx, _rx) = tokio::sync::mpsc::channel(100);
+
+                                    let user_data = UserData {
+                                        username: Username::new(
+                                            self.settings_state.username.clone(),
+                                        )
+                                        .unwrap(),
+                                        uuid: Some(self.settings_state.uuid.clone()),
+                                        access_token: None,
+                                    };
+
+                                    let java_runner = self.settings_state.java.clone();
+
                                     spawn_tokio_future(tx, async move {
-                                        instance.launch().await.report_error()
+                                        instance
+                                            .launch(user_data, &java_runner)
+                                            .await
+                                            .report_error()
                                     });
                                 }
                             }

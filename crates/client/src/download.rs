@@ -10,7 +10,7 @@ use nomi_core::{
     game_paths::GamePaths,
     instance::{launch::LaunchSettings, InstanceBuilder},
     loaders::{fabric::Fabric, vanilla::Vanilla},
-    repository::{java_runner::JavaRunner, username::Username},
+    repository::java_runner::JavaRunner,
     state::get_launcher_manifest,
 };
 use tokio::sync::mpsc::Sender;
@@ -38,7 +38,7 @@ async fn try_download(
     sender: tokio::sync::mpsc::Sender<DownloadResult>,
     total_tx: tokio::sync::mpsc::Sender<u32>,
 ) -> anyhow::Result<VersionProfile> {
-    let current_dir = std::env::current_dir()?;
+    let current_dir = PathBuf::from("./");
     let mc_dir: std::path::PathBuf = current_dir.join("minecraft");
 
     let ProfileState::NotDownloaded {
@@ -74,9 +74,6 @@ async fn try_download(
     .build();
 
     let settings = LaunchSettings {
-        access_token: None,
-        username: Username::default(),
-        uuid: None,
         assets: instance.game_paths.assets.clone(),
         game_dir: instance.game_paths.game.clone(),
         java_bin: JavaRunner::default(),

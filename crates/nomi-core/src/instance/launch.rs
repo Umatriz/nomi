@@ -4,6 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use arguments::UserData;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 use tracing::info;
@@ -13,7 +14,6 @@ use crate::{
     repository::{
         java_runner::JavaRunner,
         manifest::{Manifest, VersionType},
-        username::Username,
     },
 };
 
@@ -35,13 +35,6 @@ const LAUNCHER_VERSION: &str = "0.1.0";
 
 #[derive(Serialize, Deserialize, Default, PartialEq, Debug, Clone)]
 pub struct LaunchSettings {
-    #[serde(skip)]
-    pub access_token: Option<String>,
-    #[serde(skip)]
-    pub username: Username,
-    #[serde(skip)]
-    pub uuid: Option<String>,
-
     pub assets: PathBuf,
     pub java_bin: JavaRunner,
     pub game_dir: PathBuf,
@@ -62,18 +55,6 @@ pub struct LaunchInstance {
 }
 
 impl LaunchInstance {
-    pub fn set_username(&mut self, username: Username) {
-        self.settings.username = username;
-    }
-
-    pub fn set_access_token(&mut self, access_token: Option<String>) {
-        self.settings.access_token = access_token;
-    }
-
-    pub fn set_uuid(&mut self, uuid: Option<String>) {
-        self.settings.uuid = uuid;
-    }
-
     pub fn loader_profile(&self) -> Option<&LoaderProfile> {
         self.loader_profile.as_ref()
     }
@@ -114,10 +95,14 @@ impl LaunchInstance {
         Ok(())
     }
 
-    pub async fn launch(&self) -> anyhow::Result<()> {
+    pub async fn launch(
+        &self,
+        user_data: UserData,
+        java_runner: &JavaRunner,
+    ) -> anyhow::Result<()> {
         let manifest = read_json_config::<Manifest>(&self.settings.manifest_file).await?;
 
-        let arguments_builder = ArgumentsBuilder::new(self, &manifest).finish();
+        let arguments_builder = ArgumentsBuilder::new(self, &manifest, user_data).finish();
 
         self.process_natives(arguments_builder.get_native_libs())?;
 
@@ -132,12 +117,12 @@ impl LaunchInstance {
         let loader_jvm_arguments = loader_arguments.jvm_arguments();
         let loader_game_arguments = loader_arguments.game_arguments();
 
-        let mut child = Command::new(self.settings.java_bin.get())
+        let mut child = Command::new(java_runner.get())
             .args(custom_jvm_arguments)
             .args(loader_jvm_arguments)
-            .args(manifest_jvm_arguments)
+            .args(dbg!(manifest_jvm_arguments))
             .arg(main_class)
-            .args(manifest_game_arguments)
+            .args(dbg!(manifest_game_arguments))
             .args(loader_game_arguments)
             .spawn()?;
 

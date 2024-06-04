@@ -4,7 +4,10 @@ use anyhow::anyhow;
 use const_typed_builder::Builder;
 use serde::{Deserialize, Serialize};
 
-use crate::{instance::launch::LaunchInstance, repository::manifest::VersionType};
+use crate::{
+    instance::launch::{arguments::UserData, LaunchInstance},
+    repository::{java_runner::JavaRunner, manifest::VersionType},
+};
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct VersionProfilesConfig {
@@ -87,9 +90,13 @@ pub struct VersionProfile {
 }
 
 impl VersionProfile {
-    pub async fn launch(&self) -> anyhow::Result<()> {
+    pub async fn launch(
+        &self,
+        user_data: UserData,
+        java_runner: &JavaRunner,
+    ) -> anyhow::Result<()> {
         match &self.state {
-            ProfileState::Downloaded(instance) => instance.launch().await,
+            ProfileState::Downloaded(instance) => instance.launch(user_data, java_runner).await,
             ProfileState::NotDownloaded { .. } => Err(anyhow!("This profile is not downloaded!")),
         }
     }
@@ -120,7 +127,7 @@ mod tests {
         game_paths::GamePaths,
         instance::{launch::LaunchSettings, InstanceBuilder},
         loaders::fabric::Fabric,
-        repository::{java_runner::JavaRunner, manifest::VersionType, username::Username},
+        repository::{java_runner::JavaRunner, manifest::VersionType},
     };
 
     use super::*;
@@ -153,9 +160,6 @@ mod tests {
 
         let mc_dir = std::env::current_dir().unwrap().join("minecraft");
         let settings = LaunchSettings {
-            access_token: None,
-            username: Username::new("ItWorks").unwrap(),
-            uuid: None,
             assets: mc_dir.join("assets"),
             game_dir: mc_dir.clone(),
             java_bin: JavaRunner::default(),
