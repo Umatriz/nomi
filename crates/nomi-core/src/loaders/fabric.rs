@@ -1,9 +1,11 @@
 use std::path::{Path, PathBuf};
 
+use itertools::Itertools;
 use reqwest::Client;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
+    configs::profile::Loader,
     downloads::{
         downloaders::{
             file::FileDownloader,
@@ -13,10 +15,13 @@ use crate::{
     },
     fs::write_to_file,
     game_paths::GamePaths,
+    instance::profile::LoaderProfile,
     maven_data::MavenData,
     repository::{
         fabric_meta::FabricVersions,
         fabric_profile::{FabricLibrary, FabricProfile},
+        simple_args::SimpleArgs,
+        simple_lib::SimpleLib,
     },
     state::get_launcher_manifest,
 };
@@ -26,6 +31,7 @@ pub struct Fabric {
     pub game_version: String,
     pub profile: FabricProfile,
     game_paths: GamePaths,
+    fabric_version: String,
     libraries_downloader: LibrariesDownloader,
 }
 
@@ -57,6 +63,10 @@ impl Fabric {
             .json()
             .await?;
 
+        if versions.is_empty() {
+            return Err(crate::error::Error::NoSuchVersion.into());
+        }
+
         let profile_version = loader_version
             .map(Into::into)
             .and_then(|loader| versions.iter().find(|i| i.loader.version == loader))
@@ -79,11 +89,29 @@ impl Fabric {
         let libraries_downloader = LibrariesDownloader::new(&mapper, &profile.libraries);
 
         Ok(Self {
+            fabric_version: profile_version.loader.version.clone(),
             game_version,
             profile,
             game_paths,
             libraries_downloader,
         })
+    }
+
+    pub fn to_profile(&self) -> LoaderProfile {
+        LoaderProfile {
+            loader: Loader::Fabric {
+                version: Some(self.fabric_version.clone()),
+            },
+            main_class: self.profile.main_class.clone(),
+            args: SimpleArgs::from(&self.profile.arguments),
+            libraries: self
+                .profile
+                .libraries
+                .iter()
+                .map(|l| MavenData::new(&l.name))
+                .map(SimpleLib::from)
+                .collect_vec(),
+        }
     }
 }
 
@@ -143,51 +171,3 @@ impl<'a> DownloaderIOExt<'a> for Fabric {
         }
     }
 }
-
-// #[async_trait::async_trait]
-// impl DownloadVersion for Fabric {
-//     async fn download(&self, dir: &Path, file_name: &str) -> anyhow::Result<()> {
-//         // Vanilla::new(&self.game_version)
-//         //     .await?
-//         //     .download(dir, file_name)
-//         //     .await?;
-
-//         info!("Fabric downloaded successfully");
-
-//         Ok(())
-//     }
-
-//     async fn download_libraries(&self, dir: &Path) -> anyhow::Result<()> {
-//         let mut set = JoinSet::new();
-
-//         self.profile.libraries.iter().for_each(|lib| {
-//             let maven = MavenData::new(&lib.name);
-//             let path = dir.join(maven.path);
-//             if !path.exists() {
-//                 set.spawn(download_file(path, format!("{}{}", lib.url, maven.url)));
-//             }
-//         });
-
-//         while let Some(res) = set.join_next().await {
-//             res??
-//         }
-
-//         Ok(())
-//     }
-
-//     async fn create_json(&self, dir: &Path) -> anyhow::Result<()> {
-//         let file_name = format!("{}.json", self.profile.id);
-//         let path = dir.join(file_name);
-
-//         let body = serde_json::to_string_pretty(&self.profile)?;
-
-//         write_to_file(body.as_bytes(), &path).await?;
-
-//         info!(
-//             "Version json {} created successfully",
-//             path.to_string_lossy()
-//         );
-
-//         Ok(())
-//     }
-// }

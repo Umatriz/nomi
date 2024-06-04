@@ -1,7 +1,10 @@
+use std::{fmt::Display, sync::Arc};
+
+use anyhow::anyhow;
 use const_typed_builder::Builder;
 use serde::{Deserialize, Serialize};
 
-use crate::instance::launch::LaunchInstance;
+use crate::{instance::launch::LaunchInstance, repository::manifest::VersionType};
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct VersionProfilesConfig {
@@ -15,7 +18,7 @@ impl VersionProfilesConfig {
 
     /// Create an id for the profile
     /// depends on the last id in the vector
-    pub fn create_id(&self) -> i32 {
+    pub fn create_id(&self) -> u32 {
         match &self.profiles.iter().max_by_key(|x| x.id) {
             Some(v) => v.id + 1,
             None => 0,
@@ -29,18 +32,84 @@ impl VersionProfilesConfig {
 // TODO: fix `into_launch`
 */
 
-#[derive(Serialize, Deserialize, Debug, Default, Builder, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum Loader {
+    Vanilla,
+    Fabric { version: Option<String> },
+}
+
+impl Display for Loader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Loader::Vanilla => f.write_str("Vanilla"),
+            Loader::Fabric { .. } => f.write_str("Fabric"),
+        }
+    }
+}
+
+impl PartialEq for Loader {
+    fn eq(&self, other: &Self) -> bool {
+        core::mem::discriminant(self) == core::mem::discriminant(other)
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum ProfileState {
+    Downloaded(Arc<LaunchInstance>),
+
+    NotDownloaded {
+        version: String,
+        version_type: VersionType,
+        loader: Loader,
+    },
+}
+
+impl ProfileState {
+    pub fn downloaded(instance: LaunchInstance) -> Self {
+        Self::Downloaded(Arc::new(instance))
+    }
+
+    pub fn not_downloaded(version: String, version_type: VersionType, loader: Loader) -> Self {
+        Self::NotDownloaded {
+            version,
+            version_type,
+            loader,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Builder, Clone)]
 pub struct VersionProfile {
-    pub id: i32,
-    pub is_downloaded: bool,
+    pub id: u32,
     pub name: String,
 
-    pub instance: LaunchInstance,
+    pub state: ProfileState,
 }
 
 impl VersionProfile {
     pub async fn launch(&self) -> anyhow::Result<()> {
-        self.instance.launch().await
+        match &self.state {
+            ProfileState::Downloaded(instance) => instance.launch().await,
+            ProfileState::NotDownloaded { .. } => Err(anyhow!("This profile is not downloaded!")),
+        }
+    }
+
+    pub fn loader_name(&self) -> String {
+        match &self.state {
+            ProfileState::Downloaded(instance) => instance
+                .loader_profile()
+                .map_or(format!("{}", Loader::Vanilla), |profile| {
+                    format!("{}", profile.loader)
+                }),
+            ProfileState::NotDownloaded { loader, .. } => format!("{loader}"),
+        }
+    }
+
+    pub fn version(&self) -> &str {
+        match &self.state {
+            ProfileState::Downloaded(instance) => &instance.settings.version,
+            ProfileState::NotDownloaded { version, .. } => version,
+        }
     }
 }
 
@@ -51,7 +120,7 @@ mod tests {
         game_paths::GamePaths,
         instance::{launch::LaunchSettings, InstanceBuilder},
         loaders::fabric::Fabric,
-        repository::{java_runner::JavaRunner, username::Username},
+        repository::{java_runner::JavaRunner, manifest::VersionType, username::Username},
     };
 
     use super::*;
@@ -95,15 +164,14 @@ mod tests {
             natives_dir: mc_dir.clone().join("versions/1.18.2/natives"),
             version_jar_file: mc_dir.join("versions/1.18.2/1.18.2.jar"),
             version: "1.18.2".to_string(),
-            version_type: "release".to_string(),
+            version_type: VersionType::Release,
         };
 
         let l = builder.launch_instance(settings, None);
 
         let profile = VersionProfileBuilder::new()
             .id(mock.create_id())
-            .instance(l)
-            .is_downloaded(true)
+            .state(ProfileState::downloaded(l))
             .name("name".into())
             .build();
 

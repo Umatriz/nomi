@@ -1,5 +1,5 @@
 use nomi_core::{
-    configs::profile::{VersionProfileBuilder, VersionProfilesConfig},
+    configs::profile::{ProfileState, VersionProfileBuilder, VersionProfilesConfig},
     downloads::traits::Downloader,
     game_paths::GamePaths,
     instance::{launch::LaunchSettings, InstanceBuilder},
@@ -48,7 +48,7 @@ async fn full_fabric_test() {
         natives_dir: mc_dir.clone().join("versions/Full-fabric-test/natives"),
         version_jar_file: mc_dir.join("versions/Full-fabric-test/1.19.4.jar"),
         version: "1.19.4".to_string(),
-        version_type: "release".to_string(),
+        version_type: nomi_core::repository::manifest::VersionType::Release,
     };
 
     let launch = instance.launch_instance(settings, None);
@@ -62,8 +62,7 @@ async fn full_fabric_test() {
     let profile = VersionProfileBuilder::new()
         .id(mock.create_id())
         .name("Full-fabric-test".into())
-        .instance(launch)
-        .is_downloaded(true)
+        .state(ProfileState::downloaded(launch))
         .build();
 
     dbg!(profile).launch().await.unwrap();

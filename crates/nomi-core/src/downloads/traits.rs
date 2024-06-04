@@ -5,7 +5,7 @@ use super::{downloaders::assets::AssetsDownloaderIo, DownloadError};
 pub type DownloadResult = Result<DownloadStatus, DownloadError>;
 
 #[must_use]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DownloadStatus {
     /// Downloaded successfully
     Success,

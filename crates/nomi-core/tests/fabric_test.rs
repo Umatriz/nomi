@@ -54,7 +54,7 @@ async fn vanilla_test() {
         natives_dir: mc_dir.clone().join("versions/1.20/natives"),
         version_jar_file: mc_dir.join("versions/1.20/1.20.jar"),
         version: "1.20".to_string(),
-        version_type: "release".to_string(),
+        version_type: nomi_core::repository::manifest::VersionType::Release,
     };
 
     let l = builder.launch_instance(settings, None);

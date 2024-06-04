@@ -7,7 +7,7 @@ use crate::utils::path_to_string;
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 #[must_use]
 pub enum JavaRunner {
-    String(String),
+    Command(String),
     Path(PathBuf),
 }
 
@@ -15,7 +15,7 @@ impl JavaRunner {
     #[must_use]
     pub fn get(&self) -> &dyn AsRef<OsStr> {
         match self {
-            JavaRunner::String(s) => s,
+            JavaRunner::Command(s) => s,
             JavaRunner::Path(p) => p,
         }
     }
@@ -23,7 +23,7 @@ impl JavaRunner {
     #[must_use]
     pub fn get_string(&self) -> String {
         match self {
-            JavaRunner::String(s) => s.to_string(),
+            JavaRunner::Command(s) => s.to_string(),
             JavaRunner::Path(p) => path_to_string(p),
         }
     }
@@ -32,13 +32,13 @@ impl JavaRunner {
         JavaRunner::Path(p)
     }
 
-    pub fn str(s: &str) -> JavaRunner {
-        JavaRunner::String(s.to_string())
+    pub fn command(s: &str) -> JavaRunner {
+        JavaRunner::Command(s.to_string())
     }
 }
 
 impl Default for JavaRunner {
     fn default() -> JavaRunner {
-        JavaRunner::String("java".to_string())
+        JavaRunner::Command("java".to_string())
     }
 }

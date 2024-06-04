@@ -10,12 +10,16 @@ use tracing::info;
 
 use crate::{
     fs::read_json_config,
-    repository::{java_runner::JavaRunner, manifest::Manifest, username::Username},
+    repository::{
+        java_runner::JavaRunner,
+        manifest::{Manifest, VersionType},
+        username::Username,
+    },
 };
 
 use self::arguments::ArgumentsBuilder;
 
-use super::{profile::Loader, Undefined};
+use super::{profile::LoaderProfile, Undefined};
 
 pub mod arguments;
 pub mod rules;
@@ -47,14 +51,14 @@ pub struct LaunchSettings {
     pub version_jar_file: PathBuf,
 
     pub version: String,
-    pub version_type: String,
+    pub version_type: VersionType,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default, Clone)]
 pub struct LaunchInstance {
     pub settings: LaunchSettings,
     jvm_args: Option<Vec<String>>,
-    loader_profile: Option<Loader>,
+    loader_profile: Option<LoaderProfile>,
 }
 
 impl LaunchInstance {
@@ -68,6 +72,10 @@ impl LaunchInstance {
 
     pub fn set_uuid(&mut self, uuid: Option<String>) {
         self.settings.uuid = uuid;
+    }
+
+    pub fn loader_profile(&self) -> Option<&LoaderProfile> {
+        self.loader_profile.as_ref()
     }
 
     fn process_natives(&self, natives: &[PathBuf]) -> anyhow::Result<()> {
@@ -164,7 +172,7 @@ pub mod macros {
 pub struct LaunchInstanceBuilder<S> {
     settings: S,
     jvm_args: Option<Vec<String>>,
-    profile: Option<Loader>,
+    profile: Option<LoaderProfile>,
 }
 
 impl LaunchInstanceBuilder<Undefined> {
@@ -184,7 +192,7 @@ impl LaunchInstanceBuilder<Undefined> {
 }
 
 impl<S> LaunchInstanceBuilder<S> {
-    pub fn profile(self, profile: Loader) -> LaunchInstanceBuilder<S> {
+    pub fn profile(self, profile: LoaderProfile) -> LaunchInstanceBuilder<S> {
         LaunchInstanceBuilder {
             settings: self.settings,
             jvm_args: self.jvm_args,
@@ -211,44 +219,5 @@ impl LaunchInstanceBuilder<LaunchSettings> {
             jvm_args: self.jvm_args,
             loader_profile: self.profile,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::repository::fabric_profile::FabricProfile;
-
-    use super::*;
-
-    #[tokio::test]
-    async fn it_works() {
-        let mc_dir = std::env::current_dir().unwrap().join("minecraft");
-        let settings = LaunchSettings {
-            access_token: None,
-            username: Username::new("ItWorks").unwrap(),
-            uuid: None,
-            assets: mc_dir.join("assets"),
-            game_dir: mc_dir.clone(),
-            java_bin: JavaRunner::default(),
-            libraries_dir: mc_dir.clone().join("libraries"),
-            manifest_file: mc_dir.clone().join("instances/1.18.2/1.18.2.json"),
-            natives_dir: mc_dir.clone().join("instances/1.18.2/natives"),
-            version_jar_file: mc_dir.join("instances/1.18.2/1.18.2.jar"),
-            version: "1.18.2".to_string(),
-            version_type: "release".to_string(),
-        };
-
-        let fabric = read_json_config::<FabricProfile>(
-            "./minecraft/instances/1.18.2/fabric-loader-0.14.23-1.18.2.json",
-        )
-        .await
-        .unwrap();
-
-        let builder = LaunchInstanceBuilder::new()
-            .settings(settings)
-            .profile(fabric.into())
-            .build();
-
-        builder.launch().await.unwrap();
     }
 }

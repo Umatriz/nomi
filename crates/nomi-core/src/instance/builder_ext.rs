@@ -25,6 +25,6 @@ impl LaunchInstanceBuilderExt for Fabric {
         &self,
         builder: LaunchInstanceBuilder<LaunchSettings>,
     ) -> LaunchInstanceBuilder<LaunchSettings> {
-        builder.profile(self.profile.clone().into())
+        builder.profile(self.to_profile())
     }
 }

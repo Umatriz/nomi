@@ -3,7 +3,7 @@ use std::{marker::PhantomData, path::PathBuf};
 use crate::{
     instance::{
         launch::{macros::replace, rules::is_library_passes, LAUNCHER_NAME, LAUNCHER_VERSION},
-        profile::Loader,
+        profile::LoaderProfile,
     },
     repository::manifest::{Argument, Arguments, Classifiers, DownloadFile, Manifest, Value},
     utils::path_to_string,
@@ -26,7 +26,7 @@ pub struct ArgumentsBuilder<'a, S = Undefined> {
 struct JvmArguments(Vec<Argument>);
 struct GameArguments(Vec<Argument>);
 
-pub struct LoaderArguments<'a>(Option<&'a Loader>);
+pub struct LoaderArguments<'a>(Option<&'a LoaderProfile>);
 
 impl<'a> LoaderArguments<'a> {
     pub fn jvm_arguments(&self) -> &[String] {
@@ -53,7 +53,7 @@ impl<'a> ArgumentsBuilder<'a, Undefined> {
     }
 
     pub fn finish(&self) -> ArgumentsBuilder<'a, Defined> {
-        let (classpath, native_libs) = self.classpath();
+        let (classpath, native_libs) = dbg!(self.classpath());
         ArgumentsBuilder {
             instance: self.instance,
             manifest: self.manifest,
@@ -141,11 +141,11 @@ impl<'a> ArgumentsBuilder<'a, Defined> {
                 .clone()
                 .unwrap_or(uuid::Uuid::new_v4().to_string())
                 .as_str(),
-            "${version_type}" => &self.instance.settings.version_type,
+            "${version_type}" => &self.instance.settings.version_type.as_str(),
             "${version_name}" => &self.instance.settings.version,
             "${assets_index_name}" => &self.manifest.asset_index.id,
             "${user_properties}" => "{}",
-            "${classpath}" => dbg!(&self.classpath)
+            "${classpath}" => &self.classpath
         )
     }
 

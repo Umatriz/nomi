@@ -7,8 +7,8 @@ pub struct SimpleArgs {
     pub jvm: Vec<String>,
 }
 
-impl From<Arguments> for SimpleArgs {
-    fn from(value: Arguments) -> Self {
+impl From<&Arguments> for SimpleArgs {
+    fn from(value: &Arguments) -> Self {
         let mut args = SimpleArgs {
             game: vec![],
             jvm: vec![],

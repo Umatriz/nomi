@@ -16,3 +16,6 @@ pub mod fs;
 pub mod game_paths;
 pub mod maven_data;
 pub mod state;
+
+pub use regex;
+pub use uuid::Uuid;

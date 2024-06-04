@@ -1,46 +1,6 @@
-use std::{fmt::Display, future::Future, io::Write, sync::mpsc::Sender};
+use std::future::Future;
 
-use tracing::error;
-
-pub trait Crash<T> {
-    fn crash(self) -> T;
-}
-
-impl<T, E> Crash<T> for Result<T, E>
-where
-    E: Display + Send + Sync + 'static,
-{
-    fn crash(self) -> T {
-        match self {
-            Ok(value) => value,
-            Err(err) => {
-                error!("{}", err);
-                let mut file = std::fs::File::create("./CRASH_REPORT.txt").unwrap();
-                let _ = file.write_all(
-                    format!("Nomi crashed with the following error:\n{}", err).as_bytes(),
-                );
-                std::process::exit(1);
-            }
-        }
-    }
-}
-
-impl<T> Crash<T> for Option<T> {
-    fn crash(self) -> T {
-        match self {
-            Some(value) => value,
-            None => {
-                let mut file = std::fs::File::create("./CRASH_REPORT.txt").unwrap();
-                let _ = file.write_all(
-                    "Nomi crashed with the following error:\nValue is None"
-                        .to_string()
-                        .as_bytes(),
-                );
-                std::process::exit(1);
-            }
-        }
-    }
-}
+use tokio::sync::mpsc::Sender;
 
 pub fn spawn_tokio_future<T, Fut>(tx: Sender<T>, fut: Fut) -> tokio::task::JoinHandle<()>
 where
@@ -49,11 +9,11 @@ where
 {
     tokio::spawn(async move {
         let data = fut.await;
-        let _ = tx.send(data);
+        let _ = tx.send(data).await;
     })
 }
 
-pub fn spawn_future<T, Fut>(tx: Sender<T>, fut: Fut) -> std::thread::JoinHandle<()>
+pub fn spawn_future<T, Fut>(tx: std::sync::mpsc::Sender<T>, fut: Fut) -> std::thread::JoinHandle<()>
 where
     T: 'static + Send,
     Fut: Future<Output = T> + Send + 'static,
