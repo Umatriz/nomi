@@ -1,9 +1,11 @@
 use std::path::{Path, PathBuf};
 
+use itertools::Itertools;
 use reqwest::Client;
 use tokio::sync::mpsc::Sender;
 
 use crate::{
+    configs::profile::Loader,
     downloads::{
         downloaders::{
             file::FileDownloader,
@@ -13,10 +15,13 @@ use crate::{
     },
     fs::write_to_file,
     game_paths::GamePaths,
+    instance::profile::LoaderProfile,
     maven_data::MavenData,
     repository::{
         fabric_meta::FabricVersions,
         fabric_profile::{FabricLibrary, FabricProfile},
+        simple_args::SimpleArgs,
+        simple_lib::SimpleLib,
     },
     state::get_launcher_manifest,
 };
@@ -26,6 +31,7 @@ pub struct Fabric {
     pub game_version: String,
     pub profile: FabricProfile,
     game_paths: GamePaths,
+    fabric_version: String,
     libraries_downloader: LibrariesDownloader,
 }
 
@@ -83,11 +89,29 @@ impl Fabric {
         let libraries_downloader = LibrariesDownloader::new(&mapper, &profile.libraries);
 
         Ok(Self {
+            fabric_version: profile_version.loader.version.clone(),
             game_version,
             profile,
             game_paths,
             libraries_downloader,
         })
+    }
+
+    pub fn to_profile(&self) -> LoaderProfile {
+        LoaderProfile {
+            loader: Loader::Fabric {
+                version: Some(self.fabric_version.clone()),
+            },
+            main_class: self.profile.main_class.clone(),
+            args: SimpleArgs::from(&self.profile.arguments),
+            libraries: self
+                .profile
+                .libraries
+                .iter()
+                .map(|l| MavenData::new(&l.name))
+                .map(SimpleLib::from)
+                .collect_vec(),
+        }
     }
 }
 

@@ -124,8 +124,6 @@ impl Component for DownloadProgress<'_> {
                 task.is_finished = true;
             }
 
-            ui.label(format!("{0}", task.is_finished));
-
             if let Ok(total) = task.total_channel_mut().try_recv() {
                 task.total = total;
                 task.current = 0;

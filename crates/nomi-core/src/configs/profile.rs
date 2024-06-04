@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fmt::Display, sync::Arc};
 
 use anyhow::anyhow;
 use const_typed_builder::Builder;
@@ -36,6 +36,15 @@ impl VersionProfilesConfig {
 pub enum Loader {
     Vanilla,
     Fabric { version: Option<String> },
+}
+
+impl Display for Loader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Loader::Vanilla => f.write_str("Vanilla"),
+            Loader::Fabric { .. } => f.write_str("Fabric"),
+        }
+    }
 }
 
 impl PartialEq for Loader {
@@ -82,6 +91,17 @@ impl VersionProfile {
         match &self.state {
             ProfileState::Downloaded(instance) => instance.launch().await,
             ProfileState::NotDownloaded { .. } => Err(anyhow!("This profile is not downloaded!")),
+        }
+    }
+
+    pub fn loader_name(&self) -> String {
+        match &self.state {
+            ProfileState::Downloaded(instance) => instance
+                .loader_profile()
+                .map_or(format!("{}", Loader::Vanilla), |profile| {
+                    format!("{}", profile.loader)
+                }),
+            ProfileState::NotDownloaded { loader, .. } => format!("{loader}"),
         }
     }
 

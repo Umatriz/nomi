@@ -84,14 +84,17 @@ impl Component for ProfilesPage<'_> {
         ui.style_mut().wrap = Some(false);
 
         TableBuilder::new(ui)
-            .column(Column::auto().at_most(120.0))
-            .columns(Column::auto(), 2)
+            .column(Column::auto().at_least(60.0).at_most(120.0))
+            .columns(Column::auto(), 3)
             .header(20.0, |mut header| {
                 header.col(|ui| {
                     ui.label("Name");
                 });
                 header.col(|ui| {
                     ui.label("Version");
+                });
+                header.col(|ui| {
+                    ui.label("Loader");
                 });
             })
             .body(|mut body| {
@@ -102,6 +105,9 @@ impl Component for ProfilesPage<'_> {
                         });
                         row.col(|ui| {
                             ui.label(profile.version());
+                        });
+                        row.col(|ui| {
+                            ui.label(profile.loader_name());
                         });
                         row.col(|ui| match &profile.state {
                             ProfileState::Downloaded(instance) => {
