@@ -8,28 +8,37 @@ Minecraft launcher powered by Rust
 
 ---
 
-### Downloading
+## Downloading
 
-Ways you can download nomi
+ - [The latest release](https://github.com/Umatriz/nomi/releases/latest)
+ - [`nomi`](https://aur.archlinux.org/packages/nomi) is available on the AUR
 
-## Arch
-
-[`nomi`](https://aur.archlinux.org/packages/nomi) is available on the AUR
-
-### Contributing
+## Contributing
 
 Check out the [contributing.md](./CONTRIBUTING.md)
 
-## Requirements (outdated)
+#### Requirements
 
-- [Rust](https://www.rust-lang.org/) >= 1.70
+- [Rust](https://www.rust-lang.org/) >= 1.76.0
 
-Start project:
+#### Starting the project
+
 ```shell
+git clone https://github.com/Umatriz/nomi.git
+cd nomi
 cargo run
 ```
 
-### FAQ
+## License
+
+[GNU GPL-3.0](LICENSE.md)
+
+## Credit
+
+[nakidai](https://github.com/nakidai) - maintaining the AUR package which is available [here](https://aur.archlinux.org/packages/nomi) 
+
+
+---
 
 NOT AN OFFICIAL MINECRAFT [PRODUCT/SERVICE/EVENT/etc.]. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT
 
