@@ -8,7 +8,7 @@ pub struct FabricProfile {
     pub release_time: String,
     pub time: String,
     #[serde(rename = "type")]
-    pub _type: String,
+    pub r#type: String,
     pub main_class: String,
     pub arguments: Arguments,
     pub libraries: Vec<FabricLibrary>,

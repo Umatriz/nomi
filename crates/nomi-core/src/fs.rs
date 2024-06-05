@@ -3,9 +3,9 @@ use std::path::Path;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::io::AsyncWriteExt;
 
-pub async fn write_toml_config<T: ?Sized>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>
+pub async fn write_toml_config<T>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>
 where
-    T: Serialize,
+    T: Serialize + ?Sized,
 {
     let path = path.as_ref();
     let body = toml::to_string_pretty(data)?;
@@ -19,9 +19,9 @@ where
     Ok(())
 }
 
-pub async fn read_toml_config<T: ?Sized>(path: impl AsRef<Path>) -> anyhow::Result<T>
+pub async fn read_toml_config<T>(path: impl AsRef<Path>) -> anyhow::Result<T>
 where
-    T: DeserializeOwned,
+    T: DeserializeOwned + ?Sized,
 {
     let path = path.as_ref();
 
@@ -36,17 +36,17 @@ where
     Ok(body)
 }
 
-pub fn read_toml_config_sync<T: ?Sized>(path: impl AsRef<Path>) -> anyhow::Result<T>
+pub fn read_toml_config_sync<T>(path: impl AsRef<Path>) -> anyhow::Result<T>
 where
-    T: DeserializeOwned,
+    T: DeserializeOwned + ?Sized,
 {
     let runtime = tokio::runtime::Builder::new_current_thread().build()?;
     runtime.block_on(read_toml_config::<T>(path))
 }
 
-pub fn write_toml_config_sync<T: ?Sized>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>
+pub fn write_toml_config_sync<T>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>
 where
-    T: Serialize,
+    T: Serialize + ?Sized,
 {
     let runtime = tokio::runtime::Builder::new_current_thread().build()?;
     runtime.block_on(write_toml_config::<T>(data, path))
@@ -60,9 +60,9 @@ where
     Ok(serde_json::from_str::<T>(&s)?)
 }
 
-pub async fn write_json_config<T: ?Sized>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>
+pub async fn write_json_config<T>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>
 where
-    T: Serialize,
+    T: Serialize + ?Sized,
 {
     let path = path.as_ref();
     let body = serde_json::to_string_pretty(data)?;
