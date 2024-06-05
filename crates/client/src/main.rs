@@ -139,7 +139,7 @@ fn download_java(java_state: &mut JavaState, download_progress_state: &mut Downl
     let progress_channel = task.progress_channel().clone_tx();
     let result_channel = task.result_channel().clone_tx();
     let total_channel = task.total_channel().clone_tx();
-    tokio::spawn(async move {
+    let handle = tokio::spawn(async move {
         let downloader = JavaDownloader::new(PathBuf::from(DOT_NOMI_JAVA_DIR));
 
         total_channel.send(downloader.total()).await.report_error();
@@ -153,7 +153,7 @@ fn download_java(java_state: &mut JavaState, download_progress_state: &mut Downl
         result_channel.send(()).await.report_error();
     });
 
-    download_progress_state.java_downloading_task = Some(task);
+    download_progress_state.java_downloading_task = Some(task.with_handle(handle));
 }
 
 impl eframe::App for MyTabs {

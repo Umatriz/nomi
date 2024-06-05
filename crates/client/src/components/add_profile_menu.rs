@@ -37,19 +37,23 @@ impl AddProfileMenuState {
             self.task = Some(Task::new("Requesting available Fabric versions".to_owned()));
         }
 
-        if let Some(task) = self.task.as_mut() {
-            task.set_running(true)
-        }
+        // if let Some(task) = self.task.as_mut() {
+        //     task.set_running(true)
+        // }
 
         let version = self.selected_version_buf.as_ref().unwrap().id.clone();
 
         let sender = self.task.as_ref().unwrap().result_channel().clone_tx();
 
-        tokio::spawn(async move {
+        let handle = tokio::spawn(async move {
             if let Some(versions) = get_fabric_versions(version).await.report_error() {
                 sender.send(versions).await.report_error();
             }
         });
+
+        if let Some(task) = self.task.as_mut() {
+            task.set_handle(handle)
+        }
     }
 }
 
@@ -96,7 +100,7 @@ impl Component for AddProfileMenu<'_> {
         {
             self.menu_state.fabric_versions = versiosn;
             if let Some(task) = self.menu_state.task.as_mut() {
-                task.set_running(false)
+                task.mark_unfinished();
             }
         }
 
@@ -155,7 +159,7 @@ impl Component for AddProfileMenu<'_> {
 
             ui.add_enabled_ui(self.menu_state.selected_version_buf.is_some(), |ui| {
                 egui::ComboBox::from_label("Select the loader")
-                    .selected_text(format!("{:?}", self.menu_state.selected_loader_buf))
+                    .selected_text(format!("{}", self.menu_state.selected_loader_buf))
                     .show_ui(ui, |ui| {
                         ui.selectable_value(
                             &mut self.menu_state.selected_loader_buf,
@@ -213,7 +217,7 @@ impl Component for AddProfileMenu<'_> {
                     .menu_state
                     .task
                     .as_ref()
-                    .is_some_and(|task| task.is_running())
+                    .is_some_and(|task| !task.is_finished())
                 {
                     ui.horizontal(|ui| {
                         ui.spinner();
@@ -248,6 +252,12 @@ impl Component for AddProfileMenu<'_> {
 
         let fabric_versions_non_empty = || !self.menu_state.fabric_versions.is_empty();
 
+        if self.menu_state.profile_name_buf.trim().is_empty() {
+            ui.label(
+                RichText::new("You must enter the profile name").color(ui.visuals().error_fg_color),
+            );
+        }
+
         if self.menu_state.selected_version_buf.is_none() {
             ui.label(
                 RichText::new("You must select the version").color(ui.visuals().error_fg_color),
@@ -272,7 +282,7 @@ impl Component for AddProfileMenu<'_> {
         {
             self.profiles_state.add_profile(VersionProfile {
                 id: self.profiles_state.create_id(),
-                name: self.menu_state.profile_name_buf.clone(),
+                name: self.menu_state.profile_name_buf.trim_end().to_owned(),
                 state: ProfileState::NotDownloaded {
                     // PANICS: It will never panic because it's
                     // unreachable if `selected_version_buf` is `None`

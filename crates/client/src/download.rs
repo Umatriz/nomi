@@ -126,12 +126,12 @@ pub fn spawn_assets(
     result_tx: Sender<()>,
     progress_tx: Sender<DownloadResult>,
     total_tx: Sender<u32>,
-) {
+) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let _ = try_assets(version, assets_dir, result_tx, progress_tx, total_tx)
             .await
             .report_error_with_context("Assets downloading error");
-    });
+    })
 }
 
 async fn try_assets(

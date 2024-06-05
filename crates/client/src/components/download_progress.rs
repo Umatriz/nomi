@@ -2,6 +2,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use eframe::egui;
 use nomi_core::{configs::profile::VersionProfile, downloads::traits::DownloadResult};
+use tokio::task::JoinHandle;
 
 use crate::{channel::Channel, download::spawn_assets, errors_pool::ErrorPoolExt};
 
@@ -41,10 +42,10 @@ pub struct AssetsExtra {
 
 pub struct Task<R, Extra = ()> {
     name: String,
+    handle: Option<JoinHandle<()>>,
     total: u32,
     current: u32,
     is_finished: bool,
-    is_running: bool,
     extra: Extra,
     download_result_channel: Channel<R>,
     download_progress_channel: Channel<DownloadResult>,
@@ -55,10 +56,10 @@ impl<R> Task<R> {
     pub fn new(name: String) -> Self {
         Self {
             name,
+            handle: None,
             total: 0,
             current: 0,
             is_finished: false,
-            is_running: false,
             extra: (),
             download_result_channel: Channel::new(100),
             download_progress_channel: Channel::new(500),
@@ -72,8 +73,8 @@ impl<R> Task<R> {
             name: self.name,
             total: self.total,
             current: self.current,
+            handle: self.handle,
             is_finished: self.is_finished,
-            is_running: self.is_running,
             download_result_channel: self.download_result_channel,
             download_progress_channel: self.download_progress_channel,
             download_total_channel: self.download_total_channel,
@@ -82,21 +83,31 @@ impl<R> Task<R> {
 }
 
 impl<R, Extra> Task<R, Extra> {
+    pub fn with_handle(mut self, handle: JoinHandle<()>) -> Self {
+        self.handle = Some(handle);
+        self
+    }
+
+    pub fn set_handle(&mut self, handle: JoinHandle<()>) {
+        self.handle = Some(handle)
+    }
+
     pub fn extra(&self) -> &Extra {
         &self.extra
     }
 
-    pub fn set_running(&mut self, state: bool) {
-        self.is_running = state;
+    pub fn mark_finished(&mut self) {
+        self.is_finished = true;
     }
 
-    pub fn with_running(mut self, state: bool) -> Self {
-        self.is_running = state;
-        self
+    /// Can be used when you need to restart the task
+    /// or if you are using the same task multiple times
+    pub fn mark_unfinished(&mut self) {
+        self.is_finished = false;
     }
 
-    pub fn is_running(&self) -> bool {
-        self.is_running
+    pub fn is_finished(&self) -> bool {
+        self.is_finished
     }
 
     pub fn result_channel(&self) -> &Channel<R> {
@@ -150,14 +161,14 @@ impl Component for DownloadProgress<'_> {
 
         if self.download_progress_state.assets_task.is_none() {
             if let Some(task) = self.download_progress_state.assets_to_download.pop() {
-                spawn_assets(
+                let handle = spawn_assets(
                     task.extra().version.clone(),
                     task.extra().assets_dir.clone(),
                     task.result_channel().clone_tx(),
                     task.progress_channel().clone_tx(),
                     task.total_channel().clone_tx(),
                 );
-                self.download_progress_state.assets_task = Some(task);
+                self.download_progress_state.assets_task = Some(task.with_handle(handle));
             }
         }
 
@@ -224,5 +235,12 @@ fn show_task<T, Extra>(
             ui.spinner();
             ui.label("Waiting for the progress data...");
         });
+    }
+
+    if let Some(handle) = task.handle.as_ref() {
+        if ui.button("Cancel").clicked() {
+            handle.abort();
+            task.is_finished = true;
+        }
     }
 }

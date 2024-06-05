@@ -155,8 +155,7 @@ impl Component for ProfilesPage<'_> {
                                     )
                                     .clicked()
                                 {
-                                    let version_task =
-                                        Task::new(profile.version().to_owned()).with_running(true);
+                                    let version_task = Task::new(profile.version().to_owned());
                                     let id = profile.id;
 
                                     self.download_progress.assets_to_download.push(
@@ -173,7 +172,7 @@ impl Component for ProfilesPage<'_> {
                                             }),
                                     );
 
-                                    spawn_download(
+                                    let handle = spawn_download(
                                         profile,
                                         version_task.result_channel().clone_tx(),
                                         version_task.progress_channel().clone_tx(),
@@ -182,7 +181,7 @@ impl Component for ProfilesPage<'_> {
 
                                     self.download_progress
                                         .profile_tasks
-                                        .insert(id, version_task);
+                                        .insert(id, version_task.with_handle(handle));
                                 }
                             }
                         });
