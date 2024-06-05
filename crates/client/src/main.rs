@@ -27,6 +27,7 @@ use tracing::{info, Level};
 use tracing_subscriber::{
     fmt::{writer::MakeWriterExt, Layer},
     prelude::__tracing_subscriber_SubscriberExt,
+    EnvFilter,
 };
 
 pub mod components;
@@ -52,11 +53,16 @@ fn main() {
     file_sub.set_ansi(false);
 
     let stdout_sub = Layer::new()
-        .with_writer(std::io::stdout.with_max_level(Level::INFO))
+        .with_writer(std::io::stdout.with_max_level(Level::DEBUG))
         .pretty();
     // stdout_sub.set_ansi(false);
 
     let subscriber = tracing_subscriber::registry()
+        .with(
+            EnvFilter::builder()
+                .parse("client=debug,nomi_core=debug")
+                .unwrap(),
+        )
         .with(collector.clone())
         .with(stdout_sub)
         .with(file_sub);

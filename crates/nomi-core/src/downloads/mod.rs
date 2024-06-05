@@ -4,13 +4,13 @@ use std::path::{Path, PathBuf};
 
 use futures_util::stream::StreamExt;
 use reqwest::Client;
-use tokio::{io::AsyncWriteExt, task::JoinError};
-use tracing::{debug, error};
+use tokio::io::AsyncWriteExt;
+use tracing::{error, trace};
 
 pub mod downloaders;
 pub mod traits;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Clone)]
 pub enum DownloadError {
     #[error("DownloadError:\nurl: {url}\npath: {path}\nerror: {error:#?}")]
     Error {
@@ -19,8 +19,8 @@ pub enum DownloadError {
         error: String,
     },
 
-    #[error("{0}")]
-    JoinError(#[from] JoinError),
+    #[error("The task was cancelled or panicked")]
+    JoinError,
 }
 
 pub(crate) async fn download_file(
@@ -86,7 +86,7 @@ pub(crate) async fn download_file(
         })?;
     }
 
-    debug!("Downloaded successfully {}", path.to_string_lossy());
+    trace!("Downloaded successfully {}", path.to_string_lossy());
 
     Ok(())
 }

@@ -3,6 +3,7 @@ use std::{collections::HashMap, path::PathBuf, sync::Arc};
 use eframe::egui;
 use nomi_core::{configs::profile::VersionProfile, downloads::traits::DownloadResult};
 use tokio::task::JoinHandle;
+use tracing::error;
 
 use crate::{channel::Channel, download::spawn_assets, errors_pool::ErrorPoolExt};
 
@@ -223,7 +224,7 @@ fn show_task<T, Extra>(
     }
 
     if let Ok(data) = task.progress_channel_mut().try_recv() {
-        task.current += data.map_or(0, |_| 1);
+        task.current += data.inspect_err(|e| error!("{}", e)).map_or(0, |_| 1);
     }
 
     ui.label(format!("Name: {}", task.name));

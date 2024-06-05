@@ -12,6 +12,7 @@ use crate::downloads::{
 #[derive(Default)]
 pub struct DownloadSet {
     set: Vec<Box<dyn Downloadable<Out = DownloadResult>>>,
+    helper: Option<Sender<DownloadResult>>,
 }
 
 impl Debug for DownloadSet {
@@ -25,8 +26,17 @@ impl DownloadSet {
         Self::default()
     }
 
+    #[must_use]
+    pub fn with_helper(mut self, helper: Sender<DownloadResult>) -> Self {
+        self.helper = Some(helper);
+        self
+    }
+
     pub fn from_vec_dyn(vec: Vec<Box<dyn Downloadable<Out = DownloadResult>>>) -> Self {
-        Self { set: vec }
+        Self {
+            set: vec,
+            helper: None,
+        }
     }
 
     pub fn add<D>(&mut self, downloader: Box<D>) -> &mut Self
@@ -54,12 +64,16 @@ impl Downloader for DownloadSet {
         }
 
         while let Some(result) = set.join_next().await {
-            let _ = match result {
-                Ok(download_status) => channel.send(download_status).await,
-                Err(join_error) => {
-                    channel
-                        .send(Err(DownloadError::JoinError(join_error)))
-                        .await
+            if let Ok(download_status) = result {
+                let _ = channel.send(download_status.clone()).await;
+                if let Some(sender) = self.helper.as_ref() {
+                    let _ = sender.send(download_status).await;
+                }
+            } else {
+                let _ = channel.send(Err(DownloadError::JoinError)).await;
+
+                if let Some(sender) = self.helper.as_ref() {
+                    let _ = sender.send(Err(DownloadError::JoinError)).await;
                 }
             };
         }

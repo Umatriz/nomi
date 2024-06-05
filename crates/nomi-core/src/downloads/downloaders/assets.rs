@@ -36,12 +36,46 @@ pub struct AssetsDownloader {
     id: String,
 }
 
+#[derive(Debug)]
+pub struct Chunk {
+    ok: usize,
+    err: usize,
+    set: DownloadSet,
+}
+
+impl Chunk {
+    pub fn new(set: DownloadSet) -> Self {
+        Self { ok: 0, err: 0, set }
+    }
+}
+
+#[async_trait::async_trait]
+impl Downloader for Chunk {
+    type Data = DownloadResult;
+
+    fn total(&self) -> u32 {
+        self.set.total()
+    }
+
+    async fn download(mut self: Box<Self>, channel: Sender<Self::Data>) {
+        let (sender, mut receiver) = tokio::sync::mpsc::channel(100);
+        let downloader = self.set.with_helper(sender);
+        Box::new(downloader).download(channel).await;
+        if let Some(result) = receiver.recv().await {
+            match result {
+                Ok(_) => self.ok += 1,
+                Err(_) => self.err += 1,
+            }
+        }
+        info!("Downloaded Chunk OK: {} ERR: {}", self.ok, self.err);
+    }
+}
+
 impl AssetsDownloader {
     pub async fn new(url: String, id: String, objects: PathBuf, indexes: PathBuf) -> Result<Self> {
         let assets: Assets = Client::new().get(&url).send().await?.json().await?;
 
-        let mut queue =
-            DownloadQueue::new().with_inspector(|| info!("Asset chunk downloaded successfully"));
+        let mut queue = DownloadQueue::new();
 
         assets
             .objects
@@ -68,6 +102,7 @@ impl AssetsDownloader {
                     .collect::<Vec<_>>()
             })
             .map(DownloadSet::from_vec_dyn)
+            .map(Chunk::new)
             .for_each(|downloader| queue.add_downloader(downloader));
 
         Ok(Self {
@@ -113,6 +148,7 @@ impl Downloader for AssetsDownloader {
         self.queue.total()
     }
 
+    #[tracing::instrument(skip_all)]
     async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
         Box::new(self.queue).download(channel).await;
     }
