@@ -7,9 +7,10 @@ use std::{
 use arguments::UserData;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
-use tracing::info;
+use tracing::{debug, info, trace, warn};
 
 use crate::{
+    downloads::Assets,
     fs::read_json_config,
     repository::{
         java_runner::JavaRunner,
@@ -52,6 +53,69 @@ pub struct LaunchInstance {
 }
 
 impl LaunchInstance {
+    #[tracing::instrument(err)]
+    pub async fn delete_instance(
+        &self,
+        delete_client: bool,
+        delete_libraries: bool,
+        delete_assets: bool,
+    ) -> anyhow::Result<()> {
+        let manifest = read_json_config::<Manifest>(&self.settings.manifest_file).await?;
+        let arguments_builder = ArgumentsBuilder::new(self, &manifest).with_classpath();
+
+        if delete_client {
+            let _ = tokio::fs::remove_file(&self.settings.version_jar_file)
+                .await
+                .inspect(|()| {
+                    debug!(
+                        "Removed client successfully: {}",
+                        &self.settings.version_jar_file.display()
+                    );
+                })
+                .inspect_err(|_| {
+                    warn!(
+                        "Cannot remove client: {}",
+                        &self.settings.version_jar_file.display()
+                    );
+                });
+        }
+
+        if delete_libraries {
+            for library in arguments_builder.classpath_as_slice() {
+                let _ = tokio::fs::remove_file(library)
+                    .await
+                    .inspect(|()| trace!("Removed library successfully: {}", library.display()))
+                    .inspect_err(|_| warn!("Cannot remove library: {}", library.display()));
+            }
+        }
+
+        if delete_assets {
+            let assets = read_json_config::<Assets>(
+                &self
+                    .settings
+                    .assets
+                    .join("indexes")
+                    .join(manifest.asset_index.id),
+            )
+            .await?;
+            for asset in assets.objects.values() {
+                let path = &self
+                    .settings
+                    .assets
+                    .join("objects")
+                    .join(&asset.hash[0..2])
+                    .join(&asset.hash);
+
+                let _ = tokio::fs::remove_file(path)
+                    .await
+                    .inspect(|()| trace!("Removed asset successfully: {}", path.display()))
+                    .inspect_err(|_| warn!("Cannot remove asset: {}", path.display()));
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn loader_profile(&self) -> Option<&LoaderProfile> {
         self.loader_profile.as_ref()
     }
@@ -99,7 +163,9 @@ impl LaunchInstance {
     ) -> anyhow::Result<()> {
         let manifest = read_json_config::<Manifest>(&self.settings.manifest_file).await?;
 
-        let arguments_builder = ArgumentsBuilder::new(self, &manifest, user_data).finish();
+        let arguments_builder = ArgumentsBuilder::new(self, &manifest)
+            .with_classpath()
+            .with_userdata(user_data);
 
         self.process_natives(arguments_builder.get_native_libs())?;
 

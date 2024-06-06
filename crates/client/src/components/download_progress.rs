@@ -21,7 +21,7 @@ pub struct DownloadProgressState {
 
     pub assets_task: Option<Task<(), AssetsExtra>>,
     pub assets_to_download: Vec<Task<(), AssetsExtra>>,
-    pub profile_tasks: HashMap<u32, Task<VersionProfile>>,
+    pub profile_tasks: HashMap<usize, Task<VersionProfile>>,
 }
 
 impl Default for DownloadProgressState {

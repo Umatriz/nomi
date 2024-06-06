@@ -63,7 +63,7 @@ impl TabViewer for MyContext {
             TabKind::Profiles { menu_state } => ProfilesPage {
                 download_progress: &mut self.states.download_progress,
                 settings_state: &self.states.settings,
-                state: &mut self.states.profiles,
+                profiles_state: &mut self.states.profiles,
                 menu_state,
 
                 launcher_manifest: self.launcher_manifest,

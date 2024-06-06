@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use eframe::egui::{self, Align2, Ui};
+use eframe::egui::{self, ahash::HashMap, popup_below_widget, Align2, Id, Ui};
 use egui_extras::{Column, TableBuilder};
 use nomi_core::{
     configs::profile::{ProfileState, VersionProfile},
@@ -26,7 +26,7 @@ pub struct ProfilesPage<'a> {
 
     pub is_profile_window_open: &'a mut bool,
 
-    pub state: &'a mut ProfilesState,
+    pub profiles_state: &'a mut ProfilesState,
     pub menu_state: &'a mut AddProfileMenuState,
 
     pub launcher_manifest: &'static LauncherManifest,
@@ -38,20 +38,12 @@ pub struct ProfilesState {
 }
 
 impl ProfilesState {
-    pub const fn default_const() -> Self {
-        Self {
-            profiles: Vec::new(),
-        }
-    }
-
     pub fn add_profile(&mut self, profile: VersionProfile) {
-        self.profiles.push(profile.into());
+        self.profiles.insert(self.create_id(), profile.into());
     }
 
-    /// Create an id for the profile
-    /// depends on the last id in the vector
-    pub fn create_id(&self) -> u32 {
-        match &self.profiles.iter().max_by_key(|x| x.id) {
+    pub fn create_id(&self) -> usize {
+        match &self.profiles.iter().max_by_key(|profile| profile.id) {
             Some(v) => v.id + 1,
             None => 0,
         }
@@ -77,7 +69,7 @@ impl Component for ProfilesPage<'_> {
                 .show(ui.ctx(), |ui| {
                     AddProfileMenu {
                         menu_state: self.menu_state,
-                        profiles_state: self.state,
+                        profiles_state: self.profiles_state,
                         launcher_manifest: self.launcher_manifest,
                         // is_profile_window_open: self.is_profile_window_open,
                     }
@@ -89,7 +81,7 @@ impl Component for ProfilesPage<'_> {
 
         TableBuilder::new(ui)
             .column(Column::auto().at_least(120.0).at_most(240.0))
-            .columns(Column::auto(), 3)
+            .columns(Column::auto(), 4)
             .header(20.0, |mut header| {
                 header.col(|ui| {
                     ui.label("Name");
@@ -102,7 +94,9 @@ impl Component for ProfilesPage<'_> {
                 });
             })
             .body(|mut body| {
-                for profile in self.state.profiles.iter().cloned() {
+                let mut is_deleting = vec![];
+
+                for (index, profile) in self.profiles_state.profiles.iter().enumerate() {
                     body.row(30.0, |mut row| {
                         row.col(|ui| {
                             ui.add(egui::Label::new(&profile.name).truncate(true));
@@ -173,7 +167,7 @@ impl Component for ProfilesPage<'_> {
                                     );
 
                                     let handle = spawn_download(
-                                        profile,
+                                        profile.clone(),
                                         version_task.result_channel().clone_tx(),
                                         version_task.progress_channel().clone_tx(),
                                         version_task.total_channel().clone_tx(),
@@ -185,8 +179,51 @@ impl Component for ProfilesPage<'_> {
                                 }
                             }
                         });
+
+                        row.col(|ui| {
+                            if let ProfileState::Downloaded(instance) = &profile.state {
+                                let popup_id = ui.make_persistent_id("delete_popup_id");
+                                let button = ui
+                                    .button("Delete")
+                                    .on_hover_text("It will delete the profile and it's data");
+
+                                if button.clicked() {
+                                    ui.memory_mut(|mem| mem.open_popup(popup_id))
+                                }
+
+                                popup_below_widget(ui, popup_id, &button, |ui| {
+                                    ui.set_min_width(150.0);
+
+                                    let delete_client_id = Id::new("delete_client");
+                                    let delete_libraries_id = Id::new("delete_libraries");
+                                    let delete_assets_id = Id::new("delete_assets");
+
+                                    let mut make_checkbox = |text: &str, id, default: bool| {
+                                        let mut state = ui.data_mut(|map| *map.get_temp_mut_or_insert_with(id, move || default));
+                                        ui.checkbox(&mut state, text);
+                                        ui.data_mut(|map| map.insert_temp(id, state));
+                                    };
+
+                                    make_checkbox("Delete profile's client", delete_client_id, true);
+                                    make_checkbox("Delete profile's libraries", delete_libraries_id, true);
+                                    make_checkbox("Delete profile's assets", delete_assets_id, false);
+                                    
+                                    ui.label("Are you sure you want to delete this profile and it's data?");
+                                    ui.horizontal(|ui| {
+                                        if ui.button("Yes").clicked() {
+                                            is_deleting.push(index)
+                                        }
+                                        if ui.button("No").clicked() {}
+                                    });
+                                });
+                            }
+                        });
                     });
                 }
+
+                is_deleting.drain(..).for_each(|index| {
+                    self.profiles_state.profiles.remove(index);
+                });
             });
     }
 }
