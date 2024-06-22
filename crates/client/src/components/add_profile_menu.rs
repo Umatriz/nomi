@@ -10,7 +10,7 @@ use nomi_core::{
 
 use crate::errors_pool::ErrorPoolExt;
 
-use super::{download_progress::Task, profiles::ProfilesState, Component};
+use super::{profiles::ProfilesState, tasks_manager::Task, Component};
 
 pub struct AddProfileMenu<'a> {
     pub launcher_manifest: &'a LauncherManifest,

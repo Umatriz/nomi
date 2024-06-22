@@ -8,9 +8,9 @@ use nomi_core::{
 use crate::{
     components::{
         add_tab_menu::TabsState,
-        download_progress::DownloadProgressState,
         profiles::ProfilesState,
         settings::{ClientSettingsState, SettingsState},
+        tasks_manager::TasksManagerState,
     },
     errors_pool::ErrorsPoolState,
     TabId,
@@ -24,7 +24,7 @@ pub struct States {
     pub profiles: ProfilesState,
     pub settings: SettingsState,
     pub client_settings: ClientSettingsState,
-    pub download_progress: DownloadProgressState,
+    pub download_progress: TasksManagerState,
 }
 
 impl Default for States {
@@ -47,7 +47,7 @@ impl Default for States {
                 .unwrap_or_default(),
             client_settings: settings.client_settings.clone(),
             settings,
-            download_progress: DownloadProgressState::default(),
+            download_progress: TasksManagerState::default(),
         }
     }
 }

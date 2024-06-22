@@ -1,4 +1,8 @@
-use std::{collections::HashMap, path::PathBuf, sync::Arc};
+use std::{
+    collections::{HashMap, VecDeque},
+    path::PathBuf,
+    sync::Arc,
+};
 
 use eframe::egui;
 use nomi_core::{configs::profile::VersionProfile, downloads::traits::DownloadResult};
@@ -9,30 +13,39 @@ use crate::{channel::Channel, download::spawn_assets, errors_pool::ErrorPoolExt}
 
 use super::{profiles::ProfilesState, Component};
 
-pub struct DownloadProgress<'a> {
-    pub download_progress_state: &'a mut DownloadProgressState,
+pub struct TasksManager<'a> {
+    pub download_progress_state: &'a mut TasksManagerState,
     pub profiles_state: &'a mut ProfilesState,
 }
 
-pub struct DownloadProgressState {
+pub struct TasksManagerState {
     pub is_allowed_to_take_action: bool,
+
+    pub tasks: VecDeque<Task<()>>,
 
     pub java_downloading_task: Option<Task<()>>,
 
     pub assets_task: Option<Task<(), AssetsExtra>>,
-    pub assets_to_download: Vec<Task<(), AssetsExtra>>,
+    pub assets_to_download: VecDeque<Task<(), AssetsExtra>>,
     pub profile_tasks: HashMap<usize, Task<VersionProfile>>,
 }
 
-impl Default for DownloadProgressState {
+impl Default for TasksManagerState {
     fn default() -> Self {
         Self {
             is_allowed_to_take_action: true,
             java_downloading_task: None,
+            tasks: VecDeque::new(),
             assets_task: None,
-            assets_to_download: Vec::new(),
+            assets_to_download: VecDeque::new(),
             profile_tasks: HashMap::new(),
         }
+    }
+}
+
+impl TasksManagerState {
+    pub fn push_task(&mut self, task: Task<()>) {
+        self.tasks.push_back(task);
     }
 }
 
@@ -132,7 +145,7 @@ impl<R, Extra> Task<R, Extra> {
     }
 }
 
-impl Component for DownloadProgress<'_> {
+impl Component for TasksManager<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
         if let Some(task) = self.download_progress_state.java_downloading_task.as_mut() {
             show_task(ui, task, |_| ())
@@ -161,7 +174,7 @@ impl Component for DownloadProgress<'_> {
         }
 
         if self.download_progress_state.assets_task.is_none() {
-            if let Some(task) = self.download_progress_state.assets_to_download.pop() {
+            if let Some(task) = self.download_progress_state.assets_to_download.pop_front() {
                 let handle = spawn_assets(
                     task.extra().version.clone(),
                     task.extra().assets_dir.clone(),

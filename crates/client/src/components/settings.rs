@@ -12,11 +12,11 @@ use serde::{Deserialize, Serialize};
 
 use crate::{download_java, errors_pool::ErrorPoolExt, states::JavaState};
 
-use super::{download_progress::DownloadProgressState, Component};
+use super::{tasks_manager::TasksManagerState, Component};
 
 pub struct SettingsPage<'a> {
     pub java_state: &'a mut JavaState,
-    pub download_progress_state: &'a mut DownloadProgressState,
+    pub download_progress_state: &'a mut TasksManagerState,
 
     pub settings_state: &'a mut SettingsState,
     pub client_settings_state: &'a mut ClientSettingsState,

@@ -1,7 +1,6 @@
 use crate::{
     components::{
-        download_progress::DownloadProgress, profiles::ProfilesPage, settings::SettingsPage,
-        Component,
+        profiles::ProfilesPage, settings::SettingsPage, tasks_manager::TasksManager, Component,
     },
     errors_pool::ErrorPoolExt,
     states::States,
@@ -84,7 +83,7 @@ impl TabViewer for MyContext {
                 });
             }
             TabKind::DownloadProgress => {
-                DownloadProgress {
+                TasksManager {
                     download_progress_state: &mut self.states.download_progress,
                     profiles_state: &mut self.states.profiles,
                 }

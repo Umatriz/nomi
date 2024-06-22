@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use components::{
     add_profile_menu::AddProfileMenuState,
     add_tab_menu::AddTab,
-    download_progress::{DownloadProgressState, Task},
+    tasks_manager::{Task, TasksManagerState},
     Component,
 };
 use context::MyContext;
@@ -35,7 +35,11 @@ pub mod download;
 pub mod errors_pool;
 pub mod utils;
 
+pub mod simplify;
+pub mod task;
+
 pub mod channel;
+pub mod popup;
 pub mod tab;
 pub use tab::*;
 pub mod context;
@@ -135,7 +139,7 @@ impl MyTabs {
     }
 }
 
-fn download_java(java_state: &mut JavaState, download_progress_state: &mut DownloadProgressState) {
+fn download_java(java_state: &mut JavaState, download_progress_state: &mut TasksManagerState) {
     info!("Downloading Java");
 
     java_state.is_downloaded = true;

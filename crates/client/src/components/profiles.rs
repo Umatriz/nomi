@@ -1,6 +1,6 @@
-use std::sync::Arc;
+use std::{fmt::format, future::Future, sync::Arc};
 
-use eframe::egui::{self, ahash::HashMap, popup_below_widget, Align2, Id, Ui};
+use eframe::egui::{self, AboveOrBelow, Align2, Id, Ui};
 use egui_extras::{Column, TableBuilder};
 use nomi_core::{
     configs::profile::{ProfileState, VersionProfile},
@@ -11,17 +11,17 @@ use nomi_core::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{download::spawn_download, errors_pool::ErrorPoolExt, utils::spawn_tokio_future};
+use crate::{download::spawn_download, errors_pool::ErrorPoolExt, popup::popup, utils::spawn_tokio_future};
 
 use super::{
     add_profile_menu::{AddProfileMenu, AddProfileMenuState},
-    download_progress::{AssetsExtra, DownloadProgressState, Task},
+    tasks_manager::{AssetsExtra, TasksManagerState, Task},
     settings::SettingsState,
     Component,
 };
 
 pub struct ProfilesPage<'a> {
-    pub download_progress: &'a mut DownloadProgressState,
+    pub download_progress: &'a mut TasksManagerState,
     pub settings_state: &'a SettingsState,
 
     pub is_profile_window_open: &'a mut bool,
@@ -152,7 +152,7 @@ impl Component for ProfilesPage<'_> {
                                     let version_task = Task::new(profile.version().to_owned());
                                     let id = profile.id;
 
-                                    self.download_progress.assets_to_download.push(
+                                    self.download_progress.assets_to_download.push_back(
                                         Task::new(format!("Assets ({})", profile.version()))
                                             .with_extra(AssetsExtra {
                                                 version: profile.version().to_owned(),
@@ -187,11 +187,7 @@ impl Component for ProfilesPage<'_> {
                                     .button("Delete")
                                     .on_hover_text("It will delete the profile and it's data");
 
-                                if button.clicked() {
-                                    ui.memory_mut(|mem| mem.open_popup(popup_id))
-                                }
-
-                                popup_below_widget(ui, popup_id, &button, |ui| {
+                                popup(ui, popup_id, &button, AboveOrBelow::Below, |ui, popup| {
                                     ui.set_min_width(150.0);
 
                                     let delete_client_id = Id::new("delete_client");
@@ -204,6 +200,7 @@ impl Component for ProfilesPage<'_> {
                                         ui.data_mut(|map| map.insert_temp(id, state));
                                     };
 
+                                    
                                     make_checkbox("Delete profile's client", delete_client_id, true);
                                     make_checkbox("Delete profile's libraries", delete_libraries_id, true);
                                     make_checkbox("Delete profile's assets", delete_assets_id, false);
@@ -211,9 +208,20 @@ impl Component for ProfilesPage<'_> {
                                     ui.label("Are you sure you want to delete this profile and it's data?");
                                     ui.horizontal(|ui| {
                                         if ui.button("Yes").clicked() {
-                                            is_deleting.push(index)
+                                            is_deleting.push(index);
+                                            // let checkbox_data = |id| ui.data(|data| data.get_temp(id)).unwrap_or_default();
+
+                                            // let task = Task::new(format!("Deleting the game's files ({})", &instance.settings.version));
+
+                                            
+
+                                            // self.download_progress.push_task(task);
+
+                                            popup.close()
                                         }
-                                        if ui.button("No").clicked() {}
+                                        if ui.button("No").clicked() {
+                                            popup.close()
+                                        }
                                     });
                                 });
                             }
@@ -227,3 +235,4 @@ impl Component for ProfilesPage<'_> {
             });
     }
 }
+

@@ -1,4 +1,4 @@
-use std::{cell::Cell, marker::PhantomData, path::PathBuf};
+use std::{marker::PhantomData, path::PathBuf};
 
 use itertools::Itertools;
 
