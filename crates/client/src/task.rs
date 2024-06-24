@@ -193,7 +193,7 @@ pub struct LinearTasksExecutor {
 
 impl<'c> TasksExecutor<'c> for LinearTasksExecutor {
     fn push(&mut self, task: AnyTask) {
-        self.inner.push_back(task.into_any())
+        self.inner.push_back(task)
     }
 
     fn poll(&mut self, tasks: &[TaskData]) -> ExecutionPoll {
