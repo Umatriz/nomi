@@ -1,19 +1,24 @@
 use std::{
     any::{type_name, Any, TypeId},
     cell::Cell,
-    collections::HashMap,
+    collections::{HashMap, VecDeque},
     future::Future,
+    marker::PhantomData,
     pin::Pin,
     sync::{Arc, OnceLock},
 };
 
 use eframe::{
-    egui::{AboveOrBelow, Id, ProgressBar, Ui},
+    egui::{AboveOrBelow, Frame, Id, ProgressBar, Ui},
     glow::BOOL,
 };
 use nomi_core::downloads::traits::{DownloadResult, Downloader};
 use pollster::FutureExt;
-use tokio::{sync::mpsc::Sender, task::JoinHandle};
+use tokio::{
+    sync::mpsc::{Receiver, Sender},
+    task::JoinHandle,
+};
+use tracing::error;
 
 use crate::{channel::Channel, popup::popup};
 
@@ -28,62 +33,177 @@ impl TasksManager<'_> {
     }
 }
 
+fn task_any_mapper<'c, C>(source: C::Target) -> Box<dyn Any + Send>
+where
+    C: TasksCollection<'c>,
+    C::Target: Send,
+{
+    Box::new(source)
+}
+
+impl<'c> TasksManager<'c> {
+    fn get_collection_mut<C>(&mut self) -> &mut CollectionData<'c>
+    where
+        C: TasksCollection<'c> + 'static,
+    {
+        self.collections
+            .get_mut(&TypeId::of::<C>())
+            .unwrap_or_else(move || {
+                panic!(
+                    "You must add `{}` collection to the `TaskManager` by calling `add_collection`",
+                    type_name::<C>()
+                )
+            })
+    }
+
+    pub fn add_collection<C>(&mut self, context: C::Context) -> &mut Self
+    where
+        C: TasksCollection<'c> + 'static,
+        C::Executor: Default + 'static,
+    {
+        self.collections.insert(
+            TypeId::of::<C>(),
+            CollectionData::from_collection::<C>(context),
+        );
+        self
+    }
+
+    pub fn listen_collection<C>(&mut self)
+    where
+        C: TasksCollection<'c> + 'static,
+    {
+        self.get_collection_mut::<C>().listen()
+    }
+
+    pub fn push_task<C>(&mut self, task: Task<C::Target>)
+    where
+        C: TasksCollection<'c> + 'static,
+        C::Target: Send + 'static,
+    {
+        self.get_collection_mut::<C>().push_task::<C>(task);
+    }
+}
+
 pub struct CollectionData<'c> {
     name: &'static str,
     handle: AnyTaskHandle<'c>,
     tasks: Vec<TaskData>,
+    executor: Box<dyn TasksExecutor<'c>>,
 }
 
 impl<'c> CollectionData<'c> {
-    pub fn from_collection<C: TasksCollection<'c>>(context: C::Context) -> Self {
+    pub fn ui(&self, ui: &mut Ui) {
+        ui.label(self.name);
+
+        for task in &self.tasks {
+            ui.group(|ui| {
+                task.ui(ui);
+            });
+        }
+    }
+
+    pub fn from_collection<C>(context: C::Context) -> Self
+    where
+        C: TasksCollection<'c>,
+        C::Executor: Default + 'static,
+    {
         Self {
             name: C::name(),
             handle: C::handle(context).into_any(),
             tasks: Vec::new(),
+            executor: Box::<C::Executor>::default(),
+        }
+    }
+
+    fn execute(&mut self, task: AnyTask) {
+        let channel = self.handle.channel.clone_tx();
+        let task_data = task.execute(channel, |t| t);
+        self.push_task_data(task_data);
+    }
+
+    fn push_task_data(&mut self, task_data: TaskData) {
+        self.tasks.push(task_data)
+    }
+
+    pub fn push_task<C>(&mut self, task: Task<C::Target>)
+    where
+        C: TasksCollection<'c>,
+        C::Target: Send,
+    {
+        self.executor.push(task.into_any());
+    }
+
+    pub fn listen(&mut self) {
+        self.listen_execution();
+        self.listen_results();
+        self.listen_progress();
+    }
+
+    pub fn listen_results(&mut self) {
+        self.handle.listen()
+    }
+
+    pub fn listen_progress(&mut self) {
+        for task in self.tasks.iter_mut() {
+            let Some(progress) = task.progress_mut() else {
+                continue;
+            };
+
+            if let Ok(result) = progress.receiver_mut().try_recv() {
+                progress.current += result.inspect_err(|e| error!("{}", e)).map_or(0, |_| 1);
+            }
+        }
+    }
+
+    pub fn listen_execution(&mut self) {
+        use ExecutionPoll as E;
+        while let E::Ready(task) = self.executor.poll(&self.tasks) {
+            self.execute(task)
         }
     }
 }
 
 pub trait TasksCollection<'c> {
     type Context: 'c;
-    type Target: 'static;
+    type Target: Send + 'static;
+    type Executor: TasksExecutor<'c>;
 
     fn name() -> &'static str;
     fn handle(context: Self::Context) -> TaskHandle<'c, Self::Target>;
 }
 
-impl<'c> TasksManager<'c> {
-    pub fn add_collection<C>(&mut self, context: C::Context)
-    where
-        C: TasksCollection<'c> + 'static,
-    {
-        self.collections.insert(
-            TypeId::of::<C>(),
-            CollectionData::from_collection::<C>(context),
-        );
+const _: Option<Box<dyn TasksExecutor<'static>>> = None;
+
+pub trait TasksExecutor<'c> {
+    fn push(&mut self, task: AnyTask);
+    fn poll(&mut self, tasks: &[TaskData]) -> ExecutionPoll;
+}
+
+pub enum ExecutionPoll {
+    /// There's a task ready to be executed. [`TasksExecutor::execute`] must be called.
+    Ready(AnyTask),
+    /// There's no tasks or you're waiting for others to finish.
+    Pending,
+}
+
+#[derive(Default)]
+pub struct LinearTasksExecutor {
+    inner: VecDeque<AnyTask>,
+}
+
+impl<'c> TasksExecutor<'c> for LinearTasksExecutor {
+    fn push(&mut self, task: AnyTask) {
+        self.inner.push_back(task.into_any())
     }
 
-    pub fn push_task<C, Fut>(&mut self, task: Task<C::Target>)
-    where
-        C: TasksCollection<'c> + 'static,
-        C::Target: Send + 'static,
-    {
-        let mapper = |r: C::Target| Box::new(r) as Box<dyn Any + Send>;
+    fn poll(&mut self, tasks: &[TaskData]) -> ExecutionPoll {
+        if !self.inner.is_empty() && !tasks.is_empty() {
+            return ExecutionPoll::Pending;
+        }
 
-        let collection_data = self
-            .collections
-            .get_mut(&TypeId::of::<C>())
-            .unwrap_or_else(|| {
-                panic!(
-                    "You must add `{}` collection to the `TaskManager` by calling `add_collection`",
-                    type_name::<C>()
-                )
-            });
-
-        let channel = collection_data.handle.channel.clone_tx();
-
-        let task_data = task.execute(channel, mapper);
-        collection_data.tasks.push(task_data);
+        self.inner
+            .pop_front()
+            .map_or(ExecutionPoll::Pending, ExecutionPoll::Ready)
     }
 }
 
@@ -95,7 +215,7 @@ pub struct TaskHandle<'c, T> {
 }
 
 impl<'c, T: 'static> TaskHandle<'c, T> {
-    pub fn from_handle(handle: impl FnMut(T) + 'c) -> Self {
+    pub fn new(handle: impl FnMut(T) + 'c) -> Self {
         Self {
             channel: Channel::new(100),
             handle: Box::new(handle),
@@ -106,7 +226,7 @@ impl<'c, T: 'static> TaskHandle<'c, T> {
         TaskHandle {
             channel: Channel::new(100),
             handle: Box::new(move |boxed_any| {
-                let reference = boxed_any.downcast().unwrap();
+                let reference = boxed_any.downcast::<T>().unwrap();
                 (self.handle)(*reference)
             }),
         }
@@ -119,7 +239,7 @@ impl<'c, T: 'static> TaskHandle<'c, T> {
     }
 }
 
-pub type AnyTask = Task<Box<dyn Any>>;
+pub type AnyTask = Task<Box<dyn Any + Send>>;
 
 pub struct Task<R> {
     name: String,
@@ -127,7 +247,7 @@ pub struct Task<R> {
     inner: Caller<R>,
 }
 
-impl<R: Send + 'static> Task<R> {
+impl<R: 'static> Task<R> {
     pub fn new(name: impl Into<String>, caller: Caller<R>) -> Self {
         Self {
             name: name.into(),
@@ -172,6 +292,16 @@ impl<R: Send + 'static> Task<R> {
     }
 }
 
+impl<R: Send + 'static> Task<R> {
+    pub fn into_any(self) -> AnyTask {
+        Task {
+            name: self.name,
+            is_finished: self.is_finished,
+            inner: self.inner.into_any(),
+        }
+    }
+}
+
 type PinnedFuture<T> = Pin<Box<dyn Future<Output = T> + Send + 'static>>;
 
 pub enum Caller<T> {
@@ -192,7 +322,25 @@ impl<T> Caller<T> {
         F: FnOnce(TaskProgressShared) -> Fut + 'static,
         Fut: Future<Output = T> + Send + 'static,
     {
-        Self::Progressing(Box::new(|progress| Box::pin(fun(progress))))
+        Self::Progressing(Box::new(|progress| Box::pin((fun)(progress))))
+    }
+}
+
+impl<T: Send + 'static> Caller<T> {
+    pub fn into_any(self) -> Caller<Box<dyn Any + Send>> {
+        match self {
+            Self::Standard(fut) => Caller::standard(Box::pin(async move {
+                Box::new(fut.await) as Box<dyn Any + Send>
+            })),
+            Self::Progressing(fun) => {
+                let fun = Box::new(|progress| {
+                    let fut = (fun)(progress);
+                    Box::pin(async move { Box::new(fut.await) as Box<dyn Any + Send> })
+                });
+
+                Caller::progressing(fun)
+            }
+        }
     }
 }
 
@@ -244,7 +392,7 @@ impl TaskData {
 pub struct TaskProgress {
     current: u32,
     total: Arc<OnceLock<u32>>,
-    progress_channel: Channel<DownloadResult>,
+    channel: Channel<DownloadResult>,
 }
 
 impl Default for TaskProgress {
@@ -258,7 +406,7 @@ impl TaskProgress {
         Self {
             current: 0,
             total: Arc::new(OnceLock::new()),
-            progress_channel: Channel::new(100),
+            channel: Channel::new(100),
         }
     }
 
@@ -279,14 +427,18 @@ impl TaskProgress {
         self.total.set(total)
     }
 
-    pub fn progress_sender(&self) -> Sender<DownloadResult> {
-        self.progress_channel.clone_tx()
+    pub fn sender(&self) -> Sender<DownloadResult> {
+        self.channel.clone_tx()
+    }
+
+    pub fn receiver_mut(&mut self) -> &mut Receiver<DownloadResult> {
+        &mut self.channel
     }
 
     pub fn share(&self) -> TaskProgressShared {
         TaskProgressShared {
             total: self.total.clone(),
-            progress_sender: self.progress_sender(),
+            progress_sender: self.sender(),
         }
     }
 }
@@ -308,50 +460,47 @@ impl TaskProgressShared {
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
     use super::*;
 
-    #[test]
-    fn manager_test() {
-        struct AssetsCollection;
+    #[tokio::test]
+    async fn manager_test() {
+        struct IntCollection;
 
-        impl<'c> TasksCollection<'c> for AssetsCollection {
-            type Context = &'c mut i32;
-            type Target = ();
+        impl<'c> TasksCollection<'c> for IntCollection {
+            type Context = ();
+
+            type Target = i32;
+
+            type Executor = LinearTasksExecutor;
 
             fn name() -> &'static str {
-                "Assets collection"
+                "Integer collection"
             }
 
-            fn handle(context: Self::Context) -> TaskHandle<'c, Self::Target> {
-                TaskHandle::from_handle(move |()| {
-                    *context += 1;
-                    println!("Asset received {}", context);
-                })
+            fn handle(_context: Self::Context) -> TaskHandle<'c, Self::Target> {
+                TaskHandle::new(|int| println!("{}", int))
             }
         }
 
-        struct IOCollection;
-
-        impl<'c> TasksCollection<'c> for IOCollection {
-            type Context = &'c mut String;
-            type Target = ();
-
-            fn name() -> &'static str {
-                "IO collection"
-            }
-
-            fn handle(context: Self::Context) -> TaskHandle<'c, Self::Target> {
-                TaskHandle::from_handle(move |()| {
-                    context.push('1');
-                    println!("IO {}", context);
-                })
-            }
+        async fn task() -> i32 {
+            println!("Started");
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            1
         }
-
-        let mut state = (5, "String".to_owned());
 
         let mut manager = TasksManager::new();
-        manager.add_collection::<AssetsCollection>(&mut state.0);
-        manager.add_collection::<IOCollection>(&mut state.1);
+        manager.add_collection::<IntCollection>(());
+
+        manager.push_task::<IntCollection>(Task::new("Task", Caller::standard(task())));
+
+        manager.listen_collection::<IntCollection>();
+
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        manager.listen_collection::<IntCollection>();
+
+        task().await;
     }
 }
