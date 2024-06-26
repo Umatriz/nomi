@@ -25,7 +25,7 @@ impl<T> Caller<T> {
 }
 
 impl<T: Send + 'static> Caller<T> {
-    pub fn into_any(self) -> Caller<Box<dyn Any + Send>> {
+    pub(in crate::task) fn into_any(self) -> Caller<Box<dyn Any + Send>> {
         match self {
             Self::Standard(fut) => Caller::standard(Box::pin(async move {
                 Box::new(fut.await) as Box<dyn Any + Send>

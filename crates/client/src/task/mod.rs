@@ -71,7 +71,7 @@ impl<R: 'static> Task<R> {
 }
 
 impl<R: Send + 'static> Task<R> {
-    pub fn into_any(self) -> AnyTask {
+    pub(super) fn into_any(self) -> AnyTask {
         Task {
             name: self.name,
             is_finished: self.is_finished,
