@@ -13,7 +13,7 @@ mod collection;
 mod execution;
 mod manager;
 
-pub use collection::CollectionData;
+pub use collection::*;
 pub use execution::*;
 pub use manager::*;
 
@@ -113,6 +113,10 @@ impl TaskData {
                 };
             });
         });
+    }
+
+    pub fn is_finished(&self) -> bool {
+        self.is_finished.get().is_some()
     }
 
     pub fn progress(&self) -> Option<&TaskProgress> {

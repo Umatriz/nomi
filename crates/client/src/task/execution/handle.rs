@@ -31,7 +31,7 @@ impl<'c, T: 'static> TaskHandle<'c, T> {
         }
     }
 
-    pub fn listen(&mut self) {
+    pub fn handle(&mut self) {
         if let Ok(data) = self.channel.try_recv() {
             (self.handle)(data)
         }

@@ -3,6 +3,8 @@ use std::{
     collections::HashMap,
 };
 
+use eframe::egui::Ui;
+
 use super::{
     collection::{CollectionData, TasksCollection},
     Task,
@@ -13,13 +15,17 @@ pub struct TasksManager<'c> {
     collections: HashMap<TypeId, CollectionData<'c>>,
 }
 
-impl TasksManager<'_> {
+impl<'c> TasksManager<'c> {
+    pub fn ui(&self, ui: &mut Ui) {
+        for collection in self.collections.values() {
+            collection.ui(ui)
+        }
+    }
+
     pub fn new() -> Self {
         Self::default()
     }
-}
 
-impl<'c> TasksManager<'c> {
     fn get_collection_mut<C>(&mut self) -> &mut CollectionData<'c>
     where
         C: TasksCollection<'c> + 'static,
@@ -46,11 +52,11 @@ impl<'c> TasksManager<'c> {
         self
     }
 
-    pub fn listen_collection<C>(&mut self)
+    pub fn handle_collection<C>(&mut self)
     where
         C: TasksCollection<'c> + 'static,
     {
-        self.get_collection_mut::<C>().listen_all()
+        self.get_collection_mut::<C>().handle_all()
     }
 
     pub fn push_task<C>(&mut self, task: Task<C::Target>)

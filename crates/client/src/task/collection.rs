@@ -24,16 +24,16 @@ pub struct CollectionData<'c> {
 
 impl<'c> CollectionData<'c> {
     pub fn ui(&self, ui: &mut Ui) {
-        ui.label(self.name);
-
-        for task in &self.tasks {
-            ui.group(|ui| {
-                task.ui(ui);
-            });
-        }
+        ui.collapsing(self.name, |ui| {
+            for task in &self.tasks {
+                ui.group(|ui| {
+                    task.ui(ui);
+                });
+            }
+        });
     }
 
-    pub fn from_collection<C>(context: C::Context) -> Self
+    pub(super) fn from_collection<C>(context: C::Context) -> Self
     where
         C: TasksCollection<'c>,
         C::Executor: Default + 'static,
@@ -64,17 +64,22 @@ impl<'c> CollectionData<'c> {
         self.executor.push(task.into_any());
     }
 
-    pub fn listen_all(&mut self) {
-        self.listen_execution();
-        self.listen_results();
-        self.listen_progress();
+    pub fn handle_all(&mut self) {
+        self.handle_execution();
+        self.handle_progress();
+        self.handle_results();
+        self.handle_deletion();
     }
 
-    pub fn listen_results(&mut self) {
-        self.handle.listen()
+    pub fn handle_results(&mut self) {
+        self.handle.handle()
     }
 
-    pub fn listen_progress(&mut self) {
+    pub fn handle_deletion(&mut self) {
+        self.tasks.retain(|task| !task.is_finished())
+    }
+
+    pub fn handle_progress(&mut self) {
         for task in self.tasks.iter_mut() {
             let Some(progress) = task.progress_mut() else {
                 continue;
@@ -86,7 +91,7 @@ impl<'c> CollectionData<'c> {
         }
     }
 
-    pub fn listen_execution(&mut self) {
+    pub fn handle_execution(&mut self) {
         use crate::task::execution::ExecutionPoll as E;
         while let E::Ready(task) = self.executor.poll(&self.tasks) {
             self.execute(task)
