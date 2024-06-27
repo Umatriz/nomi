@@ -16,9 +16,9 @@ type PinnedFuture<T> = Pin<Box<dyn Future<Output = T> + Send + 'static>>;
 /// Marker to determine if task is finished
 pub(super) struct Finished;
 
-const _: Option<Box<dyn TasksExecutor<'static>>> = None;
+const _: Option<Box<dyn TasksExecutor>> = None;
 
-pub trait TasksExecutor<'c> {
+pub trait TasksExecutor {
     fn push(&mut self, task: AnyTask);
     fn poll(&mut self, tasks: &[TaskData]) -> ExecutionPoll;
 }

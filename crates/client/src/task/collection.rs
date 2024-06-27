@@ -1,28 +1,32 @@
+use std::any::Any;
+
 use eframe::egui::Ui;
 use tracing::error;
 
+use crate::channel::Channel;
+
 use super::{
-    execution::{AnyTaskHandle, TaskHandle, TasksExecutor},
-    AnyTask, Task, TaskData,
+    execution::{Handle, TasksExecutor},
+    AnyHandle, AnyTask, Task, TaskData,
 };
 
 pub trait TasksCollection<'c> {
     type Context: 'c;
     type Target: Send + 'static;
-    type Executor: TasksExecutor<'c>;
+    type Executor: TasksExecutor;
 
     fn name() -> &'static str;
-    fn handle(context: Self::Context) -> TaskHandle<'c, Self::Target>;
+    fn handle(context: Self::Context) -> Handle<'c, Self::Target>;
 }
 
-pub struct CollectionData<'c> {
+pub struct CollectionData {
     name: &'static str,
-    handle: AnyTaskHandle<'c>,
+    channel: Channel<Box<dyn Any + Send>>,
     tasks: Vec<TaskData>,
-    executor: Box<dyn TasksExecutor<'c>>,
+    executor: Box<dyn TasksExecutor>,
 }
 
-impl<'c> CollectionData<'c> {
+impl CollectionData {
     pub fn ui(&self, ui: &mut Ui) {
         ui.collapsing(self.name, |ui| {
             for task in &self.tasks {
@@ -33,22 +37,22 @@ impl<'c> CollectionData<'c> {
         });
     }
 
-    pub(super) fn from_collection<C>(context: C::Context) -> Self
+    pub(super) fn from_collection<'c, C>() -> Self
     where
         C: TasksCollection<'c>,
         C::Executor: Default + 'static,
     {
         Self {
             name: C::name(),
-            handle: C::handle(context).into_any(),
+            channel: Channel::new(100),
             tasks: Vec::new(),
             executor: Box::<C::Executor>::default(),
         }
     }
 
     fn execute(&mut self, task: AnyTask) {
-        let channel = self.handle.channel().clone_tx();
-        let task_data = task.execute(channel, |t| t);
+        let sender = self.channel.clone_tx();
+        let task_data = task.execute(sender);
         self.push_task_data(task_data);
     }
 
@@ -56,7 +60,7 @@ impl<'c> CollectionData<'c> {
         self.tasks.push(task_data)
     }
 
-    pub fn push_task<C>(&mut self, task: Task<C::Target>)
+    pub fn push_task<'c, C>(&mut self, task: Task<C::Target>)
     where
         C: TasksCollection<'c>,
         C::Target: Send,
@@ -64,15 +68,17 @@ impl<'c> CollectionData<'c> {
         self.executor.push(task.into_any());
     }
 
-    pub fn handle_all(&mut self) {
+    pub fn handle_all(&mut self, handle: AnyHandle<'_>) {
         self.handle_execution();
         self.handle_progress();
-        self.handle_results();
+        self.handle_results(handle);
         self.handle_deletion();
     }
 
-    pub fn handle_results(&mut self) {
-        self.handle.handle()
+    pub fn handle_results(&mut self, mut handle: AnyHandle<'_>) {
+        if let Ok(value) = self.channel.try_recv() {
+            handle.apply(value)
+        }
     }
 
     pub fn handle_deletion(&mut self) {

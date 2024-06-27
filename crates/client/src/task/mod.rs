@@ -25,7 +25,7 @@ pub struct Task<R> {
     inner: Caller<R>,
 }
 
-impl<R: 'static> Task<R> {
+impl<R: 'static + Send> Task<R> {
     pub fn new(name: impl Into<String>, caller: Caller<R>) -> Self {
         Self {
             name: name.into(),
@@ -34,16 +34,11 @@ impl<R: 'static> Task<R> {
         }
     }
 
-    fn execute<C, F>(self, channel: Sender<C>, mapper: F) -> TaskData
-    where
-        C: Send + 'static,
-        F: FnOnce(R) -> C + Send + 'static,
-    {
+    fn execute(self, channel: Sender<R>) -> TaskData {
         let spawn_future = |fut| {
             let is_finished = self.is_finished.clone();
             tokio::spawn(async move {
                 let value = fut.await;
-                let value = mapper(value);
                 let _ = channel.send(value).await;
                 let _ = is_finished.set(Finished);
             })

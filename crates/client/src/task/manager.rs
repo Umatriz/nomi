@@ -11,11 +11,11 @@ use super::{
 };
 
 #[derive(Default)]
-pub struct TasksManager<'c> {
-    collections: HashMap<TypeId, CollectionData<'c>>,
+pub struct TasksManager {
+    collections: HashMap<TypeId, CollectionData>,
 }
 
-impl<'c> TasksManager<'c> {
+impl TasksManager {
     pub fn ui(&self, ui: &mut Ui) {
         for collection in self.collections.values() {
             collection.ui(ui)
@@ -26,7 +26,7 @@ impl<'c> TasksManager<'c> {
         Self::default()
     }
 
-    fn get_collection_mut<C>(&mut self) -> &mut CollectionData<'c>
+    fn get_collection_mut<'c, C>(&mut self) -> &mut CollectionData
     where
         C: TasksCollection<'c> + 'static,
     {
@@ -40,26 +40,25 @@ impl<'c> TasksManager<'c> {
             })
     }
 
-    pub fn add_collection<C>(&mut self, context: C::Context) -> &mut Self
+    pub fn add_collection<'c, C>(&mut self) -> &mut Self
     where
         C: TasksCollection<'c> + 'static,
         C::Executor: Default + 'static,
     {
-        self.collections.insert(
-            TypeId::of::<C>(),
-            CollectionData::from_collection::<C>(context),
-        );
+        self.collections
+            .insert(TypeId::of::<C>(), CollectionData::from_collection::<C>());
         self
     }
 
-    pub fn handle_collection<C>(&mut self)
+    pub fn handle_collection<'c, C>(&mut self, context: C::Context)
     where
         C: TasksCollection<'c> + 'static,
     {
-        self.get_collection_mut::<C>().handle_all()
+        let handle = C::handle(context).into_any();
+        self.get_collection_mut::<C>().handle_all(handle)
     }
 
-    pub fn push_task<C>(&mut self, task: Task<C::Target>)
+    pub fn push_task<'c, C>(&mut self, task: Task<C::Target>)
     where
         C: TasksCollection<'c> + 'static,
         C::Target: Send + 'static,

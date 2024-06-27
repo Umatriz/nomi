@@ -11,11 +11,11 @@ use super::{ExecutionPoll, TasksExecutor};
 ///
 /// The underlying implementation uses [`VecDeque`].
 #[derive(Default)]
-pub struct LinearTasksExecutor {
+pub struct Linear {
     inner: VecDeque<AnyTask>,
 }
 
-impl<'c> TasksExecutor<'c> for LinearTasksExecutor {
+impl TasksExecutor for Linear {
     fn push(&mut self, task: AnyTask) {
         self.inner.push_back(task)
     }
@@ -38,11 +38,11 @@ impl<'c> TasksExecutor<'c> for LinearTasksExecutor {
 ///
 /// The underlying implementation uses [`VecDeque`].
 #[derive(Default)]
-pub struct ParallelTasksExecutor {
+pub struct Parallel {
     inner: VecDeque<AnyTask>,
 }
 
-impl<'c> TasksExecutor<'c> for ParallelTasksExecutor {
+impl TasksExecutor for Parallel {
     fn push(&mut self, task: AnyTask) {
         self.inner.push_back(task)
     }

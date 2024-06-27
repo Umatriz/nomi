@@ -1,39 +1,24 @@
 use std::any::Any;
 
-use crate::channel::Channel;
+pub type AnyHandle<'h> = Handle<'h, Box<dyn Any + Send>>;
 
-pub type AnyTaskHandle<'c> = TaskHandle<'c, Box<dyn Any + Send>>;
+pub struct Handle<'h, T>(Box<dyn FnMut(T) + 'h>);
 
-pub struct TaskHandle<'c, T> {
-    channel: Channel<T>,
-    handle: Box<dyn FnMut(T) + 'c>,
-}
-
-impl<'c, T: 'static> TaskHandle<'c, T> {
-    pub fn new(handle: impl FnMut(T) + 'c) -> Self {
-        Self {
-            channel: Channel::new(100),
-            handle: Box::new(handle),
-        }
+impl<'h, T: 'static> Handle<'h, T> {
+    pub fn new(handle: impl FnMut(T) + 'h) -> Self {
+        Self(Box::new(handle))
     }
 
-    pub fn channel(&self) -> &Channel<T> {
-        &self.channel
+    pub(in crate::task) fn into_any(mut self) -> AnyHandle<'h> {
+        let handle = Box::new(move |boxed_any: Box<dyn Any + Send>| {
+            let reference = boxed_any.downcast::<T>().unwrap();
+            (self.0)(*reference)
+        });
+
+        Handle(handle)
     }
 
-    pub fn into_any(mut self) -> AnyTaskHandle<'c> {
-        TaskHandle {
-            channel: Channel::new(100),
-            handle: Box::new(move |boxed_any| {
-                let reference = boxed_any.downcast::<T>().unwrap();
-                (self.handle)(*reference)
-            }),
-        }
-    }
-
-    pub fn handle(&mut self) {
-        if let Ok(data) = self.channel.try_recv() {
-            (self.handle)(data)
-        }
+    pub fn apply(&mut self, value: T) {
+        (self.0)(value)
     }
 }
