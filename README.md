@@ -8,7 +8,9 @@ Minecraft launcher powered by Rust
 
 ---
 
-### Downloading
+Note: See the `dev` brach for the latest changes.
+
+## Downloading
 
 Ways you can download nomi
 
