@@ -1,6 +1,6 @@
 use std::{fmt::format, future::Future, sync::Arc};
 
-use eframe::egui::{self, AboveOrBelow, Align2, Id, Ui};
+use eframe::egui::{self, AboveOrBelow, Align2, Id, TextWrapMode, Ui};
 use egui_extras::{Column, TableBuilder};
 use nomi_core::{
     configs::profile::{ProfileState, VersionProfile},
@@ -77,7 +77,7 @@ impl Component for ProfilesPage<'_> {
                 });
         }
 
-        ui.style_mut().wrap = Some(false);
+        ui.style_mut().wrap_mode = Some(TextWrapMode::Extend);
 
         TableBuilder::new(ui)
             .column(Column::auto().at_least(120.0).at_most(240.0))
@@ -99,7 +99,7 @@ impl Component for ProfilesPage<'_> {
                 for (index, profile) in self.profiles_state.profiles.iter().enumerate() {
                     body.row(30.0, |mut row| {
                         row.col(|ui| {
-                            ui.add(egui::Label::new(&profile.name).truncate(true));
+                            ui.add(egui::Label::new(&profile.name).truncate());
                         });
                         row.col(|ui| {
                             ui.label(profile.version());

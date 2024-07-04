@@ -1,7 +1,5 @@
 use crate::{
-    components::{
-        profiles::ProfilesPage, settings::SettingsPage, tasks_manager::TasksManager, Component,
-    },
+    components::{self, profiles::ProfilesPage, settings::SettingsPage, Component},
     errors_pool::ErrorPoolExt,
     states::States,
     Tab, TabKind,
@@ -20,6 +18,7 @@ pub struct MyContext {
     pub launcher_manifest: &'static LauncherManifest,
     pub file_dialog: FileDialog,
 
+    // pub manager: TasksManager,
     pub states: States,
 
     pub is_profile_window_open: bool,
@@ -38,6 +37,10 @@ impl MyContext {
         let launcher_manifest_ref = pollster::block_on(get_launcher_manifest())
             .report_error()
             .unwrap_or(EMPTY_MANIFEST);
+
+        // let mut manager = TasksManager::new();
+
+        // manager.add_collection::<AssetsCollection>();
 
         Self {
             collector,
@@ -83,7 +86,7 @@ impl TabViewer for MyContext {
                 });
             }
             TabKind::DownloadProgress => {
-                TasksManager {
+                components::TasksManager {
                     download_progress_state: &mut self.states.download_progress,
                     profiles_state: &mut self.states.profiles,
                 }

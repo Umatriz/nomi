@@ -36,7 +36,8 @@ pub mod errors_pool;
 pub mod utils;
 
 pub mod simplify;
-pub mod task;
+
+pub mod collections;
 
 pub mod channel;
 pub mod popup;
@@ -92,7 +93,7 @@ fn main() {
     let _ = eframe::run_native(
         "Nomi",
         native_options,
-        Box::new(|_cc| Box::new(MyTabs::new(collector))),
+        Box::new(|_cc| Ok(Box::new(MyTabs::new(collector)))),
     );
 
     info!("Exiting")

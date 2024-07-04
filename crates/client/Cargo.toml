@@ -16,12 +16,13 @@ tracing-subscriber.workspace = true
 
 nomi-core = { path = "../nomi-core"}
 
-eframe = "0.27.2"
-egui_dock = "0.12"
-egui_form = { version = "0.1.1", features = ["validator_garde"] }
-egui-file-dialog = "0.5.0"
-egui_tracing = "0.2.2"
-egui_extras = "0.27.2"
+eframe = "0.28.0"
+egui_dock = "0.13.0"
+egui_form = { version = "0.2.0", features = ["validator_garde"] }
+egui-file-dialog = "0.6.0"
+# egui version was incompatible so I forked it and bumped it.
+egui_tracing = { git = "https://github.com/Umatriz/egui_tracing", branch = "bump_egui"}
+egui_extras = "0.28.0"
 garde = { version = "0.18.0", features = ["derive", "regex"] }
 
 pollster = "0.3.0"
