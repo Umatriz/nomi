@@ -8,6 +8,8 @@ Minecraft launcher powered by Rust
 
 ---
 
+Note: See the `dev` brach for the latest changes.
+
 ## Downloading
 
  - [The latest release](https://github.com/Umatriz/nomi/releases/latest)
