@@ -1,9 +1,11 @@
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::{anyhow, Context};
+use egui_task_manager::TaskProgressShared;
 use nomi_core::{
     configs::profile::{Loader, ProfileState, VersionProfile},
     downloads::{
+        progress::MappedSender,
         traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
         AssetsDownloader, DownloadQueue,
     },
@@ -13,30 +15,21 @@ use nomi_core::{
     repository::java_runner::JavaRunner,
     state::get_launcher_manifest,
 };
-use tokio::sync::mpsc::Sender;
 
 use crate::errors_pool::ErrorPoolExt;
 
-pub fn spawn_download(
+pub async fn task_download_version(
     profile: Arc<VersionProfile>,
-    result_tx: Sender<VersionProfile>,
-    progress_tx: tokio::sync::mpsc::Sender<DownloadResult>,
-    total_tx: tokio::sync::mpsc::Sender<u32>,
-) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async move {
-        if let Some(data) = try_download(profile, progress_tx.clone(), total_tx)
-            .await
-            .report_error()
-        {
-            let _ = result_tx.send(data).await;
-        };
-    })
+    progress_shared: TaskProgressShared,
+) -> Option<VersionProfile> {
+    try_download_version(profile, progress_shared)
+        .await
+        .report_error()
 }
 
-async fn try_download(
+async fn try_download_version(
     profile: Arc<VersionProfile>,
-    sender: tokio::sync::mpsc::Sender<DownloadResult>,
-    total_tx: tokio::sync::mpsc::Sender<u32>,
+    progress_shared: TaskProgressShared,
 ) -> anyhow::Result<VersionProfile> {
     let current_dir = PathBuf::from("./");
     let mc_dir: std::path::PathBuf = current_dir.join("minecraft");
@@ -60,8 +53,7 @@ async fn try_download(
     let builder = InstanceBuilder::new()
         .name(profile.name.clone())
         .version(profile.version().to_string())
-        .game_paths(game_paths.clone())
-        .sender(sender.clone());
+        .game_paths(game_paths.clone());
 
     let instance = match loader {
         Loader::Vanilla => builder.instance(Box::new(
@@ -107,9 +99,11 @@ async fn try_download(
 
     let downloader = DownloadQueue::new().with_downloader_dyn(downloader);
 
-    let _ = total_tx.send(downloader.total()).await;
+    let _ = progress_shared.set_total(downloader.total());
 
-    Box::new(downloader).download(sender).await;
+    let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress_shared.sender()));
+
+    Box::new(downloader).download(&mapped_sender).await;
 
     let profile = VersionProfile {
         id: profile.id,
@@ -120,26 +114,20 @@ async fn try_download(
     Ok(profile)
 }
 
-pub fn spawn_assets(
+pub async fn task_assets(
     version: String,
     assets_dir: PathBuf,
-    result_tx: Sender<()>,
-    progress_tx: Sender<DownloadResult>,
-    total_tx: Sender<u32>,
-) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async move {
-        let _ = try_assets(version, assets_dir, result_tx, progress_tx, total_tx)
-            .await
-            .report_error_with_context("Assets downloading error");
-    })
+    progress_shared: TaskProgressShared,
+) -> Option<()> {
+    try_assets(version, assets_dir, progress_shared)
+        .await
+        .report_error()
 }
 
 async fn try_assets(
     version: String,
     assets_dir: PathBuf,
-    result_tx: Sender<()>,
-    progress_tx: Sender<DownloadResult>,
-    total_tx: Sender<u32>,
+    progress_shared: TaskProgressShared,
 ) -> anyhow::Result<()> {
     let manifest = get_launcher_manifest().await?;
     let version_manifest = manifest.get_version_manifest(version).await?;
@@ -154,14 +142,11 @@ async fn try_assets(
 
     downloader.get_io().io().await.context("`io` error")?;
 
-    total_tx
-        .send(downloader.total())
-        .await
-        .context("unable to send the `total` value")?;
+    let _ = progress_shared.set_total(downloader.total());
 
-    Box::new(downloader).download(progress_tx).await;
+    let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress_shared.sender()));
 
-    let _ = result_tx.send(()).await;
+    Box::new(downloader).download(&mapped_sender).await;
 
     Ok(())
 }

@@ -3,12 +3,12 @@ use itertools::Itertools;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, path::PathBuf};
-use tokio::sync::mpsc::Sender;
 use tracing::info;
 
 use crate::{
     downloads::{
         downloaders::file::FileDownloader,
+        progress::ProgressSender,
         set::DownloadSet,
         traits::{DownloadResult, Downloadable, Downloader, DownloaderIO, DownloaderIOExt},
     },
@@ -57,12 +57,12 @@ impl Downloader for Chunk {
         self.set.total()
     }
 
-    async fn download(mut self: Box<Self>, channel: Sender<Self::Data>) {
-        let (sender, mut receiver) = tokio::sync::mpsc::channel(100);
-        let downloader = self.set.with_helper(sender);
-        Box::new(downloader).download(channel).await;
-        if let Some(result) = receiver.recv().await {
-            match result {
+    async fn download(mut self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
+        let (helper_sender, mut helper_receiver) = tokio::sync::mpsc::channel(100);
+        let downloader = self.set.with_helper(helper_sender);
+        Box::new(downloader).download(sender).await;
+        if let Some(result) = helper_receiver.recv().await {
+            match result.0 {
                 Ok(_) => self.ok += 1,
                 Err(_) => self.err += 1,
             }
@@ -149,7 +149,7 @@ impl Downloader for AssetsDownloader {
     }
 
     #[tracing::instrument(skip_all)]
-    async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
-        Box::new(self.queue).download(channel).await;
+    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
+        Box::new(self.queue).download(sender).await;
     }
 }

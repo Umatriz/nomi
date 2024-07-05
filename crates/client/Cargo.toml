@@ -22,6 +22,7 @@ egui_form = { version = "0.2.0", features = ["validator_garde"] }
 egui-file-dialog = "0.6.0"
 # egui version was incompatible so I forked it and bumped it.
 egui_tracing = { git = "https://github.com/Umatriz/egui_tracing", branch = "bump_egui"}
+egui_task_manager = { git = "https://github.com/Umatriz/egui-task-manager" }
 egui_extras = "0.28.0"
 garde = { version = "0.18.0", features = ["derive", "regex"] }
 

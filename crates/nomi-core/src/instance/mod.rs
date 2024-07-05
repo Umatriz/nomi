@@ -1,5 +1,4 @@
 use const_typed_builder::Builder;
-use tokio::sync::mpsc::Sender;
 
 pub mod builder_ext;
 pub mod launch;
@@ -7,8 +6,7 @@ pub mod profile;
 pub mod version_marker;
 
 use crate::{
-    downloads::{downloaders::assets::AssetsDownloader, traits::DownloadResult},
-    game_paths::GamePaths,
+    downloads::downloaders::assets::AssetsDownloader, game_paths::GamePaths,
     state::get_launcher_manifest,
 };
 
@@ -23,7 +21,6 @@ pub struct Undefined;
 #[derive(Debug, Builder)]
 pub struct Instance {
     instance: Box<dyn Version>,
-    sender: Sender<DownloadResult>,
     pub game_paths: GamePaths,
     pub version: String,
     pub name: String,
@@ -32,17 +29,6 @@ pub struct Instance {
 impl Instance {
     pub fn instance(self) -> Box<dyn Version> {
         self.instance
-    }
-
-    pub async fn download(self) -> anyhow::Result<()> {
-        {
-            let io = self.instance.get_io_dyn();
-            io.io().await?;
-        }
-
-        self.instance.download(self.sender.clone()).await;
-
-        Ok(())
     }
 
     pub async fn assets(&self) -> anyhow::Result<AssetsDownloader> {

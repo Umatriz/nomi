@@ -1,5 +1,3 @@
-use crate::components::add_profile_menu::AddProfileMenuState;
-
 #[derive(PartialEq, Eq, Hash, Clone)]
 pub struct TabId(&'static str);
 
@@ -38,7 +36,7 @@ impl Tab {
 }
 
 pub enum TabKind {
-    Profiles { menu_state: AddProfileMenuState },
+    Profiles,
     Settings,
     Logs,
     DownloadProgress,
@@ -52,9 +50,7 @@ impl PartialEq for TabKind {
 
 impl TabKind {
     pub const AVAILABLE_TABS_TO_OPEN: &'static [Self] = &[
-        Self::Profiles {
-            menu_state: AddProfileMenuState::default_const(),
-        },
+        Self::Profiles,
         Self::Settings,
         Self::Logs,
         Self::DownloadProgress,
@@ -62,9 +58,7 @@ impl TabKind {
 
     pub fn from_id(id: TabId) -> Self {
         match id {
-            TabId::PROFILES => TabKind::Profiles {
-                menu_state: Default::default(),
-            },
+            TabId::PROFILES => TabKind::Profiles,
             TabId::SETTINGS => TabKind::Settings,
             TabId::LOGS => TabKind::Logs,
             TabId::DOWNLOAD_PROGRESS => TabKind::DownloadProgress,

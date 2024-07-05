@@ -1,7 +1,8 @@
-use std::{fmt::format, future::Future, sync::Arc};
+use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
-use eframe::egui::{self, AboveOrBelow, Align2, Id, TextWrapMode, Ui};
+use eframe::egui::{self, popup_below_widget, Align2, Id, PopupCloseBehavior, TextWrapMode, Ui};
 use egui_extras::{Column, TableBuilder};
+use egui_task_manager::{Caller, Task, TaskManager};
 use nomi_core::{
     configs::profile::{ProfileState, VersionProfile},
     fs::write_toml_config_sync,
@@ -11,17 +12,22 @@ use nomi_core::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{download::spawn_download, errors_pool::ErrorPoolExt, popup::popup, utils::spawn_tokio_future};
+use crate::{
+    collections::{AssetsCollection, GameDeletionCollection, GameDownloadingCollection},
+    download::{task_assets, task_download_version},
+    errors_pool::ErrorPoolExt,
+    utils::spawn_tokio_future,
+};
 
 use super::{
     add_profile_menu::{AddProfileMenu, AddProfileMenuState},
-    tasks_manager::{AssetsExtra, TasksManagerState, Task},
     settings::SettingsState,
     Component,
 };
 
 pub struct ProfilesPage<'a> {
-    pub download_progress: &'a mut TasksManagerState,
+    pub is_allowed_to_take_action: bool,
+    pub manager: &'a mut TaskManager,
     pub settings_state: &'a SettingsState,
 
     pub is_profile_window_open: &'a mut bool,
@@ -32,12 +38,17 @@ pub struct ProfilesPage<'a> {
     pub launcher_manifest: &'static LauncherManifest,
 }
 
-#[derive(Serialize, Deserialize, Default)]
 pub struct ProfilesState {
+    pub currently_downloading_profiles: HashSet<usize>,
+    pub profiles: ProfilesConfig,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct ProfilesConfig {
     pub profiles: Vec<Arc<VersionProfile>>,
 }
 
-impl ProfilesState {
+impl ProfilesConfig {
     pub fn add_profile(&mut self, profile: VersionProfile) {
         self.profiles.insert(self.create_id(), profile.into());
     }
@@ -71,7 +82,7 @@ impl Component for ProfilesPage<'_> {
                         menu_state: self.menu_state,
                         profiles_state: self.profiles_state,
                         launcher_manifest: self.launcher_manifest,
-                        // is_profile_window_open: self.is_profile_window_open,
+                        manager: self.manager, // is_profile_window_open: self.is_profile_window_open,
                     }
                     .ui(ui);
                 });
@@ -96,7 +107,7 @@ impl Component for ProfilesPage<'_> {
             .body(|mut body| {
                 let mut is_deleting = vec![];
 
-                for (index, profile) in self.profiles_state.profiles.iter().enumerate() {
+                for (index, profile) in self.profiles_state.profiles.profiles.iter().enumerate() {
                     body.row(30.0, |mut row| {
                         row.col(|ui| {
                             ui.add(egui::Label::new(&profile.name).truncate());
@@ -111,7 +122,7 @@ impl Component for ProfilesPage<'_> {
                             ProfileState::Downloaded(instance) => {
                                 if ui
                                     .add_enabled(
-                                        self.download_progress.is_allowed_to_take_action,
+                                        self.is_allowed_to_take_action,
                                         egui::Button::new("Launch"),
                                     )
                                     .clicked()
@@ -142,40 +153,25 @@ impl Component for ProfilesPage<'_> {
                                 if ui
                                     .add_enabled(
                                         !self
-                                            .download_progress
-                                            .profile_tasks
-                                            .contains_key(&profile.id),
+                                            .profiles_state
+                                            .currently_downloading_profiles
+
+                                            .contains(&profile.id),
                                         egui::Button::new("Download"),
                                     )
                                     .clicked()
                                 {
-                                    let version_task = Task::new(profile.version().to_owned());
-                                    let id = profile.id;
+                                    let game_version = profile.version().to_owned();
 
-                                    self.download_progress.assets_to_download.push_back(
-                                        Task::new(format!("Assets ({})", profile.version()))
-                                            .with_extra(AssetsExtra {
-                                                version: profile.version().to_owned(),
-                                                assets_dir: std::env::current_dir()
-                                                    .report_error_with_context(
-                                                        "Unable to get current directory",
-                                                    )
-                                                    .unwrap()
-                                                    .join("minecraft")
-                                                    .join("assets"),
-                                            }),
-                                    );
+                                    let assets_task = Task::new(format!("Assets ({})", profile.version()), Caller::progressing(|progress| 
+                                        task_assets(game_version, PathBuf::from("./minecraft/assets"), progress)
+                                    ));
+                                    self.manager.push_task::<AssetsCollection>(assets_task);
 
-                                    let handle = spawn_download(
-                                        profile.clone(),
-                                        version_task.result_channel().clone_tx(),
-                                        version_task.progress_channel().clone_tx(),
-                                        version_task.total_channel().clone_tx(),
-                                    );
+                                    let profile = profile.clone();
 
-                                    self.download_progress
-                                        .profile_tasks
-                                        .insert(id, version_task.with_handle(handle));
+                                    let game_task = Task::new(format!("Downloading version {}", profile.version()), Caller::progressing(|progress| task_download_version(profile, progress)));
+                                    self.manager.push_task::<GameDownloadingCollection>(game_task);
                                 }
                             }
                         });
@@ -187,7 +183,11 @@ impl Component for ProfilesPage<'_> {
                                     .button("Delete")
                                     .on_hover_text("It will delete the profile and it's data");
 
-                                popup(ui, popup_id, &button, AboveOrBelow::Below, |ui, popup| {
+                                if button.clicked() {
+                                    ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+                                }
+
+                                popup_below_widget(ui, popup_id, &button, PopupCloseBehavior::CloseOnClickOutside,|ui| {
                                     ui.set_min_width(150.0);
 
                                     let delete_client_id = Id::new("delete_client");
@@ -200,27 +200,36 @@ impl Component for ProfilesPage<'_> {
                                         ui.data_mut(|map| map.insert_temp(id, state));
                                     };
 
-                                    
                                     make_checkbox("Delete profile's client", delete_client_id, true);
                                     make_checkbox("Delete profile's libraries", delete_libraries_id, true);
                                     make_checkbox("Delete profile's assets", delete_assets_id, false);
-                                    
+
                                     ui.label("Are you sure you want to delete this profile and it's data?");
                                     ui.horizontal(|ui| {
                                         if ui.button("Yes").clicked() {
                                             is_deleting.push(index);
-                                            // let checkbox_data = |id| ui.data(|data| data.get_temp(id)).unwrap_or_default();
 
-                                            // let task = Task::new(format!("Deleting the game's files ({})", &instance.settings.version));
+                                            let version = &instance.settings.version;
 
-                                            
+                                            let checkbox_data = |id| ui.data(|data| data.get_temp(id)).unwrap_or_default();
 
-                                            // self.download_progress.push_task(task);
+                                            let delete_client = checkbox_data(delete_client_id);
+                                            let delete_libraries = checkbox_data(delete_libraries_id);
+                                            let delete_assets = checkbox_data(delete_assets_id);
 
-                                            popup.close()
+                                            let instance = instance.clone();
+                                            let caller = Caller::standard(async move {
+                                                instance.delete(delete_client, delete_libraries, delete_assets).await.report_error();
+                                            });
+
+                                            let task = Task::new(format!("Deleting the game's files ({})", version), caller);
+
+                                            self.manager.push_task::<GameDeletionCollection>(task);
+
+                                            ui.memory_mut(|mem| mem.close_popup());
                                         }
                                         if ui.button("No").clicked() {
-                                            popup.close()
+                                            ui.memory_mut(|mem| mem.close_popup());
                                         }
                                     });
                                 });
@@ -230,9 +239,9 @@ impl Component for ProfilesPage<'_> {
                 }
 
                 is_deleting.drain(..).for_each(|index| {
-                    self.profiles_state.profiles.remove(index);
+                    self.profiles_state.profiles.profiles.remove(index);
+                    self.profiles_state.profiles.update_config().report_error();
                 });
             });
     }
 }
-

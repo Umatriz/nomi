@@ -1,8 +1,9 @@
 use std::fmt::Debug;
 
-use tokio::sync::mpsc::Sender;
-
-use crate::downloads::traits::{DownloadResult, Downloader};
+use crate::downloads::{
+    progress::ProgressSender,
+    traits::{DownloadResult, Downloader},
+};
 
 #[derive(Default)]
 pub struct DownloadQueue {
@@ -61,9 +62,9 @@ impl Downloader for DownloadQueue {
         self.queue.iter().map(|downloader| downloader.total()).sum()
     }
 
-    async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
+    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
         for downloader in self.queue {
-            downloader.download(channel.clone()).await;
+            downloader.download(sender).await;
             self.inspector.as_ref().inspect(|f| f());
         }
     }

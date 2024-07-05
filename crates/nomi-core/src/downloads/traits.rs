@@ -1,8 +1,15 @@
-use tokio::sync::mpsc::Sender;
+use egui_task_manager::Progress;
 
-use super::{downloaders::assets::AssetsDownloaderIo, DownloadError};
+use super::{downloaders::assets::AssetsDownloaderIo, progress::ProgressSender, DownloadError};
 
-pub type DownloadResult = Result<DownloadStatus, DownloadError>;
+#[derive(Debug, Clone)]
+pub struct DownloadResult(pub Result<DownloadStatus, DownloadError>);
+
+impl Progress for DownloadResult {
+    fn apply(&self, current: &mut u32) {
+        *current += self.0.as_ref().map_or(0, |_| 1);
+    }
+}
 
 #[must_use]
 #[derive(Debug, Clone)]
@@ -34,7 +41,7 @@ pub trait Downloader: Send + Sync {
 
     /// Returns the number of items to download
     fn total(&self) -> u32;
-    async fn download(self: Box<Self>, channel: Sender<Self::Data>);
+    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>);
 }
 
 const _: Option<Box<dyn Downloader<Data = DownloadResult>>> = None;
@@ -50,9 +57,9 @@ where
         1
     }
 
-    async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
+    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
         let result = self.download().await;
-        let _ = channel.send(result).await;
+        sender.update(result).await;
     }
 }
 

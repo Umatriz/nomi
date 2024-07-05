@@ -7,6 +7,7 @@ use crate::{
 use eframe::egui::{self, ScrollArea};
 use egui_dock::TabViewer;
 use egui_file_dialog::FileDialog;
+use egui_task_manager::TaskManager;
 use egui_tracing::EventCollector;
 use nomi_core::{
     repository::launcher_manifest::{Latest, LauncherManifest},
@@ -18,9 +19,10 @@ pub struct MyContext {
     pub launcher_manifest: &'static LauncherManifest,
     pub file_dialog: FileDialog,
 
-    // pub manager: TasksManager,
+    pub manager: TaskManager,
     pub states: States,
 
+    pub is_allowed_to_take_action: bool,
     pub is_profile_window_open: bool,
 }
 
@@ -49,6 +51,8 @@ impl MyContext {
             is_profile_window_open: false,
 
             states: States::new(),
+            manager: TaskManager::new(),
+            is_allowed_to_take_action: true,
         }
     }
 }
@@ -62,11 +66,12 @@ impl TabViewer for MyContext {
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         match &mut tab.kind_mut() {
-            TabKind::Profiles { menu_state } => ProfilesPage {
-                download_progress: &mut self.states.download_progress,
+            TabKind::Profiles => ProfilesPage {
+                is_allowed_to_take_action: self.is_allowed_to_take_action,
+                manager: &mut self.manager,
                 settings_state: &self.states.settings,
                 profiles_state: &mut self.states.profiles,
-                menu_state,
+                menu_state: &mut self.states.add_profile_menu_state,
 
                 launcher_manifest: self.launcher_manifest,
                 is_profile_window_open: &mut self.is_profile_window_open,
@@ -74,7 +79,7 @@ impl TabViewer for MyContext {
             .ui(ui),
             TabKind::Settings => SettingsPage {
                 java_state: &mut self.states.java,
-                download_progress_state: &mut self.states.download_progress,
+                manager: &mut self.manager,
                 settings_state: &mut self.states.settings,
                 client_settings_state: &mut self.states.client_settings,
                 file_dialog: &mut self.file_dialog,
@@ -86,8 +91,8 @@ impl TabViewer for MyContext {
                 });
             }
             TabKind::DownloadProgress => {
-                components::TasksManager {
-                    download_progress_state: &mut self.states.download_progress,
+                components::DownloadingProgress {
+                    manager: &self.manager,
                     profiles_state: &mut self.states.profiles,
                 }
                 .ui(ui);

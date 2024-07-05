@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use reqwest::Client;
-use tokio::sync::mpsc::Sender;
 
 use tracing::error;
 
@@ -11,6 +10,7 @@ use crate::{
             file::FileDownloader,
             libraries::{LibrariesDownloader, LibrariesMapper},
         },
+        progress::ProgressSender,
         traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
         DownloadQueue,
     },
@@ -152,8 +152,8 @@ impl Downloader for Vanilla {
         self.queue.total()
     }
 
-    async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
-        Box::new(self.queue).download(channel).await;
+    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
+        Box::new(self.queue).download(sender).await;
     }
 }
 

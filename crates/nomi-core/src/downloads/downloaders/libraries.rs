@@ -1,7 +1,7 @@
 use itertools::Itertools;
-use tokio::sync::mpsc::Sender;
 
 use crate::downloads::{
+    progress::ProgressSender,
     traits::{DownloadResult, Downloader},
     DownloadSet,
 };
@@ -39,13 +39,13 @@ impl Downloader for LibrariesDownloader {
         self.downloads.len() as u32
     }
 
-    async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
+    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
         let mut download_set = DownloadSet::new();
 
         for downloader in self.downloads {
             download_set.add(Box::new(downloader));
         }
 
-        Box::new(download_set).download(channel).await;
+        Box::new(download_set).download(sender).await;
     }
 }

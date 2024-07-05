@@ -2,7 +2,6 @@ use std::path::{Path, PathBuf};
 
 use itertools::Itertools;
 use reqwest::Client;
-use tokio::sync::mpsc::Sender;
 
 use crate::{
     configs::profile::Loader,
@@ -11,6 +10,7 @@ use crate::{
             file::FileDownloader,
             libraries::{LibrariesDownloader, LibrariesMapper},
         },
+        progress::ProgressSender,
         traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
     },
     fs::write_to_file,
@@ -156,8 +156,8 @@ impl Downloader for Fabric {
         self.libraries_downloader.total()
     }
 
-    async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
-        Box::new(self.libraries_downloader).download(channel).await;
+    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
+        Box::new(self.libraries_downloader).download(sender).await;
     }
 }
 

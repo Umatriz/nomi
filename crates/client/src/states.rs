@@ -1,18 +1,27 @@
 use std::{collections::HashSet, path::PathBuf};
 
+use egui_task_manager::{Caller, Task, TaskManager};
 use nomi_core::{
-    fs::read_toml_config_sync, DOT_NOMI_JAVA_EXECUTABLE, DOT_NOMI_PROFILES_CONFIG,
+    downloads::{
+        java::JavaDownloader,
+        progress::MappedSender,
+        traits::{Downloader, DownloaderIO, DownloaderIOExt},
+    },
+    fs::read_toml_config_sync,
+    DOT_NOMI_JAVA_DIR, DOT_NOMI_JAVA_EXECUTABLE, DOT_NOMI_PROFILES_CONFIG,
     DOT_NOMI_SETTINGS_CONFIG,
 };
+use tracing::info;
 
 use crate::{
+    collections::JavaCollection,
     components::{
         add_tab_menu::TabsState,
         profiles::ProfilesState,
         settings::{ClientSettingsState, SettingsState},
-        tasks_manager::TasksManagerState,
+        AddProfileMenuState, ProfilesConfig,
     },
-    errors_pool::ErrorsPoolState,
+    errors_pool::{ErrorPoolExt, ErrorsPoolState},
     TabId,
 };
 
@@ -24,7 +33,7 @@ pub struct States {
     pub profiles: ProfilesState,
     pub settings: SettingsState,
     pub client_settings: ClientSettingsState,
-    pub download_progress: TasksManagerState,
+    pub add_profile_menu_state: AddProfileMenuState,
 }
 
 impl Default for States {
@@ -43,11 +52,14 @@ impl Default for States {
             tabs: TabsState(tabs),
             java: JavaState::new(),
             errors_pool: ErrorsPoolState::default(),
-            profiles: read_toml_config_sync::<ProfilesState>(DOT_NOMI_PROFILES_CONFIG)
-                .unwrap_or_default(),
+            profiles: ProfilesState {
+                currently_downloading_profiles: HashSet::new(),
+                profiles: read_toml_config_sync::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG)
+                    .unwrap_or_default(),
+            },
             client_settings: settings.client_settings.clone(),
             settings,
-            download_progress: TasksManagerState::default(),
+            add_profile_menu_state: AddProfileMenuState::default(),
         }
     }
 }
@@ -69,5 +81,27 @@ impl JavaState {
         Self {
             is_downloaded: res.is_ok() || PathBuf::from(DOT_NOMI_JAVA_EXECUTABLE).exists(),
         }
+    }
+
+    pub fn download_java(&mut self, manager: &mut TaskManager) {
+        info!("Downloading Java");
+
+        self.is_downloaded = true;
+
+        let caller = Caller::progressing(|progress| async move {
+            let downloader = JavaDownloader::new(PathBuf::from(DOT_NOMI_JAVA_DIR));
+
+            let _ = progress.set_total(downloader.total());
+
+            let io = downloader.get_io();
+
+            let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress.sender()));
+
+            Box::new(downloader).download(&mapped_sender).await;
+
+            io.io().await.report_error();
+        });
+        let task = Task::new("Java downloading", caller);
+        manager.push_task::<JavaCollection>(task);
     }
 }

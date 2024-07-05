@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use eframe::egui::{self, RichText};
 use egui_file_dialog::FileDialog;
 use egui_form::{garde::field_path, Form, FormField};
+use egui_task_manager::TaskManager;
 use garde::{Error, Validate};
 use nomi_core::{
     fs::write_toml_config_sync, regex::Regex, repository::java_runner::JavaRunner, Uuid,
@@ -10,13 +11,13 @@ use nomi_core::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{download_java, errors_pool::ErrorPoolExt, states::JavaState};
+use crate::{collections::JavaCollection, errors_pool::ErrorPoolExt, states::JavaState};
 
-use super::{tasks_manager::TasksManagerState, Component};
+use super::Component;
 
 pub struct SettingsPage<'a> {
     pub java_state: &'a mut JavaState,
-    pub download_progress_state: &'a mut TasksManagerState,
+    pub manager: &'a mut TaskManager,
 
     pub settings_state: &'a mut SettingsState,
     pub client_settings_state: &'a mut ClientSettingsState,
@@ -159,11 +160,12 @@ impl Component for SettingsPage<'_> {
             });
 
             ui.collapsing("Java", |ui| {
-                if ui.add_enabled(self.download_progress_state.java_downloading_task.is_none(), egui::Button::new("Download Java")).on_hover_text("Pressing this button will start the Java downloading process and add the downloaded binary as selected").clicked() {
-                    download_java(self.java_state, self.download_progress_state);
+                if ui.add_enabled(self.manager.get_collection::<JavaCollection>().tasks().is_empty(), egui::Button::new("Download Java")).on_hover_text("Pressing this button will start the Java downloading process and add the downloaded binary as selected").clicked() {
+                    self.java_state.download_java(self.manager);
                     self.settings_state.java = JavaRunner::path(PathBuf::from(DOT_NOMI_JAVA_EXECUTABLE));
                     self.settings_state.update_config();
                 }
+
                 FormField::new(&mut form, field_path!("java"))
                     .label("Java")
                     .ui(ui, |ui: &mut egui::Ui| {

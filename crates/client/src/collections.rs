@@ -1,37 +1,115 @@
-// use crate::task::{executors, Handle, TasksCollection};
+use std::sync::Arc;
 
-// pub struct AssetsCollection;
+use egui_task_manager::*;
+use nomi_core::{configs::profile::VersionProfile, repository::fabric_meta::FabricVersions};
 
-// impl<'c> TasksCollection<'c> for AssetsCollection {
-//     type Context = ();
+use crate::{components::ProfilesConfig, errors_pool::ErrorPoolExt};
 
-//     type Target = ();
+pub struct FabricDataCollection;
 
-//     type Executor = executors::Linear;
+impl<'c> TasksCollection<'c> for FabricDataCollection {
+    type Context = &'c mut FabricVersions;
 
-//     fn name() -> &'static str {
-//         "Assets"
-//     }
+    type Target = Option<FabricVersions>;
 
-//     fn handle(_context: Self::Context) -> crate::task::Handle<'c, Self::Target> {
-//         Handle::new(|()| ())
-//     }
-// }
+    type Executor = executors::Linear;
 
-// pub struct JavaCollection;
+    fn name() -> &'static str {
+        "Fabric data collection"
+    }
 
-// impl<'c> TasksCollection<'c> for JavaCollection {
-//     type Context = ();
+    fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|value| {
+            if let Some(value) = value {
+                *context = value
+            }
+        })
+    }
+}
 
-//     type Target = ();
+pub struct AssetsCollection;
 
-//     type Executor = executors::Linear;
+impl<'c> TasksCollection<'c> for AssetsCollection {
+    type Context = ();
 
-//     fn name() -> &'static str {
-//         "Java"
-//     }
+    type Target = Option<()>;
 
-//     fn handle(context: Self::Context) -> Handle<'c, Self::Target> {
-//         todo!()
-//     }
-// }
+    type Executor = executors::Linear;
+
+    fn name() -> &'static str {
+        "Assets collection"
+    }
+
+    fn handle(_context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|_| ())
+    }
+}
+
+pub struct JavaCollection;
+
+impl<'c> TasksCollection<'c> for JavaCollection {
+    type Context = ();
+
+    type Target = ();
+
+    type Executor = executors::Linear;
+
+    fn name() -> &'static str {
+        "Java collection"
+    }
+
+    fn handle(_context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|()| ())
+    }
+}
+
+pub struct GameDownloadingCollection;
+
+impl<'c> TasksCollection<'c> for GameDownloadingCollection {
+    type Context = &'c mut ProfilesConfig;
+
+    type Target = Option<VersionProfile>;
+
+    type Executor = executors::Linear;
+
+    fn name() -> &'static str {
+        "Game downloading collection"
+    }
+
+    fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|opt: Option<VersionProfile>| {
+            let Some(profile) = opt else {
+                return;
+            };
+
+            // PANICS: It will never panic because the profile
+            // cannot be downloaded if it doesn't exists
+            let prof = context
+                .profiles
+                .iter_mut()
+                .find(|prof| prof.id == profile.id)
+                .unwrap();
+
+            *prof = Arc::new(profile);
+            context.update_config().report_error();
+        })
+    }
+}
+
+pub struct GameDeletionCollection;
+
+impl<'c> TasksCollection<'c> for GameDeletionCollection {
+    type Context = ();
+
+    type Target = ();
+
+    type Executor = executors::Linear;
+
+    fn name() -> &'static str {
+        "Game deletion collection"
+    }
+
+    fn handle(_context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|()| ())
+    }
+}

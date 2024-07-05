@@ -34,7 +34,6 @@ async fn full_fabric_test() {
                 .await
                 .unwrap(),
         ))
-        .sender(tx.clone())
         .build();
 
     let mc_dir = current.join("minecraft");
@@ -54,9 +53,13 @@ async fn full_fabric_test() {
     let launch = instance.launch_instance(settings, None);
 
     Box::new(instance.assets().await.unwrap())
-        .download(tx)
+        .download(&tx)
         .await;
-    instance.download().await.unwrap();
+
+    let instance = instance.instance();
+    instance.get_io_dyn().io().await.unwrap();
+
+    instance.download(&tx).await;
 
     let profile = VersionProfileBuilder::new()
         .id(1)

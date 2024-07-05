@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use tokio::{sync::mpsc::Sender, task::JoinSet};
 
 use crate::downloads::{
+    progress::ProgressSender,
     traits::{DownloadResult, Downloadable, Downloader},
     DownloadError,
 };
@@ -56,7 +57,7 @@ impl Downloader for DownloadSet {
         self.set.len() as u32
     }
 
-    async fn download(mut self: Box<Self>, channel: Sender<Self::Data>) {
+    async fn download(mut self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
         let mut set = JoinSet::new();
 
         for downloader in self.set {
@@ -65,15 +66,19 @@ impl Downloader for DownloadSet {
 
         while let Some(result) = set.join_next().await {
             if let Ok(download_status) = result {
-                let _ = channel.send(download_status.clone()).await;
+                sender.update(download_status.clone()).await;
                 if let Some(sender) = self.helper.as_ref() {
                     let _ = sender.send(download_status).await;
                 }
             } else {
-                let _ = channel.send(Err(DownloadError::JoinError)).await;
+                sender
+                    .update(DownloadResult(Err(DownloadError::JoinError)))
+                    .await;
 
                 if let Some(sender) = self.helper.as_ref() {
-                    let _ = sender.send(Err(DownloadError::JoinError)).await;
+                    let _ = sender
+                        .send(DownloadResult(Err(DownloadError::JoinError)))
+                        .await;
                 }
             };
         }

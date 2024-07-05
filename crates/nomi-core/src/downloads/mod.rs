@@ -8,6 +8,7 @@ use tokio::io::AsyncWriteExt;
 use tracing::{error, trace};
 
 pub mod downloaders;
+pub mod progress;
 pub mod traits;
 
 #[derive(Debug, thiserror::Error, Clone)]

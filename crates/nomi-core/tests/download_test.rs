@@ -28,12 +28,17 @@ async fn download_test() {
         ))
         .game_paths(game_paths)
         .name("1.18.2-test".into())
-        .sender(tx.clone())
         .build();
 
     Box::new(instance.assets().await.unwrap())
-        .download(tx)
+        .download(&tx)
         .await;
 
-    instance.download().await.unwrap();
+    let version = instance.instance();
+    {
+        let io = version.get_io_dyn();
+        io.io().await.unwrap();
+    }
+
+    version.download(&tx).await;
 }

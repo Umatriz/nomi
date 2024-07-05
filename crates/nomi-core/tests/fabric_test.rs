@@ -16,8 +16,6 @@ async fn vanilla_test() {
         .finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
-    let (tx, _) = tokio::sync::mpsc::channel(100);
-
     let game_paths = GamePaths {
         game: "./minecraft".into(),
         assets: "./minecraft/assets".into(),
@@ -35,7 +33,6 @@ async fn vanilla_test() {
         ))
         // .instance(Inner::vanilla("1.20").await.unwrap())
         .name("1.20-fabric-test".into())
-        .sender(tx)
         .build();
 
     let _assets = builder.assets().await.unwrap();

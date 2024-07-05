@@ -54,7 +54,7 @@ pub struct LaunchInstance {
 
 impl LaunchInstance {
     #[tracing::instrument(err)]
-    pub async fn delete_instance(
+    pub async fn delete(
         &self,
         delete_client: bool,
         delete_libraries: bool,
@@ -90,13 +90,11 @@ impl LaunchInstance {
         }
 
         if delete_assets {
-            let assets = read_json_config::<Assets>(
-                &self
-                    .settings
-                    .assets
-                    .join("indexes")
-                    .join(manifest.asset_index.id),
-            )
+            let assets = read_json_config::<Assets>(dbg!(&self
+                .settings
+                .assets
+                .join("indexes")
+                .join(format!("{}.json", manifest.asset_index.id))))
             .await?;
             for asset in assets.objects.values() {
                 let path = &self
@@ -109,7 +107,7 @@ impl LaunchInstance {
                 let _ = tokio::fs::remove_file(path)
                     .await
                     .inspect(|()| trace!("Removed asset successfully: {}", path.display()))
-                    .inspect_err(|_| warn!("Cannot remove asset: {}", path.display()));
+                    .inspect_err(|e| warn!("Cannot remove asset: {}. Error: {e}", path.display()));
             }
         }
 

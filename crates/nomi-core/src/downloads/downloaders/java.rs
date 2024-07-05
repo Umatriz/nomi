@@ -3,10 +3,9 @@ use std::{
     path::{Path, PathBuf},
 };
 use thiserror::Error;
-use tokio::sync::mpsc::Sender;
 use tracing::error;
 
-use crate::DOT_NOMI_TEMP_DIR;
+use crate::{downloads::progress::ProgressSender, DOT_NOMI_TEMP_DIR};
 
 use super::{
     super::traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
@@ -77,13 +76,13 @@ impl Downloader for JavaDownloader {
         1
     }
 
-    async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
+    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
         let downloader = FileDownloader::new(
             consts::PORTABLE_URL.to_string(),
             PathBuf::from(DOT_NOMI_TEMP_DIR).join(consts::ARCHIVE_FILENAME),
         );
 
-        Box::new(downloader).download(channel).await;
+        Box::new(downloader).download(sender).await;
     }
 }
 
@@ -201,7 +200,7 @@ mod tests {
 
         let (tx, mut rx) = tokio::sync::mpsc::channel(5);
 
-        Box::new(downloader).download(tx).await;
+        Box::new(downloader).download(&tx).await;
 
         dbg!(rx.recv().await);
 
@@ -256,7 +255,7 @@ mod tests {
 
         let (tx, mut rx) = tokio::sync::mpsc::channel(5);
 
-        Box::new(downloader).download(tx).await;
+        Box::new(downloader).download(&tx).await;
 
         dbg!(rx.recv().await);
 

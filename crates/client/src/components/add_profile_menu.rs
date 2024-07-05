@@ -1,4 +1,5 @@
 use eframe::egui::{self, Color32, RichText};
+use egui_task_manager::{Caller, Task, TaskManager};
 use nomi_core::{
     configs::profile::{Loader, ProfileState, VersionProfile},
     repository::{
@@ -8,11 +9,12 @@ use nomi_core::{
     },
 };
 
-use crate::errors_pool::ErrorPoolExt;
+use crate::{collections::FabricDataCollection, errors_pool::ErrorPoolExt};
 
-use super::{profiles::ProfilesState, tasks_manager::Task, Component};
+use super::{profiles::ProfilesState, Component};
 
 pub struct AddProfileMenu<'a> {
+    pub manager: &'a mut TaskManager,
     pub launcher_manifest: &'a LauncherManifest,
     pub menu_state: &'a mut AddProfileMenuState,
     pub profiles_state: &'a mut ProfilesState,
@@ -25,35 +27,20 @@ pub struct AddProfileMenuState {
     selected_version_buf: Option<Version>,
     selected_loader_buf: Loader,
 
-    task: Option<Task<FabricVersions>>,
-    fabric_versions: FabricVersions,
+    pub fabric_versions: FabricVersions,
 }
 
 impl AddProfileMenuState {
     /// It will request available versions no matter which `Loader`
     /// is selected
-    pub fn request_fabric_versions(&mut self) {
-        if self.task.is_none() {
-            self.task = Some(Task::new("Requesting available Fabric versions".to_owned()));
-        }
-
-        // if let Some(task) = self.task.as_mut() {
-        //     task.set_running(true)
-        // }
-
+    pub fn request_fabric_versions(&self, manager: &mut TaskManager) {
         let version = self.selected_version_buf.as_ref().unwrap().id.clone();
 
-        let sender = self.task.as_ref().unwrap().result_channel().clone_tx();
-
-        let handle = tokio::spawn(async move {
-            if let Some(versions) = get_fabric_versions(version).await.report_error() {
-                sender.send(versions).await.report_error();
-            }
-        });
-
-        if let Some(task) = self.task.as_mut() {
-            task.set_handle(handle)
-        }
+        let task = Task::new(
+            "Requesting available Fabric versions",
+            Caller::standard(async move { get_fabric_versions(version).await.report_error() }),
+        );
+        manager.push_task::<FabricDataCollection>(task);
     }
 }
 
@@ -71,7 +58,6 @@ impl AddProfileMenuState {
             profile_name_buf: String::new(),
             selected_version_buf: None,
             selected_loader_buf: Loader::Vanilla,
-            task: None,
             fabric_versions: Vec::new(),
         }
     }
@@ -89,19 +75,6 @@ impl Component for AddProfileMenu<'_> {
                     Loader::Fabric { version } => func(version.as_ref()),
                     Loader::Vanilla => unreachable!(),
                 }
-        }
-
-        if let Some(Ok(versiosn)) = self
-            .menu_state
-            .task
-            .as_mut()
-            .map(|task| task.result_channel_mut())
-            .map(|channel| channel.try_recv())
-        {
-            self.menu_state.fabric_versions = versiosn;
-            if let Some(task) = self.menu_state.task.as_mut() {
-                task.mark_unfinished();
-            }
         }
 
         {
@@ -151,7 +124,7 @@ impl Component for AddProfileMenu<'_> {
                             self.menu_state.selected_version_buf = Some(version.clone());
                             if matches!(self.menu_state.selected_loader_buf, Loader::Fabric { .. })
                             {
-                                self.menu_state.request_fabric_versions()
+                                self.menu_state.request_fabric_versions(self.manager)
                             }
                         }
                     }
@@ -174,7 +147,7 @@ impl Component for AddProfileMenu<'_> {
 
                         if fabric.clicked() {
                             println!("Test!");
-                            self.menu_state.request_fabric_versions();
+                            self.menu_state.request_fabric_versions(self.manager);
                         }
                     });
             });
@@ -213,11 +186,11 @@ impl Component for AddProfileMenu<'_> {
                                 }
                             });
                     }
-                } else if self
-                    .menu_state
-                    .task
-                    .as_ref()
-                    .is_some_and(|task| !task.is_finished())
+                } else if !self
+                    .manager
+                    .get_collection::<FabricDataCollection>()
+                    .tasks()
+                    .is_empty()
                 {
                     ui.horizontal(|ui| {
                         ui.spinner();
@@ -280,8 +253,8 @@ impl Component for AddProfileMenu<'_> {
             )
             .clicked()
         {
-            self.profiles_state.add_profile(VersionProfile {
-                id: self.profiles_state.create_id(),
+            self.profiles_state.profiles.add_profile(VersionProfile {
+                id: self.profiles_state.profiles.create_id(),
                 name: self.menu_state.profile_name_buf.trim_end().to_owned(),
                 state: ProfileState::NotDownloaded {
                     // PANICS: It will never panic because it's
@@ -291,7 +264,7 @@ impl Component for AddProfileMenu<'_> {
                     version_type: self.menu_state.selected_version_type.clone(),
                 },
             });
-            self.profiles_state.update_config().report_error();
+            self.profiles_state.profiles.update_config().report_error();
         }
     }
 }

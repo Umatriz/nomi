@@ -789,6 +789,7 @@ dependencies = [
  "egui_dock",
  "egui_extras",
  "egui_form",
+ "egui_task_manager",
  "egui_tracing",
  "garde",
  "nomi-core",
@@ -1304,6 +1305,15 @@ dependencies = [
  "wasm-bindgen",
  "web-sys",
  "winit",
+]
+
+[[package]]
+name = "egui_task_manager"
+version = "0.1.1"
+source = "git+https://github.com/Umatriz/egui-task-manager#19b25af2e22e8ef77ffacb012a4057215663ef7a"
+dependencies = [
+ "egui",
+ "tokio",
 ]
 
 [[package]]
@@ -2518,6 +2528,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "const_typed_builder",
+ "egui_task_manager",
  "flate2",
  "futures-util",
  "itertools 0.13.0",
