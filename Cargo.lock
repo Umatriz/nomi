@@ -886,43 +886,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "const_typed_builder"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf163fa2de9cab2577df9779d95b12ca14fbde24ca85e1f949005d5a90d4faad"
-dependencies = [
- "const_typed_builder_derive",
-]
-
-[[package]]
-name = "const_typed_builder_derive"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "81af001519b3b43d9b1a064ffe5c24f38d216fe6ba88ea9d140646cb5e3f1479"
-dependencies = [
- "convert_case",
- "either",
- "itertools 0.11.0",
- "proc-macro-error",
- "proc-macro2",
- "quote",
- "syn 2.0.60",
-]
-
-[[package]]
 name = "constant_time_eq"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7144d30dcf0fafbce74250a3963025d8d52177934239851c917d29f1df280c2"
-
-[[package]]
-name = "convert_case"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec182b0ca2f35d8fc196cf3404988fd8b8c739a4d270ff118a398feb0cbec1ca"
-dependencies = [
- "unicode-segmentation",
-]
 
 [[package]]
 name = "core-foundation"
@@ -2161,15 +2128,6 @@ checksum = "28b29a3cd74f0f4598934efe3aeba42bae0eb4680554128851ebbecb02af14e6"
 
 [[package]]
 name = "itertools"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1c173a5686ce8bfa551b3563d0c2170bf24ca44da99c7ca4bfdab5418c3fe57"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
@@ -2527,11 +2485,10 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
- "const_typed_builder",
  "egui_task_manager",
  "flate2",
  "futures-util",
- "itertools 0.13.0",
+ "itertools",
  "regex",
  "reqwest",
  "serde",
@@ -2543,6 +2500,7 @@ dependencies = [
  "toml",
  "tracing",
  "tracing-subscriber",
+ "typed-builder",
  "urlencoding",
  "uuid",
  "zip",
@@ -2554,6 +2512,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "itertools",
  "nomi-core",
  "reqwest",
  "serde",
@@ -2562,6 +2521,7 @@ dependencies = [
  "tokio",
  "toml",
  "tracing",
+ "typed-builder",
 ]
 
 [[package]]
@@ -3949,6 +3909,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "deb68604048ff8fa93347f02441e4487594adc20bb8a084f9e564d2b827a0a9f"
 dependencies = [
  "rustc-hash",
+]
+
+[[package]]
+name = "typed-builder"
+version = "0.18.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77739c880e00693faef3d65ea3aad725f196da38b22fdc7ea6ded6e1ce4d3add"
+dependencies = [
+ "typed-builder-macro",
+]
+
+[[package]]
+name = "typed-builder-macro"
+version = "0.18.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1f718dfaf347dcb5b983bfc87608144b0bad87970aebcbea5ce44d2a30c08e63"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.60",
 ]
 
 [[package]]

@@ -2,7 +2,7 @@ use nomi_core::{
     game_paths::GamePaths,
     instance::{
         launch::{arguments::UserData, LaunchSettings},
-        InstanceBuilder,
+        Instance, InstanceBuilder,
     },
     loaders::fabric::Fabric,
     repository::java_runner::JavaRunner,
@@ -23,7 +23,7 @@ async fn vanilla_test() {
         libraries: "./minecraft/libraries".into(),
     };
 
-    let builder = InstanceBuilder::new()
+    let builder = Instance::builder()
         .version("1.20".into())
         .game_paths(game_paths.clone())
         .instance(Box::new(

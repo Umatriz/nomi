@@ -13,5 +13,7 @@ tracing.workspace = true
 async-trait.workspace = true
 reqwest.workspace = true
 thiserror.workspace = true
+typed-builder.workspace = true
+itertools.workspace = true
 
 nomi-core = { path = "../nomi-core"}

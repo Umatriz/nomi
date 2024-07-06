@@ -1,5 +1,7 @@
 use nomi_core::{
-    downloads::traits::Downloader, game_paths::GamePaths, instance::InstanceBuilder,
+    downloads::traits::Downloader,
+    game_paths::GamePaths,
+    instance::{Instance, InstanceBuilder},
     loaders::vanilla::Vanilla,
 };
 use tracing::Level;
@@ -21,7 +23,7 @@ async fn download_test() {
         libraries: "./minecraft/libraries".into(),
     };
 
-    let instance = InstanceBuilder::new()
+    let instance = Instance::builder()
         .version("1.18.2".into())
         .instance(Box::new(
             Vanilla::new("1.18.2", game_paths.clone()).await.unwrap(),

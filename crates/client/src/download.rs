@@ -10,7 +10,7 @@ use nomi_core::{
         AssetsDownloader, DownloadQueue,
     },
     game_paths::GamePaths,
-    instance::{launch::LaunchSettings, InstanceBuilder},
+    instance::{launch::LaunchSettings, Instance, InstanceBuilder},
     loaders::{fabric::Fabric, vanilla::Vanilla},
     repository::java_runner::JavaRunner,
     state::get_launcher_manifest,
@@ -50,7 +50,7 @@ async fn try_download_version(
         libraries: mc_dir.join("libraries"),
     };
 
-    let builder = InstanceBuilder::new()
+    let builder = Instance::builder()
         .name(profile.name.clone())
         .version(profile.version().to_string())
         .game_paths(game_paths.clone());

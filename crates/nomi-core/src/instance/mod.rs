@@ -1,4 +1,4 @@
-use const_typed_builder::Builder;
+use typed_builder::TypedBuilder;
 
 pub mod builder_ext;
 pub mod launch;
@@ -18,7 +18,7 @@ use self::{
 #[derive(Default, Debug)]
 pub struct Undefined;
 
-#[derive(Debug, Builder)]
+#[derive(Debug, TypedBuilder)]
 pub struct Instance {
     instance: Box<dyn Version>,
     pub game_paths: GamePaths,

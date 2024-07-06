@@ -1,10 +1,10 @@
 use nomi_core::{
-    configs::profile::{ProfileState, VersionProfileBuilder},
+    configs::profile::{ProfileState, VersionProfile, VersionProfileBuilder},
     downloads::traits::Downloader,
     game_paths::GamePaths,
     instance::{
         launch::{arguments::UserData, LaunchSettings},
-        InstanceBuilder,
+        Instance, InstanceBuilder,
     },
     loaders::fabric::Fabric,
     repository::java_runner::JavaRunner,
@@ -25,7 +25,7 @@ async fn full_fabric_test() {
         libraries: "./minecraft/libraries".into(),
     };
 
-    let instance = InstanceBuilder::new()
+    let instance = Instance::builder()
         .name("Full-fabric-test".into())
         .version("1.19.4".into())
         .game_paths(game_paths.clone())
@@ -61,7 +61,7 @@ async fn full_fabric_test() {
 
     instance.download(&tx).await;
 
-    let profile = VersionProfileBuilder::new()
+    let profile = VersionProfile::builder()
         .id(1)
         .name("Full-fabric-test".into())
         .state(ProfileState::downloaded(launch))

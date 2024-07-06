@@ -1,8 +1,8 @@
 use std::{fmt::Display, sync::Arc};
 
 use anyhow::anyhow;
-use const_typed_builder::Builder;
 use serde::{Deserialize, Serialize};
+use typed_builder::TypedBuilder;
 
 use crate::{
     instance::launch::{arguments::UserData, LaunchInstance},
@@ -55,7 +55,7 @@ impl ProfileState {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Builder, Clone)]
+#[derive(Serialize, Deserialize, Debug, TypedBuilder, Clone)]
 pub struct VersionProfile {
     pub id: usize,
     pub name: String,
