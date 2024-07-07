@@ -35,7 +35,7 @@ jobs:
           targets: ${{ matrix.target }}
 
       - name: Build project
-        uses: actions-rs/cargo@v1
+        uses: actions-rs/cargo@v1.0.1
         with:
           use-cross: true
           command: build
