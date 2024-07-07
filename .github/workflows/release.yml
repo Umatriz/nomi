@@ -44,7 +44,7 @@ jobs:
       - name: Make asset
         shell: bash
         run: |
-          name="nomi-${{ matrix.target }}"
+          name="client-${{ matrix.target }}"
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             mv "target/${{ matrix.target }}/release/client.exe" "$name.exe"
             echo "ASSET=$name.exe" >> $GITHUB_ENV
