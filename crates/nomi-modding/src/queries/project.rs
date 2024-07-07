@@ -1,10 +1,12 @@
 //! Project
 
+use std::ops::Deref;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Project {
-    pub slug: String,
+    pub slug: ProjectSlug,
     pub title: String,
     pub description: String,
     pub categories: Vec<String>,
@@ -12,7 +14,7 @@ pub struct Project {
     pub server_side: String,
     pub body: String,
     pub status: String,
-    pub requested_status: String,
+    pub requested_status: Option<String>,
     pub additional_categories: Vec<String>,
     pub issues_url: String,
     pub source_url: String,
@@ -25,20 +27,42 @@ pub struct Project {
     pub color: i64,
     pub thread_id: String,
     pub monetization_status: String,
-    pub id: String,
+    pub id: ProjectId,
     pub team: String,
-    pub body_url: Option<serde_json::Value>,
-    pub moderator_message: Option<serde_json::Value>,
+    pub body_url: Option<String>,
+    pub moderator_message: Option<String>,
     pub published: String,
     pub updated: String,
     pub approved: String,
-    pub queued: String,
+    pub queued: Option<String>,
     pub followers: i64,
     pub license: License,
     pub versions: Vec<String>,
     pub game_versions: Vec<String>,
     pub loaders: Vec<String>,
     pub gallery: Vec<Gallery>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProjectId(pub(crate) String);
+
+impl Deref for ProjectId {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProjectSlug(pub(crate) String);
+
+impl Deref for ProjectSlug {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]

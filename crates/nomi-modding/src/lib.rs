@@ -84,7 +84,7 @@ impl Builder {
 
 /// # Panics
 /// Panics if the string is empty.
-pub(crate) fn capitalize_first_letter(s: impl Into<String>) -> String {
+pub fn capitalize_first_letter(s: impl Into<String>) -> String {
     let mut chars = s.into().chars().map(String::from).collect::<Vec<String>>();
     chars[0] = chars[0].to_uppercase().to_string();
     chars.join("")
@@ -92,7 +92,7 @@ pub(crate) fn capitalize_first_letter(s: impl Into<String>) -> String {
 
 /// # Panics
 /// Panics if the string is empty.
-pub(crate) fn capitalize_first_letters_whitespace_splitted(s: impl Into<String>) -> String {
+pub fn capitalize_first_letters_whitespace_splitted(s: impl Into<String>) -> String {
     let s: String = s.into();
     let iter = s.split_whitespace().map(capitalize_first_letter);
 
@@ -101,9 +101,9 @@ pub(crate) fn capitalize_first_letters_whitespace_splitted(s: impl Into<String>)
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
-
     use categories::CategoriesData;
+    use dependencies::DependenciesData;
+    use project::ProjectId;
     use search::{Facets, InnerPart, Parts, ProjectType, SearchData};
 
     use super::*;
@@ -149,5 +149,33 @@ mod tests {
         let data = data.get_unique_headers();
 
         println!("{:#?}", data)
+    }
+
+    #[tokio::test]
+    async fn dependencies_test() {
+        let data = SearchData::builder()
+            .facets(Facets::new(
+                Parts::new()
+                    .add_part(InnerPart::new().add_category("atmosphere"))
+                    .add_project_type(ProjectType::Shader),
+            ))
+            .build();
+
+        let query = Query::new(data);
+        let data = query.query().await.unwrap();
+
+        for project in data.hits {
+            let data = DependenciesData::new(project.project_id);
+            let query = Query::new(data);
+            let data = query.query().await.unwrap();
+            println!("Success ({}): {:#?}", project.title, data.versions.first());
+        }
+
+        // Indium's ID: Orvt0mRa
+
+        let data = DependenciesData::new(ProjectId("Orvt0mRa".into()));
+        let query = Query::new(data);
+        let data = query.query().await.unwrap();
+        println!("Success (Indium): {:#?}", data.versions.first());
     }
 }

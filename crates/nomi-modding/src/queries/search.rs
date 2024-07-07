@@ -3,7 +3,10 @@
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
-use crate::{Builder, QueryData};
+use crate::{
+    project::{ProjectId, ProjectSlug},
+    Builder, QueryData,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Search {
@@ -15,7 +18,7 @@ pub struct Search {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Hit {
-    pub slug: String,
+    pub slug: ProjectSlug,
     pub title: String,
     pub description: String,
     pub categories: Vec<String>,
@@ -27,7 +30,7 @@ pub struct Hit {
     pub color: i64,
     pub thread_id: Option<String>,
     pub monetization_status: Option<String>,
-    pub project_id: String,
+    pub project_id: ProjectId,
     pub author: String,
     pub display_categories: Vec<String>,
     pub versions: Vec<String>,
