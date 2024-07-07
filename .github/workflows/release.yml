@@ -54,7 +54,7 @@ jobs:
           fi
 
       - name:
-        uses: softprops/actions-gh-release@v1
+        uses: softprops/action-gh-release@v1
         with:
           files: |
             ${{ env.ASSET }}
