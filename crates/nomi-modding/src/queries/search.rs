@@ -1,11 +1,9 @@
 //! Search for projects
 
-use std::any::Any;
-
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
-use crate::{Builder, QueryBuilder};
+use crate::{Builder, QueryData};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Search {
@@ -63,6 +61,16 @@ pub struct Facets {
 }
 
 impl Facets {
+    pub fn new(parts: Parts) -> Self {
+        Self { parts }
+    }
+
+    pub fn empty() -> Self {
+        Self {
+            parts: Parts::new(),
+        }
+    }
+
     pub fn mods() -> Self {
         Self {
             parts: Parts::new()
@@ -241,7 +249,7 @@ impl ProjectType {
     }
 }
 
-impl QueryBuilder<Search> for SearchData {
+impl QueryData<Search> for SearchData {
     fn builder(&self) -> Builder {
         Builder::new("https://api.modrinth.com/v2/search")
             .add_optional_parameter("query", self.query.as_ref())
