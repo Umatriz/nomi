@@ -39,7 +39,7 @@ jobs:
         with:
           use-cross: true
           command: build
-          args: --verbose --relesae --target ${{ matrix.target }}
+          args: --verbose --release --target ${{ matrix.target }}
       
       - name: Make asset
         shell: bash
