@@ -1,10 +1,10 @@
 use nomi_core::{
-    configs::profile::{ProfileState, VersionProfile, VersionProfileBuilder},
+    configs::profile::{ProfileState, VersionProfile},
     downloads::traits::Downloader,
     game_paths::GamePaths,
     instance::{
         launch::{arguments::UserData, LaunchSettings},
-        Instance, InstanceBuilder,
+        Instance,
     },
     loaders::fabric::Fabric,
     repository::java_runner::JavaRunner,

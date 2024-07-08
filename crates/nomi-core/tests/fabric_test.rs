@@ -2,7 +2,7 @@ use nomi_core::{
     game_paths::GamePaths,
     instance::{
         launch::{arguments::UserData, LaunchSettings},
-        Instance, InstanceBuilder,
+        Instance,
     },
     loaders::fabric::Fabric,
     repository::java_runner::JavaRunner,

@@ -1,7 +1,5 @@
 use nomi_core::{
-    downloads::traits::Downloader,
-    game_paths::GamePaths,
-    instance::{Instance, InstanceBuilder},
+    downloads::traits::Downloader, game_paths::GamePaths, instance::Instance,
     loaders::vanilla::Vanilla,
 };
 use tracing::Level;

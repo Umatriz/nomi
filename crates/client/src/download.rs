@@ -10,7 +10,7 @@ use nomi_core::{
         AssetsDownloader, DownloadQueue,
     },
     game_paths::GamePaths,
-    instance::{launch::LaunchSettings, Instance, InstanceBuilder},
+    instance::{launch::LaunchSettings, Instance},
     loaders::{fabric::Fabric, vanilla::Vanilla},
     repository::java_runner::JavaRunner,
     state::get_launcher_manifest,
