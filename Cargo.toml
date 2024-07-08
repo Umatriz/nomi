@@ -30,7 +30,7 @@ toml = "0.8.0"
 anyhow = "1.0"
 thiserror = "1.0.48"
 
-reqwest = { version = "0.11.18", default-features = false, features = ["json", "blocking", "stream", "rustls-tls"] }
+reqwest = { version = "0.12.5", features = ["json", "blocking", "stream"] }
 
 tracing = "0.1"
 tracing-subscriber = {version = "0.3", features = ["env-filter"]}
