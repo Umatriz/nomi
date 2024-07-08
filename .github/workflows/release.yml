@@ -51,7 +51,7 @@ jobs:
         run: |
           if [ "${{ matrix.target }}" == "aarch64-unknown-linux-gnu" ]; then
             sudo apt-get update
-            sudo apt-get -y install gcc-aarch64-linux-gnu
+            sudo apt-get -y install libc6-dev-arm64-cross
           fi
 
       - name: Build project
