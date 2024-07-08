@@ -41,6 +41,10 @@ jobs:
       - name: Clone project
         uses: actions/checkout@v4
 
+      - name: Setup Clang
+        if: ${{ matrix.target }} == "aarch64-unknown-linux-gnu"
+        uses: actions/clang@v1.4
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
         with:
