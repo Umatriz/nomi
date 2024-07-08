@@ -5,6 +5,7 @@ use typed_builder::TypedBuilder;
 
 use crate::{
     project::{ProjectId, ProjectSlug},
+    version::VersionId,
     Builder, QueryData,
 };
 
@@ -33,7 +34,7 @@ pub struct Hit {
     pub project_id: ProjectId,
     pub author: String,
     pub display_categories: Vec<String>,
-    pub versions: Vec<String>,
+    pub versions: Vec<VersionId>,
     pub follows: i64,
     pub date_created: String,
     pub date_modified: String,

@@ -4,6 +4,8 @@ use std::ops::Deref;
 
 use serde::{Deserialize, Serialize};
 
+use crate::QueryData;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Project {
     pub slug: ProjectSlug,
@@ -18,8 +20,8 @@ pub struct Project {
     pub additional_categories: Vec<String>,
     pub issues_url: String,
     pub source_url: String,
-    pub wiki_url: String,
-    pub discord_url: String,
+    pub wiki_url: Option<String>,
+    pub discord_url: Option<String>,
     pub donation_urls: Vec<DonationUrl>,
     pub project_type: String,
     pub downloads: i64,
@@ -65,6 +67,41 @@ impl Deref for ProjectSlug {
     }
 }
 
+#[derive(Debug)]
+pub enum ProjectIdOrSlug {
+    Slug(ProjectSlug),
+    Id(ProjectId),
+}
+
+impl ProjectIdOrSlug {
+    pub fn slug(slug: ProjectSlug) -> Self {
+        Self::Slug(slug)
+    }
+
+    pub fn id(id: ProjectId) -> Self {
+        Self::Id(id)
+    }
+
+    pub fn value(&self) -> &str {
+        match self {
+            Self::Slug(slug) => slug,
+            Self::Id(id) => id,
+        }
+    }
+}
+
+impl From<ProjectId> for ProjectIdOrSlug {
+    fn from(value: ProjectId) -> Self {
+        Self::Id(value)
+    }
+}
+
+impl From<ProjectSlug> for ProjectIdOrSlug {
+    fn from(value: ProjectSlug) -> Self {
+        Self::Slug(value)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DonationUrl {
     pub id: String,
@@ -77,7 +114,7 @@ pub struct Gallery {
     pub url: String,
     pub featured: bool,
     pub title: String,
-    pub description: String,
+    pub description: Option<String>,
     pub created: String,
     pub ordering: i64,
 }
@@ -86,5 +123,26 @@ pub struct Gallery {
 pub struct License {
     pub id: String,
     pub name: String,
-    pub url: String,
+    pub url: Option<String>,
+}
+
+pub struct ProjectData {
+    project_id_or_slug: ProjectIdOrSlug,
+}
+
+impl ProjectData {
+    pub fn new(id_or_slug: impl Into<ProjectIdOrSlug>) -> Self {
+        Self {
+            project_id_or_slug: id_or_slug.into(),
+        }
+    }
+}
+
+impl QueryData<Project> for ProjectData {
+    fn builder(&self) -> crate::Builder {
+        crate::Builder::new(format!(
+            "https://api.modrinth.com/v2/project/{}",
+            self.project_id_or_slug.value()
+        ))
+    }
 }

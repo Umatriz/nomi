@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{project::ProjectId, Builder, QueryData};
+use crate::{project::ProjectIdOrSlug, Builder, QueryData};
 
 use super::{project::Project, version::Version};
 
@@ -13,12 +13,14 @@ pub struct Dependencies {
 }
 
 pub struct DependenciesData {
-    project_id: ProjectId,
+    project_id_or_slug: ProjectIdOrSlug,
 }
 
 impl DependenciesData {
-    pub fn new(project_id: ProjectId) -> Self {
-        Self { project_id }
+    pub fn new(id_or_slug: impl Into<ProjectIdOrSlug>) -> Self {
+        Self {
+            project_id_or_slug: id_or_slug.into(),
+        }
     }
 }
 
@@ -26,7 +28,7 @@ impl QueryData<Dependencies> for DependenciesData {
     fn builder(&self) -> crate::Builder {
         Builder::new(format!(
             "https://api.modrinth.com/v2/project/{}/dependencies",
-            *self.project_id
+            self.project_id_or_slug.value()
         ))
     }
 }

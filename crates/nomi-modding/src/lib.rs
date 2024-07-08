@@ -26,7 +26,7 @@ where
     }
 
     pub async fn query(&self) -> Result<T, reqwest::Error> {
-        reqwest::get(self.data.builder().build())
+        reqwest::get(dbg!(self.data.builder().build()))
             .await?
             .json()
             .await
@@ -39,19 +39,19 @@ pub trait QueryData<T> {
 }
 
 pub struct Builder {
-    base: String,
+    base_url: String,
     data: Vec<String>,
 }
 
 impl Builder {
-    pub fn new(base: impl Into<String>) -> Self {
+    pub fn new(base_url: impl Into<String>) -> Self {
         Self {
-            base: base.into(),
+            base_url: base_url.into(),
             data: Vec::new(),
         }
     }
 
-    pub fn check_and_add_symbol(&mut self) {
+    fn check_and_add_symbol(&mut self) {
         if self.data.is_empty() {
             self.data.push("?".to_owned());
         } else {
@@ -78,7 +78,7 @@ impl Builder {
     }
 
     pub fn build(&self) -> String {
-        format!("{}{}", self.base, self.data.join(""))
+        format!("{}{}", self.base_url, self.data.join(""))
     }
 }
 
@@ -99,12 +99,27 @@ pub fn capitalize_first_letters_whitespace_splitted(s: impl Into<String>) -> Str
     itertools::intersperse(iter, " ".to_owned()).collect::<String>()
 }
 
+pub(crate) fn format_list(value: impl Iterator<Item = impl Into<String>>) -> String {
+    let iter = value.map(|s| format!("\"{}\"", s.into()));
+    let s = itertools::intersperse(iter, ",".to_owned()).collect::<String>();
+    format!("[{s}]")
+}
+
+/// Do not ask.
+///
+/// See implementation of `QueryData` for [`ProjectVersionsData`].
+pub(crate) fn bool_as_str(val: bool) -> &'static str {
+    ["false", "true"][val as usize]
+}
+
 #[cfg(test)]
 mod tests {
     use categories::CategoriesData;
     use dependencies::DependenciesData;
-    use project::ProjectId;
-    use search::{Facets, InnerPart, Parts, ProjectType, SearchData};
+    use itertools::Itertools;
+    use project::{ProjectData, ProjectId, ProjectIdOrSlug};
+    use search::{Facets, InnerPart, Parts, ProjectType, Search, SearchData};
+    use version::{MultipleVersionsData, ProjectVersionsData, SingleVersionData};
 
     use super::*;
 
@@ -115,6 +130,19 @@ mod tests {
             "Ab Ba",
             capitalize_first_letters_whitespace_splitted("ab ba")
         );
+    }
+
+    #[test]
+    fn bool_as_str_test() {
+        assert_eq!("true", bool_as_str(true));
+        assert_eq!("false", bool_as_str(false));
+    }
+
+    async fn search_mods() -> Search {
+        let data = SearchData::builder().facets(Facets::mods()).build();
+
+        let query = Query::new(data);
+        query.query().await.unwrap()
     }
 
     #[tokio::test]
@@ -153,19 +181,8 @@ mod tests {
 
     #[tokio::test]
     async fn dependencies_test() {
-        let data = SearchData::builder()
-            .facets(Facets::new(
-                Parts::new()
-                    .add_part(InnerPart::new().add_category("atmosphere"))
-                    .add_project_type(ProjectType::Shader),
-            ))
-            .build();
-
-        let query = Query::new(data);
-        let data = query.query().await.unwrap();
-
-        for project in data.hits {
-            let data = DependenciesData::new(project.project_id);
+        for project in search_mods().await.hits {
+            let data = DependenciesData::new(ProjectIdOrSlug::id(project.project_id));
             let query = Query::new(data);
             let data = query.query().await.unwrap();
             println!("Success ({}): {:#?}", project.title, data.versions.first());
@@ -177,5 +194,58 @@ mod tests {
         let query = Query::new(data);
         let data = query.query().await.unwrap();
         println!("Success (Indium): {:#?}", data.versions.first());
+    }
+
+    #[tokio::test]
+    async fn project_test() {
+        for project in search_mods().await.hits {
+            let data = ProjectData::new(project.project_id);
+            let query = Query::new(data);
+            let data = query.query().await.unwrap();
+            println!(
+                "Success ({}): description - {}",
+                project.title, data.description
+            )
+        }
+    }
+
+    #[tokio::test]
+    async fn versions_test() {
+        for project in search_mods().await.hits {
+            let data = ProjectVersionsData::builder()
+                .id_or_slug(project.slug)
+                .loaders(["fabric"].map(String::from).to_vec())
+                .game_versions(["1.19.2"].map(String::from).to_vec())
+                .build();
+
+            let query = Query::new(data);
+            let versions = query.query().await.unwrap();
+
+            for version in versions.iter().filter(|v| v.featured) {
+                println!("Success ({}): {}", &project.title, version.name)
+            }
+
+            for version in &versions[..(versions.len() / 2)] {
+                let data = SingleVersionData::new(version.id.clone());
+                let query = Query::new(data);
+                if let Ok(data) = query.query().await.inspect_err(|e| eprintln!("{:#?}", e)) {
+                    println!("Success (single): {}", data.name);
+                };
+            }
+
+            let data = MultipleVersionsData::new(
+                versions[..(versions.len() / 2)]
+                    .iter()
+                    .map(|v| &v.id)
+                    .cloned()
+                    .collect_vec(),
+            );
+            let query = Query::new(data);
+            let data = query.query().await.unwrap();
+
+            for version in data {
+                println!("Success (multiple): {}", version.name);
+            }
+        }
     }
 }
