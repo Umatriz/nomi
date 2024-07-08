@@ -2,6 +2,7 @@
 pub struct TabId(&'static str);
 
 impl TabId {
+    pub const MODS: Self = Self("Mods");
     pub const PROFILES: Self = Self("Profiles");
     pub const SETTINGS: Self = Self("Settings");
     pub const LOGS: Self = Self("Logs");
@@ -37,6 +38,7 @@ impl Tab {
 
 pub enum TabKind {
     Profiles,
+    Mods,
     Settings,
     Logs,
     DownloadProgress,
@@ -51,6 +53,7 @@ impl PartialEq for TabKind {
 impl TabKind {
     pub const AVAILABLE_TABS_TO_OPEN: &'static [Self] = &[
         Self::Profiles,
+        Self::Mods,
         Self::Settings,
         Self::Logs,
         Self::DownloadProgress,
@@ -62,16 +65,18 @@ impl TabKind {
             TabId::SETTINGS => TabKind::Settings,
             TabId::LOGS => TabKind::Logs,
             TabId::DOWNLOAD_PROGRESS => TabKind::DownloadProgress,
+            TabId::MODS => TabKind::Mods,
             _ => unreachable!(),
         }
     }
 
     pub fn id(&self) -> TabId {
         match self {
-            TabKind::Profiles { .. } => TabId::PROFILES,
-            TabKind::Settings { .. } => TabId::SETTINGS,
+            TabKind::Profiles => TabId::PROFILES,
+            TabKind::Settings => TabId::SETTINGS,
             TabKind::Logs => TabId::LOGS,
-            TabKind::DownloadProgress { .. } => TabId::DOWNLOAD_PROGRESS,
+            TabKind::DownloadProgress => TabId::DOWNLOAD_PROGRESS,
+            TabKind::Mods => TabId::MODS,
         }
     }
 

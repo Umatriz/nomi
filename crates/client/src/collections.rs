@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{marker::PhantomData, sync::Arc};
 
 use egui_task_manager::*;
 use nomi_core::{configs::profile::VersionProfile, repository::fabric_meta::FabricVersions};
@@ -113,3 +113,25 @@ impl<'c> TasksCollection<'c> for GameDeletionCollection {
         Handler::new(|()| ())
     }
 }
+
+// pub struct ModdingCollection<T, Ctx> {
+//     _marker: PhantomData<(T, Ctx)>,
+// }
+
+// impl<'c, T, Ctx> TasksCollection<'c> for ModdingCollection<T, Ctx>
+// where
+//     T: Send + 'static,
+//     Ctx: 'c,
+// {
+//     type Context = Ctx;
+
+//     type Target = T;
+
+//     type Executor = executors::Parallel;
+
+//     fn name() -> &'static str {
+//         "Modding collection"
+//     }
+
+//     fn handle(context: Self::Context) -> Handler<'c, Self::Target> {}
+// }

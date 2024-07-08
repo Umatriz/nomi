@@ -6,7 +6,8 @@ use eframe::{
 };
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
 use egui_tracing::EventCollector;
-use views::{add_tab_menu::AddTab, View};
+use std::{collections::HashSet, hash::Hash};
+use views::{add_tab_menu::AddTab, ModManager, View};
 
 use errors_pool::ERRORS_POOL;
 use nomi_core::DOT_NOMI_LOGS_DIR;
@@ -19,14 +20,12 @@ use tracing_subscriber::{
 
 pub mod download;
 pub mod errors_pool;
+pub mod ui_ext;
 pub mod utils;
 pub mod views;
 
-pub mod simplify;
-
 pub mod collections;
 
-pub mod popup;
 pub mod tab;
 pub use tab::*;
 pub mod context;
@@ -70,10 +69,23 @@ fn main() {
     let _ = eframe::run_native(
         "Nomi",
         native_options,
-        Box::new(|_cc| Ok(Box::new(MyTabs::new(collector)))),
+        Box::new(|cc| {
+            egui_extras::install_image_loaders(&cc.egui_ctx);
+            Ok(Box::new(MyTabs::new(collector)))
+        }),
     );
 
     info!("Exiting")
+}
+
+pub fn set_selected<T: Clone + Eq + Hash>(open: &mut HashSet<T>, key: &T, is_open: bool) {
+    if is_open {
+        if !open.contains(key) {
+            open.insert(key.to_owned());
+        }
+    } else {
+        open.remove(key);
+    }
 }
 
 struct MyTabs {

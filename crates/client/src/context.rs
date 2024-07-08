@@ -1,17 +1,22 @@
 use crate::{
     errors_pool::ErrorPoolExt,
     states::States,
-    views::{self, profiles::ProfilesPage, settings::SettingsPage, View},
+    views::{self, profiles::ProfilesPage, settings::SettingsPage, ModManager, View},
     Tab, TabKind,
 };
 use eframe::egui::{self, ScrollArea};
 use egui_dock::TabViewer;
 use egui_file_dialog::FileDialog;
+use egui_infinite_scroll::InfiniteScroll;
 use egui_task_manager::TaskManager;
 use egui_tracing::EventCollector;
 use nomi_core::{
     repository::launcher_manifest::{Latest, LauncherManifest},
     state::get_launcher_manifest,
+};
+use nomi_modding::{
+    modrinth::search::{Hit, SearchData},
+    Query,
 };
 
 pub struct MyContext {
@@ -39,10 +44,6 @@ impl MyContext {
         let launcher_manifest_ref = pollster::block_on(get_launcher_manifest())
             .report_error()
             .unwrap_or(EMPTY_MANIFEST);
-
-        // let mut manager = TasksManager::new();
-
-        // manager.add_collection::<AssetsCollection>();
 
         Self {
             collector,
@@ -97,6 +98,10 @@ impl TabViewer for MyContext {
                 }
                 .ui(ui);
             }
+            TabKind::Mods => ModManager {
+                mod_manager_state: &mut self.states.mod_manager,
+            }
+            .ui(ui),
         };
     }
 

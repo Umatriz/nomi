@@ -141,7 +141,9 @@ mod tests {
     }
 
     async fn search_mods() -> Search {
-        let data = SearchData::builder().facets(Facets::mods()).build();
+        let data = SearchData::builder()
+            .facets(Facets::from_project_type(ProjectType::Mod))
+            .build();
 
         let query = Query::new(data);
         query.query().await.unwrap()
@@ -152,7 +154,7 @@ mod tests {
         let data = SearchData::builder()
             .facets(Facets::new(
                 Parts::new()
-                    .add_part(InnerPart::new().add_category("atmosphere"))
+                    .part(InnerPart::new().add_category("atmosphere"))
                     .add_project_type(ProjectType::Shader),
             ))
             .build();
@@ -176,7 +178,7 @@ mod tests {
         let query = Query::new(CategoriesData);
         let data = query.query().await.unwrap();
 
-        let data = data.get_unique_headers();
+        let data = data.get_unique_headers_with_project_type();
 
         println!("{:#?}", data)
     }

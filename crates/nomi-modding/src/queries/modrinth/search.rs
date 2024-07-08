@@ -25,10 +25,10 @@ pub struct Hit {
     pub categories: Vec<String>,
     pub client_side: String,
     pub server_side: String,
-    pub project_type: String,
+    pub project_type: ProjectType,
     pub downloads: i64,
     pub icon_url: String,
-    pub color: i64,
+    pub color: Option<i64>,
     pub thread_id: Option<String>,
     pub monetization_status: Option<String>,
     pub project_id: ProjectId,
@@ -60,6 +60,7 @@ pub struct SearchData {
     limit: Option<u8>,
 }
 
+#[derive(Default, Clone, PartialEq, Eq)]
 pub struct Facets {
     parts: Parts,
 }
@@ -69,76 +70,14 @@ impl Facets {
         Self { parts }
     }
 
-    pub fn empty() -> Self {
+    pub fn from_project_type(project_type: ProjectType) -> Self {
         Self {
-            parts: Parts::new(),
+            parts: Parts::from_project_type(project_type),
         }
     }
 
-    pub fn mods() -> Self {
-        Self {
-            parts: Parts::new()
-                .add_part(
-                    InnerPart::new()
-                        .add_category("forge")
-                        .add_category("fabric")
-                        .add_category("quilt")
-                        .add_category("liteloader")
-                        .add_category("modloader")
-                        .add_category("rift")
-                        .add_category("neoforge"),
-                )
-                .add_project_type(ProjectType::Mod),
-        }
-    }
-
-    pub fn plugins() -> Self {
-        Self {
-            parts: Parts::new()
-                .add_part(
-                    InnerPart::new()
-                        .add_category("bukkit")
-                        .add_category("spigot")
-                        .add_category("paper")
-                        .add_category("purpur")
-                        .add_category("sponge")
-                        .add_category("bungeecord")
-                        .add_category("waterfall")
-                        .add_category("velocity")
-                        .add_category("folia"),
-                )
-                .add_project_type(ProjectType::Mod),
-        }
-    }
-
-    pub fn data_packs() -> Self {
-        Self {
-            parts: Parts::new()
-                .add_part(InnerPart::new().add_category("datapack"))
-                .add_project_type(ProjectType::Mod),
-        }
-    }
-
-    pub fn shaders() -> Self {
-        Self {
-            parts: Parts::new().add_project_type(ProjectType::Shader),
-        }
-    }
-
-    pub fn resource_packs() -> Self {
-        Self {
-            parts: Parts::new().add_project_type(ProjectType::ResourcePack),
-        }
-    }
-
-    pub fn modpacks() -> Self {
-        Self {
-            parts: Parts::new().add_project_type(ProjectType::Modpack),
-        }
-    }
-
-    pub fn set_parts(&mut self, parts: Parts) {
-        self.parts = parts
+    pub fn parts_mut(&mut self) -> &mut Parts {
+        &mut self.parts
     }
 
     pub fn build(&self) -> String {
@@ -152,7 +91,7 @@ impl Facets {
 ///
 /// Where items in [`InnerPart`] will be joined using `OR` operation. See [`InnerPart`]
 /// for details.
-#[derive(Default)]
+#[derive(Default, Clone, PartialEq, Eq)]
 pub struct Parts(Vec<InnerPart>);
 
 impl Parts {
@@ -160,7 +99,17 @@ impl Parts {
         Self::default()
     }
 
-    pub fn add_part(mut self, part: InnerPart) -> Self {
+    pub fn from_project_type(project_type: ProjectType) -> Self {
+        let parts = Parts::new().add_project_type(project_type);
+        InnerPart::from_project_type(project_type).map_or(parts.clone(), |inner| parts.part(inner))
+    }
+
+    pub fn part(mut self, part: InnerPart) -> Self {
+        self.0.push(part);
+        self
+    }
+
+    pub fn add_part(&mut self, part: InnerPart) -> &mut Self {
         self.0.push(part);
         self
     }
@@ -182,7 +131,7 @@ impl Parts {
 ///
 /// Eg: `["categories:fabric", "categories:forge"]` mean that mod will be supported either by Fabric
 /// or by Forge.
-#[derive(Default)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct InnerPart(Vec<String>);
 
 impl InnerPart {
@@ -190,18 +139,64 @@ impl InnerPart {
         Self::default()
     }
 
+    /// It must satisfy required format.
+    ///
+    /// Call [`Self::format_category`] and [`Self::format_version`] to format your data.
+    ///
+    /// Eg: category must be formatted in the form of `category:{CATEGORY_HERE}`.
+    pub fn from_vec(vec: Vec<String>) -> Self {
+        Self(vec)
+    }
+
+    pub fn from_project_type(project_type: ProjectType) -> Option<Self> {
+        match project_type {
+            ProjectType::Mod => Some(
+                InnerPart::new()
+                    .add_category("forge")
+                    .add_category("fabric")
+                    .add_category("quilt")
+                    .add_category("liteloader")
+                    .add_category("modloader")
+                    .add_category("rift")
+                    .add_category("neoforge"),
+            ),
+            ProjectType::Plugin => Some(
+                InnerPart::new()
+                    .add_category("bukkit")
+                    .add_category("spigot")
+                    .add_category("paper")
+                    .add_category("purpur")
+                    .add_category("sponge")
+                    .add_category("bungeecord")
+                    .add_category("waterfall")
+                    .add_category("velocity")
+                    .add_category("folia"),
+            ),
+            ProjectType::DataPack => Some(InnerPart::new().add_category("datapack")),
+            _ => None,
+        }
+    }
+
     pub fn add_project_type(mut self, project_type: ProjectType) -> Self {
         self.0.push(project_type.as_facet());
         self
     }
 
+    pub fn format_category(category: impl Into<String>) -> String {
+        format!("categories:{}", category.into())
+    }
+
+    pub fn format_version(version: impl Into<String>) -> String {
+        format!("versions:{}", version.into())
+    }
+
     pub fn add_category(mut self, category: impl Into<String>) -> Self {
-        self.0.push(format!("categories:{}", category.into()));
+        self.0.push(Self::format_category(category));
         self
     }
 
     pub fn add_version(mut self, version: impl Into<String>) -> Self {
-        self.0.push(format!("versions:{}", version.into()));
+        self.0.push(Self::format_version(version));
         self
     }
 
@@ -227,7 +222,10 @@ impl InnerPart {
     }
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Default, PartialOrd, Ord)]
+#[serde(rename_all = "lowercase")]
 pub enum ProjectType {
+    #[default]
     Mod,
     Modpack,
     ResourcePack,
@@ -237,6 +235,11 @@ pub enum ProjectType {
 }
 
 impl ProjectType {
+    pub fn iter() -> impl Iterator<Item = ProjectType> {
+        use ProjectType::*;
+        [Mod, Modpack, ResourcePack, Shader, Plugin, DataPack].into_iter()
+    }
+
     pub fn as_str(&self) -> &str {
         match self {
             Self::Mod => "mod",
@@ -298,7 +301,7 @@ mod tests {
 
     #[test]
     fn build_test() {
-        let s = Facets::mods().parts.build();
+        let s = Facets::from_project_type(ProjectType::Mod).parts.build();
         println!("{s}")
     }
 }

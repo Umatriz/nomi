@@ -20,7 +20,7 @@ use crate::{
         add_tab_menu::TabsState,
         profiles::ProfilesState,
         settings::{ClientSettingsState, SettingsState},
-        AddProfileMenuState, ProfilesConfig,
+        AddProfileMenuState, ModManagerState, ProfilesConfig,
     },
     TabId,
 };
@@ -34,22 +34,16 @@ pub struct States {
     pub settings: SettingsState,
     pub client_settings: ClientSettingsState,
     pub add_profile_menu_state: AddProfileMenuState,
+    pub mod_manager: ModManagerState,
 }
 
 impl Default for States {
     fn default() -> Self {
-        let mut tabs = HashSet::new();
-
-        tabs.insert(TabId::PROFILES);
-        tabs.insert(TabId::LOGS);
-        tabs.insert(TabId::SETTINGS);
-        tabs.insert(TabId::DOWNLOAD_PROGRESS);
-
         let settings =
             read_toml_config_sync::<SettingsState>(DOT_NOMI_SETTINGS_CONFIG).unwrap_or_default();
 
         Self {
-            tabs: TabsState(tabs),
+            tabs: TabsState::new(),
             java: JavaState::new(),
             errors_pool: ErrorsPoolState::default(),
             profiles: ProfilesState {
@@ -60,6 +54,7 @@ impl Default for States {
             client_settings: settings.client_settings.clone(),
             settings,
             add_profile_menu_state: AddProfileMenuState::default(),
+            mod_manager: ModManagerState::new(),
         }
     }
 }

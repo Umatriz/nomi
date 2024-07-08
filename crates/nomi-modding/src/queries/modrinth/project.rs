@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::QueryData;
 
+use super::search::ProjectType;
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Project {
     pub slug: ProjectSlug,
@@ -23,7 +25,7 @@ pub struct Project {
     pub wiki_url: Option<String>,
     pub discord_url: Option<String>,
     pub donation_urls: Vec<DonationUrl>,
-    pub project_type: String,
+    pub project_type: ProjectType,
     pub downloads: i64,
     pub icon_url: String,
     pub color: i64,
