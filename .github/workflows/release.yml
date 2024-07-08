@@ -50,13 +50,8 @@ jobs:
         shell: bash
         run: |
           if [ "${{ matrix.target }}" == "aarch64-unknown-linux-gnu" ]; then
-            codename=$(lsb_release --codename --short)
-
-            wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-
-            sudo add-apt-repository "deb http://api.llvm.org/$codename/ llvm-toolchain-$codename-18 main"
             sudo apt-get update
-            sudo apt-get -y install gcc-aarch64-linux-gnu libc6-dev-arm64-cross clang-18 llvm-18
+            sudo apt-get -y install gcc-aarch64-linux-gnu libc6-dev-arm64-cross clang llvm
           fi
 
       - name: Build project
