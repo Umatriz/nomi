@@ -4,7 +4,7 @@ use egui_dock::DockState;
 
 use crate::{Tab, TabId, TabKind};
 
-use super::Component;
+use super::View;
 
 pub struct AddTab<'a> {
     pub dock_state: &'a DockState<Tab>,
@@ -23,7 +23,7 @@ fn set_open(open: &mut HashSet<TabId>, key: &TabId, is_open: bool) {
     }
 }
 
-impl Component for AddTab<'_> {
+impl View for AddTab<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
         ui.menu_button("View", |ui| {
             let tabs_state = &mut self.tabs_state.0;

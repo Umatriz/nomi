@@ -1,7 +1,7 @@
 use crate::{
-    components::{self, profiles::ProfilesPage, settings::SettingsPage, Component},
     errors_pool::ErrorPoolExt,
     states::States,
+    views::{self, profiles::ProfilesPage, settings::SettingsPage, View},
     Tab, TabKind,
 };
 use eframe::egui::{self, ScrollArea};
@@ -91,7 +91,7 @@ impl TabViewer for MyContext {
                 });
             }
             TabKind::DownloadProgress => {
-                components::DownloadingProgress {
+                views::DownloadingProgress {
                     manager: &self.manager,
                     profiles_state: &mut self.states.profiles,
                 }

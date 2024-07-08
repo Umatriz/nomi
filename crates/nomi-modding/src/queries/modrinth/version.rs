@@ -5,11 +5,8 @@ use std::ops::Deref;
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
-use crate::{
-    bool_as_str, format_list,
-    project::{ProjectId, ProjectIdOrSlug},
-    QueryData,
-};
+use super::project::{ProjectId, ProjectIdOrSlug};
+use crate::{bool_as_str, format_list, QueryData};
 
 pub type ProjectVersions = Vec<Version>;
 

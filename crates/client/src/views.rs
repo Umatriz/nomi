@@ -12,6 +12,6 @@ pub use downloading_progress::*;
 pub use profiles::*;
 pub use settings::*;
 
-pub trait Component: Sized {
+pub trait View: Sized {
     fn ui(self, ui: &mut Ui);
 }

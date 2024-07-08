@@ -793,6 +793,7 @@ dependencies = [
  "egui_tracing",
  "garde",
  "nomi-core",
+ "nomi-modding",
  "once_cell",
  "pollster",
  "serde",
@@ -2568,17 +2569,10 @@ dependencies = [
 name = "nomi-modding"
 version = "0.1.0"
 dependencies = [
- "anyhow",
- "async-trait",
  "itertools",
- "nomi-core",
  "reqwest",
  "serde",
- "serde_json",
- "thiserror",
  "tokio",
- "toml",
- "tracing",
  "typed-builder",
 ]
 

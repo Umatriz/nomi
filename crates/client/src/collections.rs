@@ -3,7 +3,7 @@ use std::sync::Arc;
 use egui_task_manager::*;
 use nomi_core::{configs::profile::VersionProfile, repository::fabric_meta::FabricVersions};
 
-use crate::{components::ProfilesConfig, errors_pool::ErrorPoolExt};
+use crate::{errors_pool::ErrorPoolExt, views::ProfilesConfig};
 
 pub struct FabricDataCollection;
 

@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{collections::JavaCollection, errors_pool::ErrorPoolExt, states::JavaState};
 
-use super::Component;
+use super::View;
 
 pub struct SettingsPage<'a> {
     pub java_state: &'a mut JavaState,
@@ -98,7 +98,7 @@ fn check_uuid(value: &str, _context: &()) -> garde::Result {
         .map_or_else(|| Err(Error::new("Invalid UUID")), |_| Ok(()))
 }
 
-impl Component for SettingsPage<'_> {
+impl View for SettingsPage<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
         ui.collapsing("Utils", |ui| {
             let launcher_path = PathBuf::from(DOT_NOMI_LOGS_DIR);

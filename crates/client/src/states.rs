@@ -15,13 +15,13 @@ use tracing::info;
 
 use crate::{
     collections::JavaCollection,
-    components::{
+    errors_pool::{ErrorPoolExt, ErrorsPoolState},
+    views::{
         add_tab_menu::TabsState,
         profiles::ProfilesState,
         settings::{ClientSettingsState, SettingsState},
         AddProfileMenuState, ProfilesConfig,
     },
-    errors_pool::{ErrorPoolExt, ErrorsPoolState},
     TabId,
 };
 

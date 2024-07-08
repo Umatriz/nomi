@@ -1,5 +1,4 @@
 use collections::{AssetsCollection, GameDownloadingCollection, JavaCollection};
-use components::{add_tab_menu::AddTab, Component};
 use context::MyContext;
 use eframe::{
     egui::{self, Align, Align2, Frame, Id, Layout, RichText, ViewportBuilder},
@@ -7,6 +6,7 @@ use eframe::{
 };
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
 use egui_tracing::EventCollector;
+use views::{add_tab_menu::AddTab, View};
 
 use errors_pool::ERRORS_POOL;
 use nomi_core::DOT_NOMI_LOGS_DIR;
@@ -17,10 +17,10 @@ use tracing_subscriber::{
     EnvFilter,
 };
 
-pub mod components;
 pub mod download;
 pub mod errors_pool;
 pub mod utils;
+pub mod views;
 
 pub mod simplify;
 

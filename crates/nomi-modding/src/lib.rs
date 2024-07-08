@@ -114,12 +114,14 @@ pub(crate) fn bool_as_str(val: bool) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use categories::CategoriesData;
-    use dependencies::DependenciesData;
     use itertools::Itertools;
-    use project::{ProjectData, ProjectId, ProjectIdOrSlug};
-    use search::{Facets, InnerPart, Parts, ProjectType, Search, SearchData};
-    use version::{MultipleVersionsData, ProjectVersionsData, SingleVersionData};
+    use modrinth::{
+        categories::CategoriesData,
+        dependencies::DependenciesData,
+        project::{ProjectData, ProjectId, ProjectIdOrSlug},
+        search::{Facets, InnerPart, Parts, ProjectType, Search, SearchData},
+        version::{MultipleVersionsData, ProjectVersionsData, SingleVersionData},
+    };
 
     use super::*;
 

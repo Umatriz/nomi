@@ -11,7 +11,7 @@ use nomi_core::{
 
 use crate::{collections::FabricDataCollection, errors_pool::ErrorPoolExt};
 
-use super::{profiles::ProfilesState, Component};
+use super::{profiles::ProfilesState, View};
 
 pub struct AddProfileMenu<'a> {
     pub manager: &'a mut TaskManager,
@@ -63,7 +63,7 @@ impl AddProfileMenuState {
     }
 }
 
-impl Component for AddProfileMenu<'_> {
+impl View for AddProfileMenu<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
         fn fabric_version_is(
             selected_loader: &Loader,

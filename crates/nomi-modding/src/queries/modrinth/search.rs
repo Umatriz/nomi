@@ -3,11 +3,11 @@
 use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
-use crate::{
+use super::{
     project::{ProjectId, ProjectSlug},
     version::VersionId,
-    Builder, QueryData,
 };
+use crate::{Builder, QueryData};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Search {

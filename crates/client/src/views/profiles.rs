@@ -22,7 +22,7 @@ use crate::{
 use super::{
     add_profile_menu::{AddProfileMenu, AddProfileMenuState},
     settings::SettingsState,
-    Component,
+    View,
 };
 
 pub struct ProfilesPage<'a> {
@@ -65,7 +65,7 @@ impl ProfilesConfig {
     }
 }
 
-impl Component for ProfilesPage<'_> {
+impl View for ProfilesPage<'_> {
     fn ui(self, ui: &mut Ui) {
         {
             ui.toggle_value(self.is_profile_window_open, "Add new profile");

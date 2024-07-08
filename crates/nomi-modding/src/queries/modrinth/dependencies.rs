@@ -2,9 +2,12 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{project::ProjectIdOrSlug, Builder, QueryData};
+use crate::{Builder, QueryData};
 
-use super::{project::Project, version::Version};
+use super::{
+    project::{Project, ProjectIdOrSlug},
+    version::Version,
+};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Dependencies {
