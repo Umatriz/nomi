@@ -20,7 +20,7 @@ pub struct Manifest {
     pub version_type: VersionType,
 }
 
-#[derive(PartialEq, Eq, Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, Default, Serialize, Deserialize, Hash)]
 #[serde(rename_all = "lowercase")]
 pub enum VersionType {
     #[default]

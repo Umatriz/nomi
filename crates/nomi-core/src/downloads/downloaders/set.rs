@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
 use tokio::{sync::mpsc::Sender, task::JoinSet};
+use tracing::warn;
 
 use crate::downloads::{
     progress::ProgressSender,
@@ -8,11 +9,14 @@ use crate::downloads::{
     DownloadError,
 };
 
+use super::file::FileDownloader;
+
 /// Downloader that starts downloading all provided [`Downloadable`] elements
 /// when [`Downloader::download`] is called
 #[derive(Default)]
 pub struct DownloadSet {
     set: Vec<Box<dyn Downloadable<Out = DownloadResult>>>,
+    failed_downloads: Vec<Box<dyn Downloadable<Out = DownloadResult>>>,
     helper: Option<Sender<DownloadResult>>,
 }
 
@@ -37,6 +41,7 @@ impl DownloadSet {
         Self {
             set: vec,
             helper: None,
+            failed_downloads: Vec::new(),
         }
     }
 
@@ -68,7 +73,23 @@ impl Downloader for DownloadSet {
             if let Ok(download_status) = result {
                 sender.update(download_status.clone()).await;
                 if let Some(sender) = self.helper.as_ref() {
-                    let _ = sender.send(download_status).await;
+                    let _ = sender.send(download_status.clone()).await;
+                }
+
+                if let Err(e) = download_status.0 {
+                    match e {
+                        DownloadError::Error { url, path, .. } => self
+                            .failed_downloads
+                            .push(Box::new(FileDownloader::new(url, path))),
+                        DownloadError::HashDoesNotMatch {
+                            url, path, sha1, ..
+                        } => self
+                            .failed_downloads
+                            .push(Box::new(FileDownloader::new(url, path).with_sha1(sha1))),
+                        DownloadError::JoinError => {
+                            warn!("JoinError cannot be handled");
+                        }
+                    }
                 }
             } else {
                 sender

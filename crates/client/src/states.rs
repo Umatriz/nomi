@@ -20,9 +20,8 @@ use crate::{
         add_tab_menu::TabsState,
         profiles::ProfilesState,
         settings::{ClientSettingsState, SettingsState},
-        AddProfileMenuState, ModManagerState, ProfilesConfig,
+        AddProfileMenuState, ModManagerState, ProfileInfoState, ProfilesConfig,
     },
-    TabId,
 };
 
 pub struct States {
@@ -35,6 +34,7 @@ pub struct States {
     pub client_settings: ClientSettingsState,
     pub add_profile_menu_state: AddProfileMenuState,
     pub mod_manager: ModManagerState,
+    pub profile_info: ProfileInfoState,
 }
 
 impl Default for States {
@@ -55,6 +55,7 @@ impl Default for States {
             settings,
             add_profile_menu_state: AddProfileMenuState::default(),
             mod_manager: ModManagerState::new(),
+            profile_info: ProfileInfoState::new(),
         }
     }
 }

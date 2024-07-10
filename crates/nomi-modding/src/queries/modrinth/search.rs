@@ -60,6 +60,12 @@ pub struct SearchData {
     limit: Option<u8>,
 }
 
+impl SearchData {
+    pub fn set_query(&mut self, query: Option<String>) {
+        self.query = query;
+    }
+}
+
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct Facets {
     parts: Parts,

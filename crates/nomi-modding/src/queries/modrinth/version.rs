@@ -31,7 +31,7 @@ pub struct Version {
     pub files: Vec<File>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct VersionId(pub(crate) String);
 
 impl Deref for VersionId {

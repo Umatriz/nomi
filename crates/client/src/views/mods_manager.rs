@@ -1,21 +1,35 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, path::PathBuf, sync::mpsc::Sender};
 
-use eframe::egui::{self, Button, Color32, Layout, RichText, ScrollArea, Vec2};
+use eframe::egui::{
+    self, popup_below_widget, scroll_area::ScrollBarVisibility, Button, Color32, Id, Layout,
+    PopupCloseBehavior, RichText, ScrollArea, SizeHint, TextureOptions, Vec2,
+};
+use egui_extras::{Column, Table, TableBuilder};
 use egui_infinite_scroll::{InfiniteScroll, LoadingState};
+use egui_task_manager::{Progress, TaskProgressShared};
+use nomi_core::{
+    configs::profile::Loader,
+    downloads::{progress::MappedSender, traits::Downloader, DownloadSet, FileDownloader},
+};
 use nomi_modding::{
     capitalize_first_letters_whitespace_splitted,
     modrinth::{
         categories::{Categories, CategoriesData, Header},
+        dependencies::DependenciesData,
+        project::{Project, ProjectData, ProjectId},
         search::{Facets, Hit, InnerPart, Parts, ProjectType, SearchData},
+        version::{Dependency, ProjectVersionsData, SingleVersionData, Version, VersionId},
     },
     Query,
 };
 
 use crate::{errors_pool::ErrorPoolExt, ui_ext::UiExt};
 
-use super::View;
+use super::{TabsState, View};
 
 pub struct ModManager<'a> {
+    pub current_game_version: String,
+    pub current_loader: Loader,
     pub mod_manager_state: &'a mut ModManagerState,
 }
 
@@ -23,16 +37,37 @@ pub struct ModManager<'a> {
 pub struct ModManagerState {
     pub previous_facets: Facets,
     pub previous_project_type: ProjectType,
+    pub previous_search: String,
+    pub current_search: String,
     pub scroll: InfiniteScroll<Hit, u32>,
     pub categories: Option<Categories>,
     pub current_project_type: ProjectType,
     pub headers: Vec<(Header, ProjectType)>,
     pub selected_categories: HashSet<String>,
+
+    pub download_window_state: DownloadWindow,
 }
 
-fn fix_svg(text: &str) -> String {
+#[derive(Default)]
+pub enum DownloadWindow {
+    #[default]
+    Closed,
+    Open {
+        project_id: ProjectId,
+        game_version: String,
+        loader: String,
+    },
+}
+
+fn fix_svg(text: &str, color: Color32) -> Option<String> {
+    if text.is_empty() {
+        return None;
+    }
+    let text = text
+        .replace("currentColor", &color.to_hex())
+        .replace(']', "");
     let s = &text[5..];
-    format!("<svg xmlns=\"http://www.w3.org/2000/svg\" {s}")
+    Some(format!("<svg xmlns=\"http://www.w3.org/2000/svg\" {s}"))
 }
 
 impl ModManagerState {
@@ -52,23 +87,30 @@ impl ModManagerState {
             headers,
             previous_facets: Facets::from_project_type(ProjectType::Mod),
             selected_categories: HashSet::new(),
+            previous_search: String::new(),
+            current_search: String::new(),
             current_project_type: ProjectType::Mod,
             previous_project_type: ProjectType::Mod,
-            scroll: Self::create_scroll(None),
+            scroll: Self::create_scroll(None, None),
+            download_window_state: DownloadWindow::Closed,
         }
     }
 
-    fn create_scroll(facets: Option<Facets>) -> InfiniteScroll<Hit, u32> {
+    fn create_scroll(facets: Option<Facets>, query: Option<String>) -> InfiniteScroll<Hit, u32> {
         InfiniteScroll::new().end_loader_async(move |cursor| {
             let facets = facets.clone();
+            let query = query.clone();
             async move {
                 let offset = cursor.unwrap_or(0);
 
                 let data = SearchData::builder().offset(offset);
-                let data = match facets {
+                let mut data = match facets {
                     Some(f) => data.facets(f).build(),
                     None => data.build(),
                 };
+
+                data.set_query(query);
+
                 let query = Query::new(data);
                 let search = query.query().await.map_err(|e| format!("{:#?}", e))?;
 
@@ -77,8 +119,13 @@ impl ModManagerState {
         })
     }
 
-    pub fn update_scroll_with_facets(&mut self, facets: Option<Facets>) {
-        self.scroll = Self::create_scroll(facets);
+    pub fn update_scroll_with_facets(&mut self, facets: Option<Facets>, query: Option<String>) {
+        self.scroll = Self::create_scroll(facets, query);
+    }
+
+    pub fn clear_filter(&mut self) {
+        self.selected_categories = HashSet::new();
+        self.current_search = String::new();
     }
 }
 
@@ -87,11 +134,15 @@ impl View for ModManager<'_> {
         egui::TopBottomPanel::top("mod_manager_top_panel").show_inside(ui, |ui| {
             ui.horizontal(|ui| {
                 for project_type in ProjectType::iter() {
-                    ui.selectable_value(
+                    let response = ui.selectable_value(
                         &mut self.mod_manager_state.current_project_type,
                         project_type,
                         capitalize_first_letters_whitespace_splitted(project_type.as_str()),
                     );
+
+                    if response.clicked() {
+                        self.mod_manager_state.clear_filter()
+                    }
                 }
             });
         });
@@ -108,7 +159,7 @@ impl View for ModManager<'_> {
                             )
                             .clicked()
                         {
-                            self.mod_manager_state.selected_categories = HashSet::new()
+                            self.mod_manager_state.clear_filter()
                         }
 
                         if let Some(categories) = &self.mod_manager_state.categories {
@@ -121,6 +172,8 @@ impl View for ModManager<'_> {
                                 current
                             };
 
+                            let set = &mut self.mod_manager_state.selected_categories;
+
                             for (header, project_type) in self
                                 .mod_manager_state
                                 .headers
@@ -129,53 +182,34 @@ impl View for ModManager<'_> {
                             {
                                 ui.label(RichText::new(&**header).strong());
                                 ui.separator();
+
                                 for category in categories.filter_by_header_and_project_type(
                                     header.clone(),
                                     *project_type,
                                 ) {
-                                    let set = &mut self.mod_manager_state.selected_categories;
                                     let name = &category.name;
 
                                     let mut is_open = set.contains(name);
 
                                     ui.horizontal(|ui| {
-                                        ui.add(egui::Image::from_bytes(
-                                            format!("bytes://{}.svg", &name),
-                                            fix_svg(&category.icon).as_bytes().to_vec(),
-                                        ));
+                                        if let Some(svg) = fix_svg(&category.icon, Color32::WHITE) {
+                                            ui.add(
+                                                egui::Image::from_bytes(
+                                                    format!(
+                                                        "bytes://{}/{}.svg",
+                                                        &category.header, &name
+                                                    ),
+                                                    svg.as_bytes().to_vec(),
+                                                )
+                                                .fit_to_original_size(
+                                                    1. / ui.ctx().pixels_per_point(),
+                                                )
+                                                .max_size(Vec2::splat(18.0)),
+                                            );
+                                        }
 
                                         ui.checkbox(&mut is_open, name);
                                     });
-
-                                    let facets = || {
-                                        let parts = Parts::from_project_type(
-                                            self.mod_manager_state.current_project_type,
-                                        );
-
-                                        match (*set).is_empty() {
-                                            true => Facets::new(parts),
-                                            false => Facets::new(
-                                                parts.part(InnerPart::from_vec(
-                                                    set.iter()
-                                                        .map(InnerPart::format_category)
-                                                        .collect(),
-                                                )),
-                                            ),
-                                        }
-                                    };
-
-                                    if self.mod_manager_state.previous_facets != facets() {
-                                        self.mod_manager_state.previous_facets = facets();
-                                        self.mod_manager_state.scroll =
-                                            ModManagerState::create_scroll(Some(facets()));
-                                    } else if self.mod_manager_state.previous_project_type
-                                        != self.mod_manager_state.current_project_type
-                                    {
-                                        self.mod_manager_state.previous_project_type =
-                                            self.mod_manager_state.current_project_type;
-                                        self.mod_manager_state.scroll =
-                                            ModManagerState::create_scroll(Some(facets()));
-                                    }
 
                                     if is_open {
                                         if !set.contains(name) {
@@ -185,6 +219,45 @@ impl View for ModManager<'_> {
                                         set.remove(name);
                                     }
                                 }
+                            }
+                            let facets = || {
+                                let mut parts = Parts::from_project_type(
+                                    self.mod_manager_state.current_project_type,
+                                );
+
+                                if !(*set).is_empty() {
+                                    parts.add_part(InnerPart::from_vec(
+                                        set.iter().map(InnerPart::format_category).collect(),
+                                    ));
+                                }
+
+                                Facets::new(parts)
+                            };
+
+                            let query = || {
+                                (!self.mod_manager_state.current_search.is_empty())
+                                    .then_some(self.mod_manager_state.current_search.clone())
+                            };
+
+                            if self.mod_manager_state.previous_facets != facets() {
+                                self.mod_manager_state.previous_facets = facets();
+                                self.mod_manager_state.scroll =
+                                    ModManagerState::create_scroll(Some(facets()), query());
+                            } else if self.mod_manager_state.previous_project_type
+                                != self.mod_manager_state.current_project_type
+                            {
+                                self.mod_manager_state.previous_project_type =
+                                    self.mod_manager_state.current_project_type;
+                                self.mod_manager_state.scroll =
+                                    ModManagerState::create_scroll(Some(facets()), query());
+                            } else if self.mod_manager_state.previous_search
+                                != self.mod_manager_state.current_search
+                            {
+                                self.mod_manager_state
+                                    .previous_search
+                                    .clone_from(&self.mod_manager_state.current_search);
+                                self.mod_manager_state.scroll =
+                                    ModManagerState::create_scroll(Some(facets()), query())
                             }
                         } else {
                             ui.error_label("Unable to get categories");
@@ -201,6 +274,9 @@ impl View for ModManager<'_> {
 
             ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
                 ui.set_width(ui.available_width() / 2.0);
+
+                ui.text_edit_singleline(&mut self.mod_manager_state.current_search);
+
                 self.mod_manager_state
                     .scroll
                     .ui(ui, 10, |ui, _index, item| {
@@ -214,7 +290,15 @@ impl View for ModManager<'_> {
                                 ui.vertical(|ui| {
                                     ui.label(&item.title);
                                     ui.label(&item.description);
-                                    let _ = ui.button("Download");
+
+                                    if ui.button("Download").clicked() {
+                                        // self.mod_manager_state.download_window_state =
+                                        //     DownloadWindow::Open {
+                                        //         project_id: item.project_id.clone(),
+                                        //         game_version: (),
+                                        //         loader: (),
+                                        //     };
+                                    }
                                 });
                             });
                         });
@@ -234,5 +318,70 @@ impl View for ModManager<'_> {
                 ui.spinner();
             }
         });
+    }
+}
+
+struct ModsConfig {
+    mods: Vec<Mod>,
+}
+
+struct Mod {
+    name: String,
+    version_id: VersionId,
+    is_installed: bool,
+    files: Vec<ModFile>,
+    dependencies: Vec<Dependency>,
+}
+
+struct ModFile {
+    sha1: String,
+    url: String,
+    filename: String,
+}
+
+async fn download_mods(
+    progress: TaskProgressShared,
+    dir: PathBuf,
+    versions: Vec<Version>,
+) -> Vec<Mod> {
+    let _ = progress.set_total(versions.iter().map(|v| v.files.len() as u32).sum());
+    let mut mods = Vec::new();
+    for version in versions {
+        let mod_value = download_mod(progress.sender(), dir.clone(), version).await;
+        mods.push(mod_value);
+    }
+    mods
+}
+
+async fn download_mod(sender: Sender<Box<dyn Progress>>, dir: PathBuf, version: Version) -> Mod {
+    let mut set = DownloadSet::new();
+
+    // We do not download any dependencies. Just the mod.
+    for file in &version.files {
+        let downloader = FileDownloader::new(file.url.clone(), dir.join(&file.filename))
+            .with_sha1(file.hashes.sha1.clone());
+        set.add(Box::new(downloader));
+    }
+
+    let files = version
+        .files
+        .iter()
+        .map(|f| ModFile {
+            sha1: f.hashes.sha1.clone(),
+            url: f.url.clone(),
+            filename: f.filename.clone(),
+        })
+        .collect::<Vec<_>>();
+
+    let sender = MappedSender::new_progress_mapper(Box::new(sender));
+
+    Box::new(set).download(&sender).await;
+
+    Mod {
+        name: version.name,
+        version_id: version.id,
+        is_installed: true,
+        files,
+        dependencies: version.dependencies,
     }
 }

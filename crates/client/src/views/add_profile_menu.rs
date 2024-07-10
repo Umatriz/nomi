@@ -67,10 +67,10 @@ impl View for AddProfileMenu<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
         fn fabric_version_is(
             selected_loader: &Loader,
-            loader_is: impl Fn(Loader) -> bool,
+            loader: Loader,
             func: impl Fn(Option<&String>) -> bool,
         ) -> bool {
-            loader_is(Loader::Fabric { version: None })
+            matches!(loader, Loader::Fabric { .. })
                 && match selected_loader {
                     Loader::Fabric { version } => func(version.as_ref()),
                     Loader::Vanilla => unreachable!(),
@@ -206,19 +206,18 @@ impl View for AddProfileMenu<'_> {
         }
 
         let some_version_buf = || self.menu_state.selected_version_buf.is_some();
-        let loader_is = |kind| self.menu_state.selected_loader_buf == kind;
 
         let fabric_version_is_some = || {
             fabric_version_is(
                 &self.menu_state.selected_loader_buf,
-                loader_is,
+                self.menu_state.selected_loader_buf.clone(),
                 |opt: Option<&String>| opt.is_some(),
             )
         };
         let fabric_version_is_none = || {
             fabric_version_is(
                 &self.menu_state.selected_loader_buf,
-                loader_is,
+                self.menu_state.selected_loader_buf.clone(),
                 |opt: Option<&String>| opt.is_none(),
             )
         };
@@ -247,7 +246,7 @@ impl View for AddProfileMenu<'_> {
         if ui
             .add_enabled(
                 some_version_buf()
-                    && (loader_is(Loader::Vanilla)
+                    && ((matches!(self.menu_state.selected_loader_buf, Loader::Vanilla))
                         || (fabric_version_is_some() && fabric_versions_non_empty())),
                 egui::Button::new("Create"),
             )

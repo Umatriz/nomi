@@ -9,10 +9,13 @@ use crate::{
     repository::{java_runner::JavaRunner, manifest::VersionType},
 };
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum Loader {
+    #[default]
     Vanilla,
-    Fabric { version: Option<String> },
+    Fabric {
+        version: Option<String>,
+    },
 }
 
 impl Display for Loader {
@@ -24,13 +27,17 @@ impl Display for Loader {
     }
 }
 
-impl PartialEq for Loader {
-    fn eq(&self, other: &Self) -> bool {
-        core::mem::discriminant(self) == core::mem::discriminant(other)
+impl Loader {
+    pub fn is_fabric(&self) -> bool {
+        matches!(*self, Self::Fabric { .. })
+    }
+
+    pub fn is_vanilla(&self) -> bool {
+        matches!(*self, Self::Vanilla)
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ProfileState {
     Downloaded(Arc<LaunchInstance>),
 
@@ -55,7 +62,7 @@ impl ProfileState {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, TypedBuilder, Clone)]
+#[derive(Serialize, Deserialize, Debug, TypedBuilder, Clone, PartialEq, Eq, Hash)]
 pub struct VersionProfile {
     pub id: usize,
     pub name: String,
@@ -72,6 +79,15 @@ impl VersionProfile {
         match &self.state {
             ProfileState::Downloaded(instance) => instance.launch(user_data, java_runner).await,
             ProfileState::NotDownloaded { .. } => Err(anyhow!("This profile is not downloaded!")),
+        }
+    }
+
+    pub fn loader(&self) -> Loader {
+        match &self.state {
+            ProfileState::Downloaded(instance) => instance
+                .loader_profile()
+                .map_or(Loader::Vanilla, |profile| profile.loader.clone()),
+            ProfileState::NotDownloaded { loader, .. } => loader.clone(),
         }
     }
 

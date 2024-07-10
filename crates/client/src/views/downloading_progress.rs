@@ -11,7 +11,11 @@ pub struct DownloadingProgress<'a> {
 impl View for DownloadingProgress<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
         ui.with_layout(Layout::top_down_justified(egui::Align::Min), |ui| {
-            self.manager.ui(ui)
+            for collection in self.manager.iter_collections() {
+                for task in collection.iter_tasks() {
+                    task.ui(ui)
+                }
+            }
         });
     }
 }

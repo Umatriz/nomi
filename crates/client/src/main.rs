@@ -7,7 +7,7 @@ use eframe::{
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
 use egui_tracing::EventCollector;
 use std::{collections::HashSet, hash::Hash};
-use views::{add_tab_menu::AddTab, ModManager, View};
+use views::{add_tab_menu::AddTab, View};
 
 use errors_pool::ERRORS_POOL;
 use nomi_core::DOT_NOMI_LOGS_DIR;
@@ -90,25 +90,17 @@ pub fn set_selected<T: Clone + Eq + Hash>(open: &mut HashSet<T>, key: &T, is_ope
 
 struct MyTabs {
     context: MyContext,
-    dock_state: DockState<Tab>,
+    dock_state: DockState<TabKind>,
 }
 
 impl MyTabs {
     pub fn new(collector: EventCollector) -> Self {
-        let tabs = vec![
-            Tab::from_tab_kind(TabKind::Profiles),
-            Tab::from_tab_kind(TabKind::Logs),
-            Tab::from_tab_kind(TabKind::Settings),
-        ];
+        let tabs = vec![TabKind::Profiles, TabKind::Logs, TabKind::Settings];
 
         let mut dock_state = DockState::new(tabs);
 
         let surface = dock_state.main_surface_mut();
-        surface.split_right(
-            NodeIndex::root(),
-            0.60,
-            vec![Tab::from_tab_kind(TabKind::DownloadProgress)],
-        );
+        surface.split_right(NodeIndex::root(), 0.60, vec![TabKind::DownloadProgress]);
 
         Self {
             context: MyContext::new(collector),
@@ -239,20 +231,19 @@ impl eframe::App for MyTabs {
         let opened_tabs = self
             .dock_state
             .iter_all_tabs()
-            .map(|(_, tab)| tab.id().clone())
+            .map(|(_, tab)| tab.clone())
             .collect::<Vec<_>>();
 
-        for tab_id in &self.context.states.tabs.0 {
-            if !opened_tabs.contains(tab_id) {
-                self.dock_state
-                    .push_to_first_leaf(Tab::from_tab_kind(TabKind::from_id(tab_id.to_owned())))
+        for tab in &self.context.states.tabs.0 {
+            if !opened_tabs.contains(tab) {
+                self.dock_state.push_to_first_leaf(tab.clone())
             }
         }
 
-        for tab_id in &opened_tabs {
-            if !self.context.states.tabs.0.contains(tab_id) {
+        for tab in &opened_tabs {
+            if !self.context.states.tabs.0.contains(tab) {
                 self.dock_state
-                    .find_tab(&Tab::from_tab_kind(TabKind::from_id(tab_id.clone())))
+                    .find_tab(tab)
                     .and_then(|tab_info| self.dock_state.remove_tab(tab_info));
             }
         }

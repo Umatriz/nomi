@@ -1,8 +1,10 @@
+use std::ops::Deref;
+
 use crate::{
     errors_pool::ErrorPoolExt,
     states::States,
-    views::{self, profiles::ProfilesPage, settings::SettingsPage, ModManager, View},
-    Tab, TabKind,
+    views::{self, profiles::ProfilesPage, settings::SettingsPage, ModManager, ProfileInfo, View},
+    TabKind,
 };
 use eframe::egui::{self, ScrollArea};
 use egui_dock::TabViewer;
@@ -59,20 +61,29 @@ impl MyContext {
 }
 
 impl TabViewer for MyContext {
-    type Tab = Tab;
+    type Tab = TabKind;
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
-        tab.kind().name().into()
+        if let TabKind::Mods { profile } = tab {
+            format!(
+                "Mods ({}, {}, {})",
+                profile.name, profile.version, profile.loader
+            )
+            .into()
+        } else {
+            tab.name().into()
+        }
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
-        match &mut tab.kind_mut() {
+        match tab {
             TabKind::Profiles => ProfilesPage {
                 is_allowed_to_take_action: self.is_allowed_to_take_action,
                 manager: &mut self.manager,
                 settings_state: &self.states.settings,
                 profiles_state: &mut self.states.profiles,
                 menu_state: &mut self.states.add_profile_menu_state,
+                tabs_state: &mut self.states.tabs,
 
                 launcher_manifest: self.launcher_manifest,
                 is_profile_window_open: &mut self.is_profile_window_open,
@@ -98,15 +109,25 @@ impl TabViewer for MyContext {
                 }
                 .ui(ui);
             }
-            TabKind::Mods => ModManager {
+            TabKind::Mods { profile } => ModManager {
                 mod_manager_state: &mut self.states.mod_manager,
+                current_game_version: profile.version.clone(),
+                current_loader: profile.loader.clone(),
+            }
+            .ui(ui),
+            TabKind::ProfileInfo { profile } => {
+                ProfileInfo {
+                    profile: (**profile).clone(),
+                    tabs_state: &mut self.states.tabs,
+                    profile_info_state: &mut self.states.profile_info,
+                }
             }
             .ui(ui),
         };
     }
 
     fn on_close(&mut self, tab: &mut Self::Tab) -> bool {
-        self.states.tabs.0.remove(tab.id());
+        self.states.tabs.0.remove(tab);
         true
     }
 }

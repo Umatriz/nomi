@@ -149,6 +149,17 @@ mod tests {
         query.query().await.unwrap()
     }
 
+    async fn search_mods_big(offset: u32) -> Search {
+        let data = SearchData::builder()
+            .facets(Facets::from_project_type(ProjectType::Mod))
+            .limit(99)
+            .offset(offset)
+            .build();
+
+        let query = Query::new(data);
+        query.query().await.unwrap()
+    }
+
     #[tokio::test]
     async fn search_test() {
         let data = SearchData::builder()
@@ -215,6 +226,9 @@ mod tests {
 
     #[tokio::test]
     async fn versions_test() {
+        let mut total_eq = 0;
+        let mut total_ne = 0;
+
         for project in search_mods().await.hits {
             let data = ProjectVersionsData::builder()
                 .id_or_slug(project.slug)
@@ -224,6 +238,12 @@ mod tests {
 
             let query = Query::new(data);
             let versions = query.query().await.unwrap();
+
+            if project.versions[0] == versions[0].id {
+                total_eq += 1;
+            } else {
+                total_ne += 1;
+            }
 
             for version in versions.iter().filter(|v| v.featured) {
                 println!("Success ({}): {}", &project.title, version.name)
@@ -251,5 +271,36 @@ mod tests {
                 println!("Success (multiple): {}", version.name);
             }
         }
+
+        println!("EQ: {total_eq}\nNE: {total_ne}");
+    }
+
+    #[tokio::test]
+    async fn feature() {
+        let mut total_some = 0;
+        let mut total_none = 0;
+        for i in 0..5 {
+            for hit in search_mods_big(i * 99).await.hits {
+                let q = Query::new(
+                    ProjectVersionsData::builder()
+                        .featured(true)
+                        .id_or_slug(hit.project_id)
+                        .game_versions(vec!["1.19.2".to_owned()])
+                        .build(),
+                );
+                for version in q.query().await.unwrap() {
+                    for dep in version.dependencies {
+                        println!("{}", dep.version_id.is_some());
+                        if dep.version_id.is_some() {
+                            total_some += 1
+                        } else {
+                            total_none += 1
+                        }
+                    }
+                }
+            }
+        }
+
+        println!("SOME: {total_some}\nNONE: {total_none}");
     }
 }

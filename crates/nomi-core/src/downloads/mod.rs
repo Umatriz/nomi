@@ -7,6 +7,8 @@ use reqwest::Client;
 use tokio::io::AsyncWriteExt;
 use tracing::{error, trace};
 
+use crate::error;
+
 pub mod downloaders;
 pub mod progress;
 pub mod traits;
@@ -17,6 +19,14 @@ pub enum DownloadError {
     Error {
         url: String,
         path: PathBuf,
+        error: String,
+    },
+
+    #[error("Hashes does not match.\nurl: {url}\npath: {path}\nerror: {error:#?}")]
+    HashDoesNotMatch {
+        url: String,
+        path: PathBuf,
+        sha1: String,
         error: String,
     },
 

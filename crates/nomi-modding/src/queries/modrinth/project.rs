@@ -47,7 +47,7 @@ pub struct Project {
     pub gallery: Vec<Gallery>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ProjectId(pub(crate) String);
 
 impl Deref for ProjectId {

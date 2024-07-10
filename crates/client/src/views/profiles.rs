@@ -1,10 +1,13 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
-use eframe::egui::{self, popup_below_widget, Align2, Id, PopupCloseBehavior, TextWrapMode, Ui};
+use eframe::egui::{
+    self, popup_below_widget, Align2, Button, Id, PopupCloseBehavior, TextWrapMode, Ui,
+};
+use egui_dock::DockState;
 use egui_extras::{Column, TableBuilder};
 use egui_task_manager::{Caller, Task, TaskManager};
 use nomi_core::{
-    configs::profile::{ProfileState, VersionProfile},
+    configs::profile::{Loader, ProfileState, VersionProfile},
     fs::write_toml_config_sync,
     instance::launch::arguments::UserData,
     repository::{launcher_manifest::LauncherManifest, username::Username},
@@ -17,12 +20,13 @@ use crate::{
     download::{task_assets, task_download_version},
     errors_pool::ErrorPoolExt,
     utils::spawn_tokio_future,
+    TabKind,
 };
 
 use super::{
     add_profile_menu::{AddProfileMenu, AddProfileMenuState},
     settings::SettingsState,
-    View,
+    TabsState, View,
 };
 
 pub struct ProfilesPage<'a> {
@@ -32,6 +36,7 @@ pub struct ProfilesPage<'a> {
 
     pub is_profile_window_open: &'a mut bool,
 
+    pub tabs_state: &'a mut TabsState,
     pub profiles_state: &'a mut ProfilesState,
     pub menu_state: &'a mut AddProfileMenuState,
 
@@ -41,6 +46,13 @@ pub struct ProfilesPage<'a> {
 pub struct ProfilesState {
     pub currently_downloading_profiles: HashSet<usize>,
     pub profiles: ProfilesConfig,
+}
+
+#[derive(Default, PartialEq, Eq, Hash, Clone)]
+pub struct SimpleProfile {
+    pub name: String,
+    pub version: String,
+    pub loader: Loader,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -92,7 +104,7 @@ impl View for ProfilesPage<'_> {
 
         TableBuilder::new(ui)
             .column(Column::auto().at_least(120.0).at_most(240.0))
-            .columns(Column::auto(), 4)
+            .columns(Column::auto(), 5)
             .header(20.0, |mut header| {
                 header.col(|ui| {
                     ui.label("Name");
@@ -177,10 +189,15 @@ impl View for ProfilesPage<'_> {
                         });
 
                         row.col(|ui| {
+                            if ui.button("Details").clicked() {
+                                self.tabs_state.0.insert(TabKind::ProfileInfo { profile: profile.clone() });
+                            }
+                        });
+
+                        row.col(|ui| {
                             if let ProfileState::Downloaded(instance) = &profile.state {
                                 let popup_id = ui.make_persistent_id("delete_popup_id");
-                                let button = ui
-                                    .button("Delete")
+                                let button = ui.add_enabled(self.is_allowed_to_take_action, Button::new("Delete"))
                                     .on_hover_text("It will delete the profile and it's data");
 
                                 if button.clicked() {

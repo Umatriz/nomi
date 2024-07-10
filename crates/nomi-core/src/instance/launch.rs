@@ -31,7 +31,7 @@ const CLASSPATH_SEPARATOR: &str = ";";
 #[cfg(not(windows))]
 const CLASSPATH_SEPARATOR: &str = ":";
 
-#[derive(Serialize, Deserialize, Default, PartialEq, Debug, Clone)]
+#[derive(Serialize, Deserialize, Default, PartialEq, Eq, Debug, Clone, Hash)]
 pub struct LaunchSettings {
     pub assets: PathBuf,
     pub java_bin: JavaRunner,
@@ -45,7 +45,7 @@ pub struct LaunchSettings {
     pub version_type: VersionType,
 }
 
-#[derive(Serialize, Deserialize, Debug, Default, Clone)]
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct LaunchInstance {
     pub settings: LaunchSettings,
     jvm_args: Option<Vec<String>>,
