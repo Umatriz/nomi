@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use nomi_core::configs::profile::VersionProfile;
 
-use crate::views::SimpleProfile;
+use crate::views::{ModdedProfile, SimpleProfile};
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 pub enum TabKind {
     Profiles,
-    Mods { profile: SimpleProfile },
-    ProfileInfo { profile: Arc<VersionProfile> },
+    Mods { profile: Arc<ModdedProfile> },
+    ProfileInfo { profile: Arc<ModdedProfile> },
     Settings,
     Logs,
     DownloadProgress,
@@ -27,9 +27,11 @@ impl TabKind {
             TabKind::Profiles => "Profiles".to_owned(),
             TabKind::Mods { profile } => format!(
                 "Mods ({}, {}, {})",
-                profile.name, profile.version, profile.loader
+                profile.profile.name,
+                profile.profile.version(),
+                profile.profile.loader_name()
             ),
-            TabKind::ProfileInfo { profile } => format!("Profile ({})", profile.name),
+            TabKind::ProfileInfo { profile } => format!("Profile ({})", profile.profile.name),
             TabKind::Settings => "Settings".to_owned(),
             TabKind::Logs => "Logs".to_owned(),
             TabKind::DownloadProgress => "Progress".to_owned(),

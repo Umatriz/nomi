@@ -9,7 +9,7 @@ use nomi_core::{
     },
 };
 
-use crate::{collections::FabricDataCollection, errors_pool::ErrorPoolExt};
+use crate::{collections::FabricDataCollection, errors_pool::ErrorPoolExt, views::ModdedProfile};
 
 use super::{profiles::ProfilesState, View};
 
@@ -252,17 +252,19 @@ impl View for AddProfileMenu<'_> {
             )
             .clicked()
         {
-            self.profiles_state.profiles.add_profile(VersionProfile {
-                id: self.profiles_state.profiles.create_id(),
-                name: self.menu_state.profile_name_buf.trim_end().to_owned(),
-                state: ProfileState::NotDownloaded {
-                    // PANICS: It will never panic because it's
-                    // unreachable if `selected_version_buf` is `None`
-                    version: self.menu_state.selected_version_buf.clone().unwrap().id,
-                    loader: self.menu_state.selected_loader_buf.clone(),
-                    version_type: self.menu_state.selected_version_type.clone(),
-                },
-            });
+            self.profiles_state
+                .profiles
+                .add_profile(ModdedProfile::new(VersionProfile {
+                    id: self.profiles_state.profiles.create_id(),
+                    name: self.menu_state.profile_name_buf.trim_end().to_owned(),
+                    state: ProfileState::NotDownloaded {
+                        // PANICS: It will never panic because it's
+                        // unreachable for `selected_version_buf` to be `None`
+                        version: self.menu_state.selected_version_buf.clone().unwrap().id,
+                        loader: self.menu_state.selected_loader_buf.clone(),
+                        version_type: self.menu_state.selected_version_type.clone(),
+                    },
+                }));
             self.profiles_state.profiles.update_config().report_error();
         }
     }

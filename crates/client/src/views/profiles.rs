@@ -8,7 +8,7 @@ use egui_extras::{Column, TableBuilder};
 use egui_task_manager::{Caller, Task, TaskManager};
 use nomi_core::{
     configs::profile::{Loader, ProfileState, VersionProfile},
-    fs::write_toml_config_sync,
+    fs::{read_toml_config_sync, write_toml_config_sync},
     instance::launch::arguments::UserData,
     repository::{launcher_manifest::LauncherManifest, username::Username},
     DOT_NOMI_PROFILES_CONFIG,
@@ -26,7 +26,7 @@ use crate::{
 use super::{
     add_profile_menu::{AddProfileMenu, AddProfileMenuState},
     settings::SettingsState,
-    TabsState, View,
+    ModsConfig, TabsState, View,
 };
 
 pub struct ProfilesPage<'a> {
@@ -57,17 +57,40 @@ pub struct SimpleProfile {
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct ProfilesConfig {
-    pub profiles: Vec<Arc<VersionProfile>>,
+    pub profiles: Vec<Arc<ModdedProfile>>,
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct ModdedProfile {
+    pub profile: VersionProfile,
+    pub mods: ModsConfig,
+}
+
+impl ModdedProfile {
+    pub fn new(profile: VersionProfile) -> Self {
+        Self {
+            profile,
+            mods: ModsConfig::default(),
+        }
+    }
 }
 
 impl ProfilesConfig {
-    pub fn add_profile(&mut self, profile: VersionProfile) {
-        self.profiles.insert(self.create_id(), profile.into());
+    pub fn read() -> Self {
+        read_toml_config_sync::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG).unwrap_or_default()
+    }
+
+    pub fn add_profile(&mut self, profile: ModdedProfile) {
+        self.profiles.push(profile.into())
     }
 
     pub fn create_id(&self) -> usize {
-        match &self.profiles.iter().max_by_key(|profile| profile.id) {
-            Some(v) => v.id + 1,
+        match &self
+            .profiles
+            .iter()
+            .max_by_key(|profile| profile.profile.id)
+        {
+            Some(v) => v.profile.id + 1,
             None => 0,
         }
     }
@@ -122,15 +145,15 @@ impl View for ProfilesPage<'_> {
                 for (index, profile) in self.profiles_state.profiles.profiles.iter().enumerate() {
                     body.row(30.0, |mut row| {
                         row.col(|ui| {
-                            ui.add(egui::Label::new(&profile.name).truncate());
+                            ui.add(egui::Label::new(&profile.profile.name).truncate());
                         });
                         row.col(|ui| {
-                            ui.label(profile.version());
+                            ui.label(profile.profile.version());
                         });
                         row.col(|ui| {
-                            ui.label(profile.loader_name());
+                            ui.label(profile.profile.loader_name());
                         });
-                        row.col(|ui| match &profile.state {
+                        row.col(|ui| match &profile.profile.state {
                             ProfileState::Downloaded(instance) => {
                                 if ui
                                     .add_enabled(
@@ -168,21 +191,21 @@ impl View for ProfilesPage<'_> {
                                             .profiles_state
                                             .currently_downloading_profiles
 
-                                            .contains(&profile.id),
+                                            .contains(&profile.profile.id),
                                         egui::Button::new("Download"),
                                     )
                                     .clicked()
                                 {
-                                    let game_version = profile.version().to_owned();
+                                    let game_version = profile.profile.version().to_owned();
 
-                                    let assets_task = Task::new(format!("Assets ({})", profile.version()), Caller::progressing(|progress| 
+                                    let assets_task = Task::new(format!("Assets ({})", profile.profile.version()), Caller::progressing(|progress| 
                                         task_assets(game_version, PathBuf::from("./minecraft/assets"), progress)
                                     ));
                                     self.manager.push_task::<AssetsCollection>(assets_task);
 
                                     let profile = profile.clone();
 
-                                    let game_task = Task::new(format!("Downloading version {}", profile.version()), Caller::progressing(|progress| task_download_version(profile, progress)));
+                                    let game_task = Task::new(format!("Downloading version {}", profile.profile.version()), Caller::progressing(|progress| task_download_version(profile, progress)));
                                     self.manager.push_task::<GameDownloadingCollection>(game_task);
                                 }
                             }
@@ -195,7 +218,7 @@ impl View for ProfilesPage<'_> {
                         });
 
                         row.col(|ui| {
-                            if let ProfileState::Downloaded(instance) = &profile.state {
+                            if let ProfileState::Downloaded(instance) = &profile.profile.state {
                                 let popup_id = ui.make_persistent_id("delete_popup_id");
                                 let button = ui.add_enabled(self.is_allowed_to_take_action, Button::new("Delete"))
                                     .on_hover_text("It will delete the profile and it's data");

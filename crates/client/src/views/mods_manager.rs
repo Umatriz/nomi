@@ -1,35 +1,40 @@
-use std::{collections::HashSet, path::PathBuf, sync::mpsc::Sender};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    sync::{mpsc::Sender, Arc},
+};
 
 use eframe::egui::{
-    self, popup_below_widget, scroll_area::ScrollBarVisibility, Button, Color32, Id, Layout,
-    PopupCloseBehavior, RichText, ScrollArea, SizeHint, TextureOptions, Vec2,
+    self, Button, Color32, ComboBox, Id, Image, Layout, RichText, ScrollArea, Vec2,
 };
-use egui_extras::{Column, Table, TableBuilder};
 use egui_infinite_scroll::{InfiniteScroll, LoadingState};
-use egui_task_manager::{Progress, TaskProgressShared};
-use nomi_core::{
-    configs::profile::Loader,
-    downloads::{progress::MappedSender, traits::Downloader, DownloadSet, FileDownloader},
-};
+use egui_task_manager::{Caller, Progress, Task, TaskManager, TaskProgressShared};
+use itertools::Itertools;
+use nomi_core::{calculate_sha1, downloads::{
+    progress::MappedSender, traits::Downloader, DownloadSet, FileDownloader,
+}};
 use nomi_modding::{
     capitalize_first_letters_whitespace_splitted,
     modrinth::{
         categories::{Categories, CategoriesData, Header},
-        dependencies::DependenciesData,
         project::{Project, ProjectData, ProjectId},
         search::{Facets, Hit, InnerPart, Parts, ProjectType, SearchData},
-        version::{Dependency, ProjectVersionsData, SingleVersionData, Version, VersionId},
+        version::{Dependency, File, ProjectVersionsData, Version, VersionId},
     },
     Query,
 };
+use serde::{Deserialize, Serialize};
 
-use crate::{errors_pool::ErrorPoolExt, ui_ext::UiExt};
+use crate::{
+    collections::{DependenciesCollection, ProjectCollection, ProjectVersionsCollection}, errors_pool::ErrorPoolExt, progress::UnitProgress, ui_ext::UiExt, DOT_NOMI_MODS_STASH_DIR
+};
 
-use super::{TabsState, View};
+use super::{ModdedProfile, ProfilesConfig, View};
 
 pub struct ModManager<'a> {
-    pub current_game_version: String,
-    pub current_loader: Loader,
+    pub task_manager: &'a mut TaskManager,
+    pub profiles_config: &'a ProfilesConfig,
+    pub profile: Arc<ModdedProfile>,
     pub mod_manager_state: &'a mut ModManagerState,
 }
 
@@ -45,18 +50,25 @@ pub struct ModManagerState {
     pub headers: Vec<(Header, ProjectType)>,
     pub selected_categories: HashSet<String>,
 
-    pub download_window_state: DownloadWindow,
+    pub is_download_window_open: bool,
+    pub download_window_state: DownloadWindowState,
+    pub current_project: Option<Project>,
+    pub current_versions: Vec<Arc<Version>>,
+    pub selected_version: Option<Arc<Version>>,
+    pub current_dependencies: Vec<SimpleDependency>,
+    pub selected_dependencies: HashMap<String, MaybeAddedDependency>,
+}
+
+pub struct MaybeAddedDependency {
+    version: Option<Arc<Version>>,
+    is_added: bool,
 }
 
 #[derive(Default)]
-pub enum DownloadWindow {
-    #[default]
-    Closed,
-    Open {
-        project_id: ProjectId,
-        game_version: String,
-        loader: String,
-    },
+pub struct DownloadWindowState {
+    project_id: ProjectId,
+    game_version: String,
+    loader: String,
 }
 
 fn fix_svg(text: &str, color: Color32) -> Option<String> {
@@ -92,7 +104,13 @@ impl ModManagerState {
             current_project_type: ProjectType::Mod,
             previous_project_type: ProjectType::Mod,
             scroll: Self::create_scroll(None, None),
-            download_window_state: DownloadWindow::Closed,
+            download_window_state: DownloadWindowState::default(),
+            is_download_window_open: false,
+            current_project: None,
+            current_versions: Vec::new(),
+            selected_version: None,
+            current_dependencies: Vec::new(),
+            selected_dependencies: HashMap::new(),
         }
     }
 
@@ -292,12 +310,55 @@ impl View for ModManager<'_> {
                                     ui.label(&item.description);
 
                                     if ui.button("Download").clicked() {
-                                        // self.mod_manager_state.download_window_state =
-                                        //     DownloadWindow::Open {
-                                        //         project_id: item.project_id.clone(),
-                                        //         game_version: (),
-                                        //         loader: (),
-                                        //     };
+                                        self.mod_manager_state.is_download_window_open = true;
+
+                                        let game_version =
+                                            self.profile.profile.version().to_owned();
+
+                                        let loader =
+                                            self.profile.profile.loader_name().to_lowercase();
+
+                                        self.mod_manager_state.download_window_state =
+                                            DownloadWindowState {
+                                                project_id: item.project_id.clone(),
+                                                game_version: game_version.clone(),
+                                                loader: loader.clone(),
+                                            };
+
+                                        let id = item.project_id.clone();
+                                        let get_project = Task::new(
+                                            "Get project",
+                                            Caller::standard({
+                                                async move {
+                                                    let query =
+                                                        Query::new(ProjectData::new(id.clone()));
+                                                    query.query().await.report_error()
+                                                }
+                                            }),
+                                        );
+
+                                        self.task_manager
+                                            .push_task::<ProjectCollection>(get_project);
+
+                                        self.mod_manager_state.current_versions = Vec::new();
+
+                                        let id = item.project_id.clone();
+                                        let get_versions = Task::new(
+                                            "Get project",
+                                            Caller::standard(async move {
+                                                let query = Query::new(
+                                                    ProjectVersionsData::builder()
+                                                        .id_or_slug(id)
+                                                        .game_versions(vec![game_version])
+                                                        .loaders(vec![loader])
+                                                        .build(),
+                                                );
+                                                query.query().await.report_error()
+                                            }),
+                                        );
+
+                                        self.task_manager
+                                            .push_task::<ProjectVersionsCollection>(get_versions);
                                     }
                                 });
                             });
@@ -318,13 +379,173 @@ impl View for ModManager<'_> {
                 ui.spinner();
             }
         });
+
+        egui::Window::new("Mod")
+            .open(&mut self.mod_manager_state.is_download_window_open)
+            .show(ui.ctx(), |ui| {
+                let project_id = self
+                    .mod_manager_state
+                    .download_window_state
+                    .project_id
+                    .clone();
+
+                if let Some(project) = &self.mod_manager_state.current_project {
+                    ui.vertical(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.add(
+                                Image::new(&project.icon_url).fit_to_exact_size(Vec2::splat(50.0)),
+                            );
+                            ui.vertical(|ui| {
+                                ui.label(RichText::new(&project.title).heading());
+                                ui.label(&project.description)
+                            });
+                        });
+
+                        ui.separator();
+
+                        ComboBox::from_label("Select mod version")
+                            .selected_text(
+                                self.mod_manager_state
+                                    .selected_version
+                                    .as_ref()
+                                    .map_or("Select version from the list", |v| &v.version_number),
+                            )
+                            .show_ui(ui, |ui| {
+                                for version in &self.mod_manager_state.current_versions {
+                                    let response = ui.selectable_value(
+                                        &mut self.mod_manager_state.selected_version,
+                                        Some(version.clone()),
+                                        version.version_number.clone(),
+                                    );
+
+                                    if response.clicked() {
+                                        let game_version =
+                                            self.profile.profile.version().to_owned();
+                                        let loader =
+                                            self.profile.profile.loader_name().to_lowercase();
+                                        let version = version.clone();
+
+                                        let get_dependencies = Task::new(
+                                            "Get dependencies",
+                                            Caller::standard(async move {
+                                                let mut deps = Vec::new();
+                                                proceed_deps(
+                                                    &mut deps,
+                                                    version.name.clone(),
+                                                    version.clone(),
+                                                    game_version,
+                                                    loader,
+                                                )
+                                                .await
+                                                .report_error()
+                                                .map(|_| deps)
+                                            }),
+                                        );
+
+                                        self.task_manager
+                                            .push_task::<DependenciesCollection>(get_dependencies);
+                                    }
+                                }
+                            });
+
+                        if !self.mod_manager_state.current_dependencies.is_empty() {
+                            ui.separator();
+
+                            ui.label(RichText::new("Dependencies").strong());
+                        }
+
+                        for dep in &self.mod_manager_state.current_dependencies {
+                            if !self
+                                .mod_manager_state
+                                .selected_dependencies
+                                .contains_key(&dep.name)
+                            {
+                                self.mod_manager_state.selected_dependencies.insert(
+                                    dep.name.clone(),
+                                    MaybeAddedDependency {
+                                        version: None,
+                                        is_added: dep.is_required,
+                                    },
+                                );
+                            }
+                            let val = self
+                                .mod_manager_state
+                                .selected_dependencies
+                                .get_mut(&dep.name)
+                                .unwrap();
+
+                            ui.horizontal(|ui| {
+                                ui.add_enabled_ui(!dep.is_required, |ui| {
+                                    ui.checkbox(&mut val.is_added, "")
+                                        .on_hover_text("Include this dependency");
+                                });
+
+                                ui.add_enabled_ui(val.is_added, |ui| {
+                                    ui.label(&dep.name);
+    
+                                    ComboBox::from_id_source(Id::new(&dep.name))
+                                        .selected_text(
+                                            val.version
+                                                .clone()
+                                                .map_or("No version selected".to_owned(), |v| {
+                                                    v.version_number.clone()
+                                                })
+                                                .to_string(),
+                                        )
+                                        .show_ui(ui, |ui| {
+                                            for version in &dep.versions {
+                                                ui.horizontal(|ui| {
+                                                    if version.featured {
+                                                        ui.colored_label(Color32::GREEN, "✅")
+                                                            .on_hover_text(
+                                                            "This version is featured by the author",
+                                                        );
+                                                    }
+                                                    ui.selectable_value(
+                                                        &mut val.version,
+                                                        Some(version.clone()),
+                                                        version.version_number.clone(),
+                                                    );
+                                                });
+                                            }
+                                        });
+                                });
+                            });
+                        }
+
+                        if self.mod_manager_state.selected_version.is_none() {
+                            ui.error_label("You must select the version");
+                        }
+
+                        if self.mod_manager_state.selected_dependencies.values().filter(|d| d.is_added).all(|d| d.version.is_some()) {
+                            ui.error_label("Select version for all included dependencies");
+                        }
+
+                        if ui.button("Download").clicked() {
+                            let directory = PathBuf::from(DOT_NOMI_MODS_STASH_DIR).join(format!("{}", self.profile.profile.id));
+                            let mut versions = vec![self.mod_manager_state.selected_version.clone().unwrap()];
+                            versions.extend(self.mod_manager_state.selected_dependencies.values().filter_map(|d| d.version));
+
+                            self.profiles_config.update_config();
+                            let download_task = Task::new("Download mods", Caller::progressing(|progress| async move {
+                                let mods = download_mods(progress, directory, versions);
+                                let cfg = ProfilesConfig::read();
+                                
+                                // TODO
+                            }));
+                        };
+                    });
+                }
+            });
     }
 }
 
-struct ModsConfig {
+#[derive(Serialize, Deserialize, Default, PartialEq, Eq, Hash)]
+pub struct ModsConfig {
     mods: Vec<Mod>,
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
 struct Mod {
     name: String,
     version_id: VersionId,
@@ -333,18 +554,75 @@ struct Mod {
     dependencies: Vec<Dependency>,
 }
 
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
 struct ModFile {
     sha1: String,
     url: String,
     filename: String,
 }
 
+pub struct SimpleDependency {
+    pub name: String,
+    pub versions: Vec<Arc<Version>>,
+    pub is_required: bool,
+}
+
+async fn proceed_deps(
+    dist: &mut Vec<SimpleDependency>,
+    parent: String,
+    version: Arc<Version>,
+    game_version: String,
+    loader: String,
+) -> anyhow::Result<()> {
+    for dep in &version.dependencies {
+        let query = Query::new(
+            ProjectVersionsData::builder()
+                .id_or_slug(dep.project_id.clone())
+                .game_versions(vec![game_version.clone()])
+                .loaders(vec![loader.clone()])
+                .build(),
+        );
+
+        let data = query.query().await?;
+
+        let versions = data.into_iter().map(Arc::new).collect_vec();
+
+        dist.push(SimpleDependency {
+            name: versions
+                .first()
+                .map_or(format!("Dependency. {:?}", &dep.project_id), |v| {
+                    v.name.clone()
+                }),
+            versions: versions.clone(),
+            is_required: dep
+                .dependency_type
+                .as_ref()
+                .is_some_and(|d| d == "required")
+                || dep.dependency_type.is_none(),
+        });
+    }
+
+    Ok(())
+}
+
 async fn download_mods(
     progress: TaskProgressShared,
     dir: PathBuf,
-    versions: Vec<Version>,
+    versions: Vec<Arc<Version>>,
 ) -> Vec<Mod> {
-    let _ = progress.set_total(versions.iter().map(|v| v.files.len() as u32).sum());
+    let _ = progress.set_total(
+        versions
+            .iter()
+            .map(|v| {
+                v.files
+                    .iter()
+                    .filter(|f| f.primary)
+                    .collect::<Vec<_>>()
+                    .len() as u32
+            })
+            .sum(),
+    );
+
     let mut mods = Vec::new();
     for version in versions {
         let mod_value = download_mod(progress.sender(), dir.clone(), version).await;
@@ -353,35 +631,38 @@ async fn download_mods(
     mods
 }
 
-async fn download_mod(sender: Sender<Box<dyn Progress>>, dir: PathBuf, version: Version) -> Mod {
+async fn download_mod(sender: Sender<Box<dyn Progress>>, dir: PathBuf, version: Arc<Version>) -> Mod {
     let mut set = DownloadSet::new();
 
+    let mut downloaded_files = Vec::new();
+
     // We do not download any dependencies. Just the mod.
-    for file in &version.files {
+    for file in version.files.iter().filter(|f| f.primary) {
+        if tokio::fs::read_to_string(dir.join(&file.filename)).await.is_ok_and(|s| calculate_sha1(s) == file.hashes.sha1) {
+            let _ = sender.send(Box::new(UnitProgress));
+            continue;
+        }
+
+        downloaded_files.push(ModFile {
+            sha1: file.hashes.sha1.clone(),
+            url: file.url.clone(),
+            filename: file.filename.clone(),
+        });
+
         let downloader = FileDownloader::new(file.url.clone(), dir.join(&file.filename))
             .with_sha1(file.hashes.sha1.clone());
         set.add(Box::new(downloader));
     }
-
-    let files = version
-        .files
-        .iter()
-        .map(|f| ModFile {
-            sha1: f.hashes.sha1.clone(),
-            url: f.url.clone(),
-            filename: f.filename.clone(),
-        })
-        .collect::<Vec<_>>();
 
     let sender = MappedSender::new_progress_mapper(Box::new(sender));
 
     Box::new(set).download(&sender).await;
 
     Mod {
-        name: version.name,
-        version_id: version.id,
+        name: version.name.clone(),
+        version_id: version.id.clone(),
         is_installed: true,
-        files,
-        dependencies: version.dependencies,
+        files: downloaded_files,
+        dependencies: version.dependencies.clone(),
     }
 }

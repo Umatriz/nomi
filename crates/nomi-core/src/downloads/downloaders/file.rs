@@ -3,10 +3,13 @@ use std::path::PathBuf;
 use sha1::Digest;
 use tracing::{debug, error};
 
-use crate::downloads::{
-    download_file,
-    traits::{DownloadResult, DownloadStatus, Downloadable},
-    DownloadError,
+use crate::{
+    calculate_sha1,
+    downloads::{
+        download_file,
+        traits::{DownloadResult, DownloadStatus, Downloadable},
+        DownloadError,
+    },
 };
 
 #[derive(Debug)]
@@ -59,14 +62,12 @@ impl Downloadable for FileDownloader {
                 Err(e) => return DownloadResult(result.map_err(|_| e)),
             };
 
-            let h = sha1::Sha1::digest(file);
+            let calculated_hash = calculate_sha1(file);
 
-            let v = base16ct::lower::encode_str(&h, &mut []).unwrap();
-
-            if hash == v {
+            if hash == calculated_hash {
                 debug!("Hashes matched successfully");
             } else {
-                let s = format!("Hashes does not match. {hash} != {v}");
+                let s = format!("Hashes does not match. {hash} != {calculated_hash}");
                 error!("{s}");
                 return DownloadResult(Err(DownloadError::Error {
                     url: self.url.clone(),

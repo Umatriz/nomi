@@ -16,23 +16,27 @@ use nomi_core::{
     state::get_launcher_manifest,
 };
 
-use crate::errors_pool::ErrorPoolExt;
+use crate::{
+    errors_pool::ErrorPoolExt,
+    views::{ModdedProfile, ModsConfig},
+};
 
 pub async fn task_download_version(
-    profile: Arc<VersionProfile>,
+    profile: Arc<ModdedProfile>,
     progress_shared: TaskProgressShared,
-) -> Option<VersionProfile> {
+) -> Option<ModdedProfile> {
     try_download_version(profile, progress_shared)
         .await
         .report_error()
 }
 
 async fn try_download_version(
-    profile: Arc<VersionProfile>,
+    profile: Arc<ModdedProfile>,
     progress_shared: TaskProgressShared,
-) -> anyhow::Result<VersionProfile> {
+) -> anyhow::Result<ModdedProfile> {
     let current_dir = PathBuf::from("./");
     let mc_dir: std::path::PathBuf = current_dir.join("minecraft");
+    let profile = &profile.profile;
 
     let ProfileState::NotDownloaded {
         version,
@@ -111,7 +115,7 @@ async fn try_download_version(
         state: ProfileState::downloaded(launch_instance),
     };
 
-    Ok(profile)
+    Ok(ModdedProfile::new(profile))
 }
 
 pub async fn task_assets(

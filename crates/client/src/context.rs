@@ -64,15 +64,7 @@ impl TabViewer for MyContext {
     type Tab = TabKind;
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
-        if let TabKind::Mods { profile } = tab {
-            format!(
-                "Mods ({}, {}, {})",
-                profile.name, profile.version, profile.loader
-            )
-            .into()
-        } else {
-            tab.name().into()
-        }
+        tab.name().into()
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
@@ -110,14 +102,15 @@ impl TabViewer for MyContext {
                 .ui(ui);
             }
             TabKind::Mods { profile } => ModManager {
+                task_manager: &mut self.manager,
+                profiles_config: &self.states.profiles.profiles,
                 mod_manager_state: &mut self.states.mod_manager,
-                current_game_version: profile.version.clone(),
-                current_loader: profile.loader.clone(),
+                profile: profile.clone(),
             }
             .ui(ui),
             TabKind::ProfileInfo { profile } => {
                 ProfileInfo {
-                    profile: (**profile).clone(),
+                    profile: profile.clone(),
                     tabs_state: &mut self.states.tabs,
                     profile_info_state: &mut self.states.profile_info,
                 }

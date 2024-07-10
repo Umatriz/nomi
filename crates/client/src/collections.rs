@@ -1,9 +1,16 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
 use egui_task_manager::*;
 use nomi_core::{configs::profile::VersionProfile, repository::fabric_meta::FabricVersions};
+use nomi_modding::modrinth::{
+    project::Project,
+    version::{Version, VersionId},
+};
 
-use crate::{errors_pool::ErrorPoolExt, views::ProfilesConfig};
+use crate::{
+    errors_pool::ErrorPoolExt,
+    views::{ModdedProfile, ModsConfig, ProfilesConfig, SimpleDependency},
+};
 
 pub struct FabricDataCollection;
 
@@ -68,7 +75,7 @@ pub struct GameDownloadingCollection;
 impl<'c> TasksCollection<'c> for GameDownloadingCollection {
     type Context = &'c mut ProfilesConfig;
 
-    type Target = Option<VersionProfile>;
+    type Target = Option<ModdedProfile>;
 
     type Executor = executors::Linear;
 
@@ -77,7 +84,7 @@ impl<'c> TasksCollection<'c> for GameDownloadingCollection {
     }
 
     fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|opt: Option<VersionProfile>| {
+        Handler::new(|opt: Option<ModdedProfile>| {
             let Some(profile) = opt else {
                 return;
             };
@@ -87,7 +94,7 @@ impl<'c> TasksCollection<'c> for GameDownloadingCollection {
             let prof = context
                 .profiles
                 .iter_mut()
-                .find(|prof| prof.id == profile.id)
+                .find(|prof| prof.profile.id == profile.profile.id)
                 .unwrap();
 
             *prof = Arc::new(profile);
@@ -114,24 +121,68 @@ impl<'c> TasksCollection<'c> for GameDeletionCollection {
     }
 }
 
-// pub struct ModdingCollection<T, Ctx> {
-//     _marker: PhantomData<(T, Ctx)>,
-// }
+pub struct ProjectCollection;
 
-// impl<'c, T, Ctx> TasksCollection<'c> for ModdingCollection<T, Ctx>
-// where
-//     T: Send + 'static,
-//     Ctx: 'c,
-// {
-//     type Context = Ctx;
+impl<'c> TasksCollection<'c> for ProjectCollection {
+    type Context = &'c mut Option<Project>;
 
-//     type Target = T;
+    type Target = Option<Project>;
 
-//     type Executor = executors::Parallel;
+    type Executor = executors::Linear;
 
-//     fn name() -> &'static str {
-//         "Modding collection"
-//     }
+    fn name() -> &'static str {
+        "Project collection"
+    }
 
-//     fn handle(context: Self::Context) -> Handler<'c, Self::Target> {}
-// }
+    fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|value| {
+            if let Some(value) = value {
+                *context = Some(value)
+            }
+        })
+    }
+}
+
+pub struct ProjectVersionsCollection;
+
+impl<'c> TasksCollection<'c> for ProjectVersionsCollection {
+    type Context = &'c mut Vec<Arc<Version>>;
+
+    type Target = Option<Vec<Version>>;
+
+    type Executor = executors::Linear;
+
+    fn name() -> &'static str {
+        "Project collection"
+    }
+
+    fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|value: Option<Vec<Version>>| {
+            if let Some(value) = value {
+                context.extend(value.into_iter().map(Arc::new));
+            }
+        })
+    }
+}
+
+pub struct DependenciesCollection;
+
+impl<'c> TasksCollection<'c> for DependenciesCollection {
+    type Context = &'c mut Vec<SimpleDependency>;
+
+    type Target = Option<Vec<SimpleDependency>>;
+
+    type Executor = executors::Linear;
+
+    fn name() -> &'static str {
+        "Dependencies collection"
+    }
+
+    fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|value| {
+            if let Some(deps) = value {
+                *context = deps
+            }
+        })
+    }
+}

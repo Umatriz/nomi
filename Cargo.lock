@@ -802,6 +802,7 @@ dependencies = [
  "egui_tracing",
  "garde",
  "image",
+ "itertools",
  "nomi-core",
  "nomi-modding",
  "once_cell",

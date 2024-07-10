@@ -18,6 +18,7 @@ use tracing_subscriber::{
     EnvFilter,
 };
 
+pub mod consts;
 pub mod download;
 pub mod errors_pool;
 pub mod ui_ext;
@@ -25,11 +26,14 @@ pub mod utils;
 pub mod views;
 
 pub mod collections;
+pub mod progress;
 
 pub mod tab;
 pub use tab::*;
 pub mod context;
 pub mod states;
+
+pub use consts::*;
 
 fn main() {
     let collector = egui_tracing::EventCollector::default().with_level(Level::INFO);
@@ -131,7 +135,16 @@ impl eframe::App for MyTabs {
             .add_collection::<collections::GameDownloadingCollection>(
                 &mut self.context.states.profiles.profiles,
             )
-            .add_collection::<collections::JavaCollection>(());
+            .add_collection::<collections::JavaCollection>(())
+            .add_collection::<collections::ProjectCollection>(
+                &mut self.context.states.mod_manager.current_project,
+            )
+            .add_collection::<collections::ProjectVersionsCollection>(
+                &mut self.context.states.mod_manager.current_versions,
+            )
+            .add_collection::<collections::DependenciesCollection>(
+                &mut self.context.states.mod_manager.current_dependencies,
+            );
 
         ctx.set_pixels_per_point(self.context.states.client_settings.pixels_per_point);
 
