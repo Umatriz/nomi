@@ -11,7 +11,9 @@ use egui_infinite_scroll::{InfiniteScroll, LoadingState};
 use egui_task_manager::{Caller, Progress, Task, TaskManager, TaskProgressShared};
 use itertools::Itertools;
 use nomi_core::{
-    calculate_sha1, downloads::{progress::MappedSender, traits::Downloader, DownloadSet, FileDownloader}, DOT_NOMI_DATA_PACKS_DIR, MINECRAFT_DIR
+    calculate_sha1,
+    downloads::{progress::MappedSender, traits::Downloader, DownloadSet, FileDownloader},
+    DOT_NOMI_DATA_PACKS_DIR, MINECRAFT_DIR,
 };
 use nomi_modding::{
     capitalize_first_letters_whitespace_splitted,
@@ -517,10 +519,10 @@ impl View for ModManager<'_> {
                                         ui.checkbox(&mut val.is_added, "")
                                             .on_hover_text("Include this dependency");
                                     });
-    
+
                                     ui.add_enabled_ui(val.is_added, |ui| {
                                         ui.label(&dep.name);
-    
+
                                         ComboBox::from_id_source(Id::new(&dep.name))
                                             .selected_text(
                                                 val.version
@@ -599,4 +601,3 @@ impl View for ModManager<'_> {
             });
     }
 }
-

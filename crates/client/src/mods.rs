@@ -13,7 +13,7 @@ use nomi_core::{
 };
 use nomi_modding::{
     modrinth::{
-        project::ProjectId,
+        project::{ProjectData, ProjectId},
         version::{Dependency, ProjectVersionsData, Version, VersionId},
     },
     Query,
@@ -73,12 +73,11 @@ pub async fn proceed_deps(
 
         let versions = data.into_iter().map(Arc::new).collect_vec();
 
+        let query = Query::new(ProjectData::new(dep.project_id.clone()));
+        let name = query.query().await?.title;
+
         dist.push(SimpleDependency {
-            name: versions
-                .first()
-                .map_or(format!("Dependency. {:?}", &dep.project_id), |v| {
-                    v.name.clone()
-                }),
+            name,
             versions: versions.clone(),
             is_required: dep
                 .dependency_type
