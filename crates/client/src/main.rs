@@ -1,16 +1,22 @@
 use collections::{AssetsCollection, GameDownloadingCollection, JavaCollection};
 use context::MyContext;
 use eframe::{
-    egui::{self, Align, Align2, Frame, Id, Layout, RichText, ScrollArea, ViewportBuilder},
+    egui::{self, Align, Align2, Button, Frame, Id, Layout, RichText, ScrollArea, ViewportBuilder},
     epaint::Vec2,
 };
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
+use egui_file_dialog::DialogMode;
 use egui_tracing::EventCollector;
-use std::{collections::HashSet, hash::Hash};
+use open_directory::open_directory_native;
+use std::{
+    collections::HashSet,
+    hash::Hash,
+    path::{Path, PathBuf},
+};
 use views::{add_tab_menu::AddTab, View};
 
-use errors_pool::ERRORS_POOL;
-use nomi_core::DOT_NOMI_LOGS_DIR;
+use errors_pool::{ErrorPoolExt, ERRORS_POOL};
+use nomi_core::{DOT_NOMI_DATA_PACKS_DIR, DOT_NOMI_DIR, DOT_NOMI_LOGS_DIR};
 use tracing::{info, Level};
 use tracing_subscriber::{
     fmt::{writer::MakeWriterExt, Layer},
@@ -26,6 +32,7 @@ pub mod utils;
 pub mod views;
 
 pub mod mods;
+pub mod open_directory;
 
 pub mod collections;
 pub mod progress;
@@ -180,6 +187,21 @@ impl eframe::App for MyTabs {
                         tabs_state: &mut self.context.states.tabs,
                     }
                     .ui(ui);
+
+                    ui.menu_button("Open", |ui| {
+                        if ui
+                            .add_enabled(
+                                Path::new(DOT_NOMI_DATA_PACKS_DIR).exists(),
+                                Button::new("Data Packs"),
+                            )
+                            .on_disabled_hover_text("You did not downloaded any datapacks")
+                            .clicked()
+                        {
+                            if let Ok(path) = std::fs::canonicalize(DOT_NOMI_DATA_PACKS_DIR) {
+                                open_directory_native(path).report_error();
+                            }
+                        }
+                    });
 
                     ui.add_space(this_target_width);
                     ui.horizontal(|ui| {

@@ -8,6 +8,16 @@ pub trait UiExt {
         let ui = self.ui_mut();
         ui.label(RichText::new(text).color(ui.visuals().error_fg_color))
     }
+
+    fn warn_label(&mut self, text: impl Into<String>) -> Response {
+        let ui = self.ui_mut();
+        ui.label(RichText::new(text).color(ui.visuals().warn_fg_color))
+    }
+
+    fn warn_label_with_icon_before(&mut self, text: impl Into<String>) -> Response {
+        let ui = self.ui_mut();
+        ui.label(RichText::new(format!("⚠ {}", text.into())).color(ui.visuals().warn_fg_color))
+    }
 }
 
 impl UiExt for Ui {

@@ -11,8 +11,7 @@ use egui_infinite_scroll::{InfiniteScroll, LoadingState};
 use egui_task_manager::{Caller, Progress, Task, TaskManager, TaskProgressShared};
 use itertools::Itertools;
 use nomi_core::{
-    calculate_sha1,
-    downloads::{progress::MappedSender, traits::Downloader, DownloadSet, FileDownloader},
+    calculate_sha1, downloads::{progress::MappedSender, traits::Downloader, DownloadSet, FileDownloader}, DOT_NOMI_DATA_PACKS_DIR, MINECRAFT_DIR
 };
 use nomi_modding::{
     capitalize_first_letters_whitespace_splitted,
@@ -35,7 +34,7 @@ use crate::{
     errors_pool::ErrorPoolExt,
     progress::UnitProgress,
     ui_ext::UiExt,
-    DOT_NOMI_MODS_STASH_DIR,
+    DOT_NOMI_MODS_STASH_DIR, MINECRAFT_MODS_DIRECTORY,
 };
 
 use super::{ModdedProfile, ProfilesConfig, View};
@@ -162,7 +161,7 @@ impl View for ModManager<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
         egui::TopBottomPanel::top("mod_manager_top_panel").show_inside(ui, |ui| {
             ui.horizontal(|ui| {
-                for project_type in ProjectType::iter() {
+                for project_type in ProjectType::iter().filter(|t| !matches!(t, ProjectType::Plugin)) {
                     let response = ui.selectable_value(
                         &mut self.mod_manager_state.current_project_type,
                         project_type,
@@ -172,6 +171,16 @@ impl View for ModManager<'_> {
                     if response.clicked() {
                         self.mod_manager_state.clear_filter()
                     }
+                }
+
+                match self.mod_manager_state.current_project_type {
+                    ProjectType::Shader => {
+                        ui.warn_label_with_icon_before("You need to have a way to support shader.").on_hover_text("By default shaders are downloaded into minecraft/shaderpacks.");
+                    },
+                    ProjectType::DataPack => {
+                        ui.warn_label_with_icon_before("You need to manually add datapacks to your world. Open -> Data Packs.").on_hover_text("You can open a datapacks folder by clicking Open -> Data Packs in the top menu.");
+                    },
+                    _ => ()
                 }
             });
         });
@@ -297,9 +306,6 @@ impl View for ModManager<'_> {
 
         ScrollArea::vertical().show(ui, |ui| {
             ui.set_width(ui.available_width());
-            if ui.button("Reset").clicked() {
-                self.mod_manager_state.scroll.reset()
-            }
 
             ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
                 ui.set_width(ui.available_width() / 2.0);
@@ -557,7 +563,14 @@ impl View for ModManager<'_> {
                         }
 
                         if ui.add_enabled(is_version_selected && is_dependencies_selected, Button::new("Download")).clicked() {
-                            let directory = PathBuf::from(DOT_NOMI_MODS_STASH_DIR).join(format!("{}", self.profile.profile.id));
+                            let directory = match self.mod_manager_state.current_project_type {
+                                ProjectType::Mod | ProjectType::Modpack => PathBuf::from(DOT_NOMI_MODS_STASH_DIR).join(format!("{}", self.profile.profile.id)),
+                                ProjectType::ResourcePack => PathBuf::from(MINECRAFT_DIR).join("resourcepacks"),
+                                ProjectType::Shader => PathBuf::from(MINECRAFT_DIR).join("shaderpacks"),
+                                ProjectType::DataPack => PathBuf::from(DOT_NOMI_DATA_PACKS_DIR),
+                                _ => unreachable!("You cannot download plugins")
+                            };
+
                             let mut versions = vec![self.mod_manager_state.selected_version.clone().unwrap()];
                             versions.extend(self.mod_manager_state.selected_dependencies.values().filter(|d| d.is_added).filter_map(|d| d.version.clone()));
 
