@@ -6,8 +6,8 @@ use egui_form::{garde::field_path, Form, FormField};
 use egui_task_manager::TaskManager;
 use garde::{Error, Validate};
 use nomi_core::{
-    fs::write_toml_config_sync, regex::Regex, repository::java_runner::JavaRunner, Uuid,
-    DOT_NOMI_JAVA_EXECUTABLE, DOT_NOMI_LOGS_DIR, DOT_NOMI_SETTINGS_CONFIG,
+    fs::write_toml_config_sync, regex::Regex, repository::java_runner::JavaRunner, Uuid, DOT_NOMI_JAVA_EXECUTABLE, DOT_NOMI_LOGS_DIR,
+    DOT_NOMI_SETTINGS_CONFIG,
 };
 use serde::{Deserialize, Serialize};
 
@@ -61,16 +61,13 @@ pub struct ClientSettingsState {
 
 impl Default for ClientSettingsState {
     fn default() -> Self {
-        Self {
-            pixels_per_point: 1.5,
-        }
+        Self { pixels_per_point: 1.5 }
     }
 }
 
 fn check_username(value: &str, _context: &()) -> garde::Result {
-    let regex = Regex::new(r"^[a-zA-Z0-9_]{3,16}$").map_err(|_| {
-        Error::new("Cannot create regex (this is a bug, please create an issue on the github)")
-    })?;
+    let regex =
+        Regex::new(r"^[a-zA-Z0-9_]{3,16}$").map_err(|_| Error::new("Cannot create regex (this is a bug, please create an issue on the github)"))?;
 
     regex.captures(value).map_or_else(
         || {
@@ -89,13 +86,9 @@ A-Z characters, a-z characters, 0-9 numbers, `_` (underscore) symbol
 
 fn check_uuid(value: &str, _context: &()) -> garde::Result {
     let regex = Regex::new(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
-        .map_err(|_| {
-            Error::new("Cannot create regex (this is a bug, please create an issue on the github)")
-        })?;
+        .map_err(|_| Error::new("Cannot create regex (this is a bug, please create an issue on the github)"))?;
 
-    regex
-        .captures(value)
-        .map_or_else(|| Err(Error::new("Invalid UUID")), |_| Ok(()))
+    regex.captures(value).map_or_else(|| Err(Error::new("Invalid UUID")), |_| Ok(()))
 }
 
 impl View for SettingsPage<'_> {
@@ -108,10 +101,7 @@ impl View for SettingsPage<'_> {
                     let _ = std::fs::remove_dir_all(launcher_path);
                 }
             } else {
-                ui.label(
-                    RichText::new("The launcher log's directory is already deleted")
-                        .color(ui.visuals().warn_fg_color),
-                );
+                ui.label(RichText::new("The launcher log's directory is already deleted").color(ui.visuals().warn_fg_color));
             }
 
             let game_path = PathBuf::from("./logs");
@@ -121,18 +111,13 @@ impl View for SettingsPage<'_> {
                     let _ = std::fs::remove_dir_all(game_path);
                 }
             } else {
-                ui.label(
-                    RichText::new("The games log's directory is already deleted")
-                        .color(ui.visuals().warn_fg_color),
-                );
+                ui.label(RichText::new("The games log's directory is already deleted").color(ui.visuals().warn_fg_color));
             }
         });
 
         let settings_data = self.settings_state.clone();
 
-        let mut form = Form::new().add_report(egui_form::garde::GardeReport::new(
-            settings_data.validate(&()),
-        ));
+        let mut form = Form::new().add_report(egui_form::garde::GardeReport::new(settings_data.validate(&())));
 
         {
             if let Some(path) = self.file_dialog.update(ui.ctx()).selected() {
@@ -146,65 +131,48 @@ impl View for SettingsPage<'_> {
             ui.collapsing("User", |ui| {
                 FormField::new(&mut form, field_path!("username"))
                     .label("Username")
-                    .ui(
-                        ui,
-                        egui::TextEdit::singleline(&mut self.settings_state.username),
-                    );
+                    .ui(ui, egui::TextEdit::singleline(&mut self.settings_state.username));
 
                 FormField::new(&mut form, field_path!("uuid"))
                     .label("UUID")
-                    .ui(
-                        ui,
-                        egui::TextEdit::singleline(&mut self.settings_state.uuid),
-                    );
+                    .ui(ui, egui::TextEdit::singleline(&mut self.settings_state.uuid));
             });
 
             ui.collapsing("Java", |ui| {
-                if ui.add_enabled(self.manager.get_collection::<JavaCollection>().tasks().is_empty(), egui::Button::new("Download Java")).on_hover_text("Pressing this button will start the Java downloading process and add the downloaded binary as selected").clicked() {
+                if ui
+                    .add_enabled(
+                        self.manager.get_collection::<JavaCollection>().tasks().is_empty(),
+                        egui::Button::new("Download Java"),
+                    )
+                    .on_hover_text("Pressing this button will start the Java downloading process and add the downloaded binary as selected")
+                    .clicked()
+                {
                     self.java_state.download_java(self.manager);
                     self.settings_state.java = JavaRunner::path(PathBuf::from(DOT_NOMI_JAVA_EXECUTABLE));
                     self.settings_state.update_config();
                 }
 
-                FormField::new(&mut form, field_path!("java"))
-                    .label("Java")
-                    .ui(ui, |ui: &mut egui::Ui| {
-                        ui.radio_value(
-                            &mut self.settings_state.java,
-                            JavaRunner::command("java"),
-                            "Command",
-                        );
+                FormField::new(&mut form, field_path!("java")).label("Java").ui(ui, |ui: &mut egui::Ui| {
+                    ui.radio_value(&mut self.settings_state.java, JavaRunner::command("java"), "Command");
 
-                        ui.radio_value(
-                            &mut self.settings_state.java,
-                            JavaRunner::path(PathBuf::new()),
-                            "Custom path",
-                        );
+                    ui.radio_value(&mut self.settings_state.java, JavaRunner::path(PathBuf::new()), "Custom path");
 
-                        if matches!(settings_data.java, JavaRunner::Path(_))
-                            && ui.button("Select custom java binary").clicked()
-                        {
-                            self.file_dialog.select_file();
+                    if matches!(settings_data.java, JavaRunner::Path(_)) && ui.button("Select custom java binary").clicked() {
+                        self.file_dialog.select_file();
+                    }
+
+                    ui.label(format!(
+                        "Java will be run using {}",
+                        match &settings_data.java {
+                            JavaRunner::Command(command) => format!("{} command", command),
+                            JavaRunner::Path(path) => format!("{} executable", path.display()),
                         }
-
-                        ui.label(format!(
-                            "Java will be run using {}",
-                            match &settings_data.java {
-                                JavaRunner::Command(command) => format!("{} command", command),
-                                JavaRunner::Path(path) => format!("{} executable", path.display()),
-                            }
-                        ))
-                    });
+                    ))
+                });
             });
 
             ui.collapsing("Client", |ui| {
-                ui.add(
-                    egui::Slider::new(
-                        &mut self.settings_state.client_settings.pixels_per_point,
-                        0.5..=5.0,
-                    )
-                    .text("Pixels per point"),
-                )
+                ui.add(egui::Slider::new(&mut self.settings_state.client_settings.pixels_per_point, 0.5..=5.0).text("Pixels per point"))
             });
         }
 

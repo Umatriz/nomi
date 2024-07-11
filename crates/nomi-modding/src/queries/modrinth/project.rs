@@ -142,9 +142,6 @@ impl ProjectData {
 
 impl QueryData<Project> for ProjectData {
     fn builder(&self) -> crate::Builder {
-        crate::Builder::new(format!(
-            "https://api.modrinth.com/v2/project/{}",
-            self.project_id_or_slug.value()
-        ))
+        crate::Builder::new(format!("https://api.modrinth.com/v2/project/{}", self.project_id_or_slug.value()))
     }
 }

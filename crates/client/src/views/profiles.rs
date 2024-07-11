@@ -1,8 +1,6 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
-use eframe::egui::{
-    self, popup_below_widget, Align2, Button, Id, PopupCloseBehavior, TextWrapMode, Ui,
-};
+use eframe::egui::{self, popup_below_widget, Align2, Button, Id, PopupCloseBehavior, TextWrapMode, Ui};
 use egui_dock::DockState;
 use egui_extras::{Column, TableBuilder};
 use egui_task_manager::{Caller, Task, TaskManager};
@@ -16,9 +14,7 @@ use nomi_core::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    collections::{
-        AssetsCollection, GameDeletionCollection, GameDownloadingCollection, GameRunnerCollection,
-    },
+    collections::{AssetsCollection, GameDeletionCollection, GameDownloadingCollection, GameRunnerCollection},
     download::{task_assets, task_download_version},
     errors_pool::ErrorPoolExt,
     utils::spawn_tokio_future,
@@ -88,9 +84,7 @@ impl ProfilesConfig {
     }
 
     pub async fn read_async() -> Self {
-        read_toml_config::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG)
-            .await
-            .unwrap_or_default()
+        read_toml_config::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG).await.unwrap_or_default()
     }
 
     pub fn try_read() -> anyhow::Result<Self> {
@@ -102,11 +96,7 @@ impl ProfilesConfig {
     }
 
     pub fn create_id(&self) -> usize {
-        match &self
-            .profiles
-            .iter()
-            .max_by_key(|profile| profile.profile.id)
-        {
+        match &self.profiles.iter().max_by_key(|profile| profile.profile.id) {
             Some(v) => v.profile.id + 1,
             None => 0,
         }
@@ -176,18 +166,9 @@ impl View for ProfilesPage<'_> {
                         });
                         row.col(|ui| match &profile.profile.state {
                             ProfileState::Downloaded(instance) => {
-                                if ui
-                                    .add_enabled(
-                                        self.is_allowed_to_take_action,
-                                        egui::Button::new("Launch"),
-                                    )
-                                    .clicked()
-                                {
+                                if ui.add_enabled(self.is_allowed_to_take_action, egui::Button::new("Launch")).clicked() {
                                     let user_data = UserData {
-                                        username: Username::new(
-                                            self.settings_state.username.clone(),
-                                        )
-                                        .unwrap(),
+                                        username: Username::new(self.settings_state.username.clone()).unwrap(),
                                         uuid: Some(self.settings_state.uuid.clone()),
                                         access_token: None,
                                     };
@@ -198,16 +179,16 @@ impl View for ProfilesPage<'_> {
                                     let should_load_mods = profile.profile.loader().is_fabric();
                                     let profile_id = profile.profile.id;
 
-                                    let run_game = Task::new("Running the game", Caller::standard(async move {
-                                        if should_load_mods {
-                                            load_mods(profile_id).await.report_error();
-                                        }
+                                    let run_game = Task::new(
+                                        "Running the game",
+                                        Caller::standard(async move {
+                                            if should_load_mods {
+                                                load_mods(profile_id).await.report_error();
+                                            }
 
-                                        instance
-                                            .launch(user_data, &java_runner)
-                                            .await
-                                            .report_error()
-                                    }));
+                                            instance.launch(user_data, &java_runner).await.report_error()
+                                        }),
+                                    );
 
                                     self.manager.push_task::<GameRunnerCollection>(run_game)
                                 }
@@ -215,25 +196,25 @@ impl View for ProfilesPage<'_> {
                             ProfileState::NotDownloaded { .. } => {
                                 if ui
                                     .add_enabled(
-                                        !self
-                                            .profiles_state
-                                            .currently_downloading_profiles
-
-                                            .contains(&profile.profile.id),
+                                        !self.profiles_state.currently_downloading_profiles.contains(&profile.profile.id),
                                         egui::Button::new("Download"),
                                     )
                                     .clicked()
                                 {
                                     let game_version = profile.profile.version().to_owned();
 
-                                    let assets_task = Task::new(format!("Assets ({})", profile.profile.version()), Caller::progressing(|progress| 
-                                        task_assets(game_version, PathBuf::from("./minecraft/assets"), progress)
-                                    ));
+                                    let assets_task = Task::new(
+                                        format!("Assets ({})", profile.profile.version()),
+                                        Caller::progressing(|progress| task_assets(game_version, PathBuf::from("./minecraft/assets"), progress)),
+                                    );
                                     self.manager.push_task::<AssetsCollection>(assets_task);
 
                                     let profile = profile.clone();
 
-                                    let game_task = Task::new(format!("Downloading version {}", profile.profile.version()), Caller::progressing(|progress| task_download_version(profile, progress)));
+                                    let game_task = Task::new(
+                                        format!("Downloading version {}", profile.profile.version()),
+                                        Caller::progressing(|progress| task_download_version(profile, progress)),
+                                    );
                                     self.manager.push_task::<GameDownloadingCollection>(game_task);
                                 }
                             }
@@ -248,14 +229,15 @@ impl View for ProfilesPage<'_> {
                         row.col(|ui| {
                             if let ProfileState::Downloaded(instance) = &profile.profile.state {
                                 let popup_id = ui.make_persistent_id("delete_popup_id");
-                                let button = ui.add_enabled(self.is_allowed_to_take_action, Button::new("Delete"))
+                                let button = ui
+                                    .add_enabled(self.is_allowed_to_take_action, Button::new("Delete"))
                                     .on_hover_text("It will delete the profile and it's data");
 
                                 if button.clicked() {
                                     ui.memory_mut(|mem| mem.toggle_popup(popup_id));
                                 }
 
-                                popup_below_widget(ui, popup_id, &button, PopupCloseBehavior::CloseOnClickOutside,|ui| {
+                                popup_below_widget(ui, popup_id, &button, PopupCloseBehavior::CloseOnClickOutside, |ui| {
                                     ui.set_min_width(150.0);
 
                                     let delete_client_id = Id::new("delete_client");

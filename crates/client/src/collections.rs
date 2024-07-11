@@ -91,11 +91,7 @@ impl<'c> TasksCollection<'c> for GameDownloadingCollection {
 
             // PANICS: It will never panic because the profile
             // cannot be downloaded if it doesn't exists
-            let prof = context
-                .profiles
-                .iter_mut()
-                .find(|prof| prof.profile.id == profile.profile.id)
-                .unwrap();
+            let prof = context.profiles.iter_mut().find(|prof| prof.profile.id == profile.profile.id).unwrap();
 
             *prof = Arc::new(profile);
             context.update_config().report_error();

@@ -6,8 +6,7 @@ use std::{
 use once_cell::sync::Lazy;
 use tracing::error;
 
-pub static ERRORS_POOL: Lazy<Arc<RwLock<ErrorsPool>>> =
-    Lazy::new(|| Arc::new(RwLock::new(ErrorsPool::default())));
+pub static ERRORS_POOL: Lazy<Arc<RwLock<ErrorsPool>>> = Lazy::new(|| Arc::new(RwLock::new(ErrorsPool::default())));
 
 pub trait Error: Display + Debug {}
 

@@ -36,28 +36,18 @@ pub struct Fabric {
 }
 
 impl Fabric {
-    pub async fn new(
-        game_version: impl Into<String>,
-        loader_version: Option<impl Into<String>>,
-        game_paths: GamePaths,
-    ) -> anyhow::Result<Self> {
+    pub async fn new(game_version: impl Into<String>, loader_version: Option<impl Into<String>>, game_paths: GamePaths) -> anyhow::Result<Self> {
         let game_version = game_version.into();
 
         let client = Client::new();
         let launcher_manifest = get_launcher_manifest().await?;
 
-        if !launcher_manifest
-            .versions
-            .iter()
-            .any(|v| v.id == game_version)
-        {
+        if !launcher_manifest.versions.iter().any(|v| v.id == game_version) {
             return Err(crate::error::Error::NoSuchVersion.into());
         };
 
         let versions: FabricVersions = client
-            .get(format!(
-                "https://meta.fabricmc.net/v2/versions/loader/{game_version}"
-            ))
+            .get(format!("https://meta.fabricmc.net/v2/versions/loader/{game_version}"))
             .send()
             .await?
             .json()
@@ -141,10 +131,7 @@ impl LibrariesMapper<FabricLibrary> for FabricLibrariesMapper {
         let data = MavenData::new(&library.name);
         let path = self.libraries.join(&data.path);
 
-        (!path.exists()).then_some(FileDownloader::new(
-            format!("{}{}", library.url, data.url),
-            path,
-        ))
+        (!path.exists()).then_some(FileDownloader::new(format!("{}{}", library.url, data.url), path))
     }
 }
 

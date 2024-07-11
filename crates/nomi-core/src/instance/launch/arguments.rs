@@ -56,10 +56,7 @@ impl<'a> LoaderArguments<'a> {
 }
 
 impl<'a> ArgumentsBuilder<'a, Undefined, Undefined> {
-    pub fn new(
-        instance: &'a LaunchInstance,
-        manifest: &'a Manifest,
-    ) -> ArgumentsBuilder<'a, Undefined, Undefined> {
+    pub fn new(instance: &'a LaunchInstance, manifest: &'a Manifest) -> ArgumentsBuilder<'a, Undefined, Undefined> {
         ArgumentsBuilder {
             instance,
             manifest,
@@ -80,11 +77,8 @@ impl<'a, U> ArgumentsBuilder<'a, Undefined, U> {
             instance: self.instance,
             manifest: self.manifest,
             user_data: self.user_data,
-            classpath_string: itertools::intersperse(
-                classpath.iter().map(|p| p.display().to_string()),
-                CLASSPATH_SEPARATOR.to_string(),
-            )
-            .collect::<String>(),
+            classpath_string: itertools::intersperse(classpath.iter().map(|p| p.display().to_string()), CLASSPATH_SEPARATOR.to_string())
+                .collect::<String>(),
             classpath,
             native_libs,
             _classpath_marker: PhantomData,
@@ -129,10 +123,7 @@ impl<'a, U> ArgumentsBuilder<'a, WithClasspath, U> {
     }
 
     pub fn custom_jvm_arguments(&self) -> &[String] {
-        self.instance
-            .jvm_args
-            .as_ref()
-            .map_or(&[], |args| args.as_slice())
+        self.instance.jvm_args.as_ref().map_or(&[], |args| args.as_slice())
     }
 
     pub fn loader_arguments(&self) -> LoaderArguments<'a> {
@@ -146,16 +137,10 @@ impl<'a> ArgumentsBuilder<'a, WithClasspath, WithUserData> {
             |JvmArguments(jvm), _| jvm.clone(),
             |_| {
                 vec![
-                    format!(
-                        "-Djava.library.path={}",
-                        &self.instance.settings.natives_dir.display()
-                    ),
+                    format!("-Djava.library.path={}", &self.instance.settings.natives_dir.display()),
                     "-Dminecraft.launcher.brand=${launcher_name}".into(),
                     "-Dminecraft.launcher.version=${launcher_version}".into(),
-                    format!(
-                        "-Dminecraft.client.jar={}",
-                        &self.instance.settings.version_jar_file.display()
-                    ),
+                    format!("-Dminecraft.client.jar={}", &self.instance.settings.version_jar_file.display()),
                     "-cp".to_string(),
                     self.classpath_as_str().to_owned(),
                 ]
@@ -166,12 +151,7 @@ impl<'a> ArgumentsBuilder<'a, WithClasspath, WithUserData> {
     pub fn manifest_game_arguments(&self) -> Vec<String> {
         self.arguments_parser(
             |_, GameArguments(game)| game.clone(),
-            |arguments| {
-                arguments
-                    .split_whitespace()
-                    .map(|arg| self.parse_args_from_str(arg))
-                    .collect()
-            },
+            |arguments| arguments.split_whitespace().map(|arg| self.parse_args_from_str(arg)).collect(),
         )
     }
 
@@ -209,10 +189,7 @@ impl<'a> ArgumentsBuilder<'a, WithClasspath, WithUserData> {
         old_arguments_parser: impl Fn(String) -> Vec<String>,
     ) -> Vec<String> {
         match &self.manifest.arguments {
-            Arguments::New { jvm, game } => self.parse_arguments(new_arguments_parser(
-                JvmArguments(jvm.clone()),
-                GameArguments(game.clone()),
-            )),
+            Arguments::New { jvm, game } => self.parse_arguments(new_arguments_parser(JvmArguments(jvm.clone()), GameArguments(game.clone()))),
             Arguments::Old(arguments) => old_arguments_parser(arguments.clone()),
         }
     }
@@ -227,10 +204,7 @@ impl<'a> ArgumentsBuilder<'a, WithClasspath, WithUserData> {
 
                     match value {
                         Value::String(v) => vec![self.parse_args_from_str(&v)],
-                        Value::Array(arr) => arr
-                            .into_iter()
-                            .map(|arg| self.parse_args_from_str(&arg))
-                            .collect(),
+                        Value::Array(arr) => arr.into_iter().map(|arg| self.parse_args_from_str(&arg)).collect(),
                     }
                 }
                 Argument::String(arg) => vec![self.parse_args_from_str(&arg)],
@@ -287,10 +261,7 @@ impl<'a, S, U> ArgumentsBuilder<'a, S, U> {
             .loader_profile
             .as_ref()
             .map(|p| &p.libraries)
-            .map(|libs| {
-                libs.iter()
-                    .map(|lib| self.instance.settings.libraries_dir.join(&lib.jar))
-            })
+            .map(|libs| libs.iter().map(|lib| self.instance.settings.libraries_dir.join(&lib.jar)))
         {
             classpath.extend(libs);
         }

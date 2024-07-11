@@ -11,10 +11,7 @@ where
     let body = toml::to_string_pretty(data)?;
     write_to_file(body.as_bytes(), path).await?;
 
-    tracing::info!(
-        "Config {} has been created successfully",
-        path.to_string_lossy()
-    );
+    tracing::info!("Config {} has been created successfully", path.to_string_lossy());
 
     Ok(())
 }
@@ -28,10 +25,7 @@ where
     let string = tokio::fs::read_to_string(&path).await?;
     let body: T = toml::from_str(&string)?;
 
-    tracing::info!(
-        "Config {} has been read successfully",
-        path.to_string_lossy()
-    );
+    tracing::info!("Config {} has been read successfully", path.to_string_lossy());
 
     Ok(body)
 }

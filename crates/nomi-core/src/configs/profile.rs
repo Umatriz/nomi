@@ -71,11 +71,7 @@ pub struct VersionProfile {
 }
 
 impl VersionProfile {
-    pub async fn launch(
-        &self,
-        user_data: UserData,
-        java_runner: &JavaRunner,
-    ) -> anyhow::Result<()> {
+    pub async fn launch(&self, user_data: UserData, java_runner: &JavaRunner) -> anyhow::Result<()> {
         match &self.state {
             ProfileState::Downloaded(instance) => instance.launch(user_data, java_runner).await,
             ProfileState::NotDownloaded { .. } => Err(anyhow!("This profile is not downloaded!")),
@@ -84,9 +80,7 @@ impl VersionProfile {
 
     pub fn loader(&self) -> Loader {
         match &self.state {
-            ProfileState::Downloaded(instance) => instance
-                .loader_profile()
-                .map_or(Loader::Vanilla, |profile| profile.loader.clone()),
+            ProfileState::Downloaded(instance) => instance.loader_profile().map_or(Loader::Vanilla, |profile| profile.loader.clone()),
             ProfileState::NotDownloaded { loader, .. } => loader.clone(),
         }
     }
@@ -95,9 +89,7 @@ impl VersionProfile {
         match &self.state {
             ProfileState::Downloaded(instance) => instance
                 .loader_profile()
-                .map_or(format!("{}", Loader::Vanilla), |profile| {
-                    format!("{}", profile.loader)
-                }),
+                .map_or(format!("{}", Loader::Vanilla), |profile| format!("{}", profile.loader)),
             ProfileState::NotDownloaded { loader, .. } => format!("{loader}"),
         }
     }

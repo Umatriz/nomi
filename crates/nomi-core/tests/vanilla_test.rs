@@ -2,10 +2,7 @@ use nomi_core::{instance::launch::LaunchSettings, repository::java_runner::JavaR
 
 #[tokio::test]
 async fn vanilla_test() {
-    let subscriber = tracing_subscriber::fmt()
-        .pretty()
-        .with_max_level(tracing::Level::INFO)
-        .finish();
+    let subscriber = tracing_subscriber::fmt().pretty().with_max_level(tracing::Level::INFO).finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     // let builder = InstanceBuilder::new()

@@ -45,10 +45,7 @@ impl DownloadQueue {
     }
 
     #[must_use]
-    pub fn with_downloader_dyn(
-        mut self,
-        downloader: Box<dyn Downloader<Data = DownloadResult>>,
-    ) -> Self {
+    pub fn with_downloader_dyn(mut self, downloader: Box<dyn Downloader<Data = DownloadResult>>) -> Self {
         self.queue.push(downloader);
         self
     }

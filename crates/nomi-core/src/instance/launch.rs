@@ -54,12 +54,7 @@ pub struct LaunchInstance {
 
 impl LaunchInstance {
     #[tracing::instrument(err)]
-    pub async fn delete(
-        &self,
-        delete_client: bool,
-        delete_libraries: bool,
-        delete_assets: bool,
-    ) -> anyhow::Result<()> {
+    pub async fn delete(&self, delete_client: bool, delete_libraries: bool, delete_assets: bool) -> anyhow::Result<()> {
         let manifest = read_json_config::<Manifest>(&self.settings.manifest_file).await?;
         let arguments_builder = ArgumentsBuilder::new(self, &manifest).with_classpath();
 
@@ -67,16 +62,10 @@ impl LaunchInstance {
             let _ = tokio::fs::remove_file(&self.settings.version_jar_file)
                 .await
                 .inspect(|()| {
-                    debug!(
-                        "Removed client successfully: {}",
-                        &self.settings.version_jar_file.display()
-                    );
+                    debug!("Removed client successfully: {}", &self.settings.version_jar_file.display());
                 })
                 .inspect_err(|_| {
-                    warn!(
-                        "Cannot remove client: {}",
-                        &self.settings.version_jar_file.display()
-                    );
+                    warn!("Cannot remove client: {}", &self.settings.version_jar_file.display());
                 });
         }
 
@@ -97,12 +86,7 @@ impl LaunchInstance {
                 .join(format!("{}.json", manifest.asset_index.id))))
             .await?;
             for asset in assets.objects.values() {
-                let path = &self
-                    .settings
-                    .assets
-                    .join("objects")
-                    .join(&asset.hash[0..2])
-                    .join(&asset.hash);
+                let path = &self.settings.assets.join("objects").join(&asset.hash[0..2]).join(&asset.hash);
 
                 let _ = tokio::fs::remove_file(path)
                     .await
@@ -126,19 +110,14 @@ impl LaunchInstance {
             let mut archive = zip::ZipArchive::new(reader)?;
 
             let mut names = vec![];
-            archive
-                .file_names()
-                .map(String::from)
-                .for_each(|el| names.push(el));
+            archive.file_names().map(String::from).for_each(|el| names.push(el));
 
             names
                 .into_iter()
                 .filter(|l| {
                     let path = Path::new(l).extension();
 
-                    let check = |expected_ext| {
-                        path.map_or(false, |ext| ext.eq_ignore_ascii_case(expected_ext))
-                    };
+                    let check = |expected_ext| path.map_or(false, |ext| ext.eq_ignore_ascii_case(expected_ext));
 
                     check("dll") || check("so") || check("dylib")
                 })
@@ -154,16 +133,10 @@ impl LaunchInstance {
         Ok(())
     }
 
-    pub async fn launch(
-        &self,
-        user_data: UserData,
-        java_runner: &JavaRunner,
-    ) -> anyhow::Result<()> {
+    pub async fn launch(&self, user_data: UserData, java_runner: &JavaRunner) -> anyhow::Result<()> {
         let manifest = read_json_config::<Manifest>(&self.settings.manifest_file).await?;
 
-        let arguments_builder = ArgumentsBuilder::new(self, &manifest)
-            .with_classpath()
-            .with_userdata(user_data);
+        let arguments_builder = ArgumentsBuilder::new(self, &manifest).with_classpath().with_userdata(user_data);
 
         self.process_natives(arguments_builder.get_native_libs())?;
 
@@ -187,11 +160,7 @@ impl LaunchInstance {
             .args(loader_game_arguments)
             .spawn()?;
 
-        child
-            .wait()
-            .await?
-            .code()
-            .inspect(|code| info!("Minecraft exit code: {}", code));
+        child.wait().await?.code().inspect(|code| info!("Minecraft exit code: {}", code));
 
         Ok(())
     }

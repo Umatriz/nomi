@@ -15,12 +15,7 @@ pub enum TabKind {
 }
 
 impl TabKind {
-    pub const AVAILABLE_TABS_TO_OPEN: &'static [Self] = &[
-        Self::Profiles,
-        Self::Settings,
-        Self::Logs,
-        Self::DownloadProgress,
-    ];
+    pub const AVAILABLE_TABS_TO_OPEN: &'static [Self] = &[Self::Profiles, Self::Settings, Self::Logs, Self::DownloadProgress];
 
     pub fn name(&self) -> String {
         match self {

@@ -5,9 +5,7 @@ pub struct RetryPool {
 }
 
 impl RetryPool {
-    pub fn new(
-        base: Box<dyn RetryDownloader<Out = DownloadResult, Data = DownloadResult>>,
-    ) -> Self {
+    pub fn new(base: Box<dyn RetryDownloader<Out = DownloadResult, Data = DownloadResult>>) -> Self {
         Self { base }
     }
 

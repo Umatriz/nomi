@@ -22,10 +22,7 @@ impl LibrariesDownloader {
     where
         M: LibrariesMapper<L>,
     {
-        let downloads = libraries
-            .iter()
-            .filter_map(|lib| mapper.proceed(lib))
-            .collect_vec();
+        let downloads = libraries.iter().filter_map(|lib| mapper.proceed(lib)).collect_vec();
 
         Self { downloads }
     }

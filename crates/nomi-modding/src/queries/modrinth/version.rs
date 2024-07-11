@@ -80,19 +80,10 @@ pub struct ProjectVersionsData {
 
 impl QueryData<ProjectVersions> for ProjectVersionsData {
     fn builder(&self) -> crate::Builder {
-        crate::Builder::new(format!(
-            "https://api.modrinth.com/v2/project/{}/version",
-            self.id_or_slug.value()
-        ))
-        .add_optional_parameter(
-            "loaders",
-            self.loaders.as_ref().map(|s| format_list(s.iter())),
-        )
-        .add_optional_parameter(
-            "game_versions",
-            self.game_versions.as_ref().map(|s| format_list(s.iter())),
-        )
-        .add_optional_parameter("featured", self.featured.map(bool_as_str))
+        crate::Builder::new(format!("https://api.modrinth.com/v2/project/{}/version", self.id_or_slug.value()))
+            .add_optional_parameter("loaders", self.loaders.as_ref().map(|s| format_list(s.iter())))
+            .add_optional_parameter("game_versions", self.game_versions.as_ref().map(|s| format_list(s.iter())))
+            .add_optional_parameter("featured", self.featured.map(bool_as_str))
     }
 }
 
@@ -130,9 +121,7 @@ impl MultipleVersionsData {
 
 impl QueryData<ProjectVersions> for MultipleVersionsData {
     fn builder(&self) -> crate::Builder {
-        crate::Builder::new("https://api.modrinth.com/v2/versions").add_parameter(
-            "ids",
-            format_list(self.ids.iter().map(<VersionId as Deref>::deref)),
-        )
+        crate::Builder::new("https://api.modrinth.com/v2/versions")
+            .add_parameter("ids", format_list(self.ids.iter().map(<VersionId as Deref>::deref)))
     }
 }

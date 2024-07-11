@@ -29,11 +29,7 @@ async fn full_fabric_test() {
         .name("Full-fabric-test".into())
         .version("1.19.4".into())
         .game_paths(game_paths.clone())
-        .instance(Box::new(
-            Fabric::new("1.19.4", None::<String>, game_paths)
-                .await
-                .unwrap(),
-        ))
+        .instance(Box::new(Fabric::new("1.19.4", None::<String>, game_paths).await.unwrap()))
         .build();
 
     let mc_dir = current.join("minecraft");
@@ -52,9 +48,7 @@ async fn full_fabric_test() {
 
     let launch = instance.launch_instance(settings, None);
 
-    Box::new(instance.assets().await.unwrap())
-        .download(&tx)
-        .await;
+    Box::new(instance.assets().await.unwrap()).download(&tx).await;
 
     let instance = instance.instance();
     instance.get_io_dyn().io().await.unwrap();
@@ -67,8 +61,5 @@ async fn full_fabric_test() {
         .state(ProfileState::downloaded(launch))
         .build();
 
-    dbg!(profile)
-        .launch(UserData::default(), &JavaRunner::default())
-        .await
-        .unwrap();
+    dbg!(profile).launch(UserData::default(), &JavaRunner::default()).await.unwrap();
 }

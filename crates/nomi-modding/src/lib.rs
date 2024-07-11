@@ -20,27 +20,16 @@ where
     T: DeserializeOwned,
 {
     pub fn new(data: Data) -> Self {
-        Self {
-            data,
-            _marker: PhantomData,
-        }
+        Self { data, _marker: PhantomData }
     }
 
     pub async fn query(&self) -> anyhow::Result<T> {
-        let s = reqwest::get(dbg!(self.data.builder().build()))
-            .await?
-            .text()
-            .await?;
+        let s = reqwest::get(dbg!(self.data.builder().build())).await?.text().await?;
 
         let mut deserializer = serde_json::Deserializer::from_str(&s);
 
-        serde_path_to_error::deserialize(&mut deserializer).map_err(|e| {
-            anyhow!(
-                "Path: {}. Error: {}",
-                e.path().clone().to_string(),
-                e.into_inner().to_string()
-            )
-        })
+        serde_path_to_error::deserialize(&mut deserializer)
+            .map_err(|e| anyhow!("Path: {}. Error: {}", e.path().clone().to_string(), e.into_inner().to_string()))
     }
 }
 
@@ -70,11 +59,7 @@ impl Builder {
         }
     }
 
-    pub fn add_optional_parameter(
-        mut self,
-        name: impl Into<String>,
-        param: Option<impl Into<String>>,
-    ) -> Self {
+    pub fn add_optional_parameter(mut self, name: impl Into<String>, param: Option<impl Into<String>>) -> Self {
         if let Some(param) = param.map(Into::into) {
             self.check_and_add_symbol();
             self.data.push(format!("{}={}", name.into(), param));
@@ -103,7 +88,7 @@ pub fn capitalize_first_letter(s: impl Into<String>) -> String {
 
 /// # Panics
 /// Panics if the string is empty.
-pub fn capitalize_first_letters_whitespace_splitted(s: impl Into<String>) -> String {
+pub fn capitalize_first_letters_whitespace_split(s: impl Into<String>) -> String {
     let s: String = s.into();
     let iter = s.split_whitespace().map(capitalize_first_letter);
 
@@ -139,10 +124,7 @@ mod tests {
     #[test]
     fn capitalize_test() {
         assert_eq!("Ab", capitalize_first_letter("ab"));
-        assert_eq!(
-            "Ab Ba",
-            capitalize_first_letters_whitespace_splitted("ab ba")
-        );
+        assert_eq!("Ab Ab", capitalize_first_letters_whitespace_split("ab ab"));
     }
 
     #[test]
@@ -152,9 +134,7 @@ mod tests {
     }
 
     async fn search_mods() -> Search {
-        let data = SearchData::builder()
-            .facets(Facets::from_project_type(ProjectType::Mod))
-            .build();
+        let data = SearchData::builder().facets(Facets::from_project_type(ProjectType::Mod)).build();
 
         let query = Query::new(data);
         query.query().await.unwrap()
@@ -228,10 +208,7 @@ mod tests {
             let data = ProjectData::new(project.project_id);
             let query = Query::new(data);
             let data = query.query().await.unwrap();
-            println!(
-                "Success ({}): description - {}",
-                project.title, data.description
-            )
+            println!("Success ({}): description - {}", project.title, data.description)
         }
     }
 
@@ -268,13 +245,7 @@ mod tests {
                 };
             }
 
-            let data = MultipleVersionsData::new(
-                versions[..(versions.len() / 2)]
-                    .iter()
-                    .map(|v| &v.id)
-                    .cloned()
-                    .collect_vec(),
-            );
+            let data = MultipleVersionsData::new(versions[..(versions.len() / 2)].iter().map(|v| &v.id).cloned().collect_vec());
             let query = Query::new(data);
             let data = query.query().await.unwrap();
 

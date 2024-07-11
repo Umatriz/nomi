@@ -8,7 +8,7 @@ Minecraft launcher powered by Rust
 
 ---
 
-Note: See the `dev` brach for the latest changes.
+Note: See the `dev` branch for the latest changes.
 
 ## Downloading
 

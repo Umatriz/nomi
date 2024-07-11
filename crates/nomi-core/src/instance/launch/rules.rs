@@ -18,10 +18,7 @@ pub fn is_rule_passes(rule: &Rule) -> bool {
 
                 !(custom_res || demo || quick_realms)
             }
-            Some(RuleKind::JvmRule(os)) => os
-                .name
-                .as_ref()
-                .map_or(true, |target_os| dbg!(env::consts::OS == target_os)),
+            Some(RuleKind::JvmRule(os)) => os.name.as_ref().map_or(true, |target_os| dbg!(env::consts::OS == target_os)),
 
             None => true,
         },

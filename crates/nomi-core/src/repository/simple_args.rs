@@ -9,10 +9,7 @@ pub struct SimpleArgs {
 
 impl From<&Arguments> for SimpleArgs {
     fn from(value: &Arguments) -> Self {
-        let mut args = SimpleArgs {
-            game: vec![],
-            jvm: vec![],
-        };
+        let mut args = SimpleArgs { game: vec![], jvm: vec![] };
         value.game.iter().for_each(|a| args.game.push(a.to_owned()));
         value.jvm.iter().for_each(|a| args.jvm.push(a.to_owned()));
         args

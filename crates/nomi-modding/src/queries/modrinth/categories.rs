@@ -46,10 +46,7 @@ impl Categories {
             .collect_vec()
     }
 
-    pub fn get_unique_headers_sorted_for_project_type(
-        &self,
-        project_type: ProjectType,
-    ) -> Vec<Header> {
+    pub fn get_unique_headers_sorted_for_project_type(&self, project_type: ProjectType) -> Vec<Header> {
         self.0
             .iter()
             .filter(|c| c.project_type == project_type)
@@ -61,18 +58,10 @@ impl Categories {
     }
 
     pub fn get_unique_headers(&self) -> HashSet<Header> {
-        self.0
-            .iter()
-            .map(|c| c.header.clone())
-            .map(Header)
-            .collect::<HashSet<_>>()
+        self.0.iter().map(|c| c.header.clone()).map(Header).collect::<HashSet<_>>()
     }
 
-    pub fn filter_by_header_and_project_type(
-        &self,
-        header: Header,
-        project_type: ProjectType,
-    ) -> Vec<&Category> {
+    pub fn filter_by_header_and_project_type(&self, header: Header, project_type: ProjectType) -> Vec<&Category> {
         self.0
             .iter()
             .filter(|c| c.project_type == project_type && c.header == *header)

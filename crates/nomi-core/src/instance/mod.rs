@@ -5,10 +5,7 @@ pub mod launch;
 pub mod profile;
 pub mod version_marker;
 
-use crate::{
-    downloads::downloaders::assets::AssetsDownloader, game_paths::GamePaths,
-    state::get_launcher_manifest,
-};
+use crate::{downloads::downloaders::assets::AssetsDownloader, game_paths::GamePaths, state::get_launcher_manifest};
 
 use self::{
     launch::{LaunchInstance, LaunchInstanceBuilder, LaunchSettings},
@@ -45,11 +42,7 @@ impl Instance {
     }
 
     #[must_use]
-    pub fn launch_instance(
-        &self,
-        settings: LaunchSettings,
-        jvm_args: Option<Vec<String>>,
-    ) -> LaunchInstance {
+    pub fn launch_instance(&self, settings: LaunchSettings, jvm_args: Option<Vec<String>>) -> LaunchInstance {
         let builder = LaunchInstanceBuilder::new().settings(settings);
         let builder = match jvm_args {
             Some(jvm) => builder.jvm_args(jvm),

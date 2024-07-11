@@ -40,10 +40,7 @@ impl VersionType {
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(untagged)]
 pub enum Arguments {
-    New {
-        game: Vec<Argument>,
-        jvm: Vec<Argument>,
-    },
+    New { game: Vec<Argument>, jvm: Vec<Argument> },
     Old(String),
 }
 
@@ -164,13 +161,23 @@ mod tests {
 
     #[tokio::test]
     async fn old_version_test() {
-        let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/d546f1707a3f2b7d034eece5ea2e311eda875787/1.8.9.json").await.unwrap().json().await.unwrap();
+        let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/d546f1707a3f2b7d034eece5ea2e311eda875787/1.8.9.json")
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
         println!("{:#?}", manifest.arguments);
     }
 
     #[tokio::test]
     async fn deserialize_test() {
-        let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/114cfbddea80aa1d423ff1efecc7a294a29bf27b/1.20.6.json").await.unwrap().json().await.unwrap();
+        let manifest: Manifest = get("https://piston-meta.mojang.com/v1/packages/114cfbddea80aa1d423ff1efecc7a294a29bf27b/1.20.6.json")
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
         println!("{:#?}", manifest.arguments);
     }
 }

@@ -88,29 +88,18 @@ impl AssetsDownloader {
                     .filter_map(|asset| {
                         let path = objects.join(&asset.hash[0..2]).join(&asset.hash);
                         (!path.exists()).then_some(FileDownloader::new(
-                            format!(
-                                "https://resources.download.minecraft.net/{}/{}",
-                                &asset.hash[0..2],
-                                asset.hash
-                            ),
+                            format!("https://resources.download.minecraft.net/{}/{}", &asset.hash[0..2], asset.hash),
                             path,
                         ))
                     })
-                    .map::<Box<dyn Downloadable<Out = DownloadResult>>, _>(|downloader| {
-                        Box::new(downloader)
-                    })
+                    .map::<Box<dyn Downloadable<Out = DownloadResult>>, _>(|downloader| Box::new(downloader))
                     .collect::<Vec<_>>()
             })
             .map(DownloadSet::from_vec_dyn)
             .map(Chunk::new)
             .for_each(|downloader| queue.add_downloader(downloader));
 
-        Ok(Self {
-            queue,
-            assets,
-            indexes,
-            id,
-        })
+        Ok(Self { queue, assets, indexes, id })
     }
 }
 

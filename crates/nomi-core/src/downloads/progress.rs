@@ -63,13 +63,9 @@ mod tests {
     #[test]
     fn construction_test() {
         let (sender, _) = std::sync::mpsc::channel();
-        let _ = MappedSender::new(Box::new(sender), |val: u32| {
-            Box::new(val) as Box<dyn Any + Send>
-        });
+        let _ = MappedSender::new(Box::new(sender), |val: u32| Box::new(val) as Box<dyn Any + Send>);
 
         let (sender, _) = tokio::sync::mpsc::channel(1);
-        let _ = MappedSender::new(Box::new(sender), |val: u32| {
-            Box::new(val) as Box<dyn Any + Send>
-        });
+        let _ = MappedSender::new(Box::new(sender), |val: u32| Box::new(val) as Box<dyn Any + Send>);
     }
 }

@@ -14,41 +14,41 @@ use super::{
 
 #[cfg(all(target_arch = "x86_64", target_os = "windows"))]
 mod consts {
-    pub(super) const PORTABLE_URL: &str = "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_windows-x64_bin.zip";
-    pub(super) const SHA256: &str =
-        "de7f00fd1bd0d3a4c678fff2681dfad19284d74d357218a4be6f623488d040da";
+    pub(super) const PORTABLE_URL: &str =
+        "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_windows-x64_bin.zip";
+    pub(super) const SHA256: &str = "de7f00fd1bd0d3a4c678fff2681dfad19284d74d357218a4be6f623488d040da";
     pub(super) const ARCHIVE_FILENAME: &str = "openjdk-22.0.1_windows-x64_bin.zip";
 }
 
 #[cfg(all(target_arch = "x86_64", target_os = "macos"))]
 mod consts {
-    pub(super) const PORTABLE_URL: &str = "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_macos-x64_bin.tar.gz";
-    pub(super) const SHA256: &str =
-        "5daa4f9894cc3a617a5f9fe2c48e5391d3a2e672c91e1597041672f57696846f";
+    pub(super) const PORTABLE_URL: &str =
+        "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_macos-x64_bin.tar.gz";
+    pub(super) const SHA256: &str = "5daa4f9894cc3a617a5f9fe2c48e5391d3a2e672c91e1597041672f57696846f";
     pub(super) const ARCHIVE_FILENAME: &str = "openjdk-22.0.1_macos-x64_bin.tar.gz";
 }
 
 #[cfg(all(target_arch = "aarch64", target_os = "macos"))]
 mod consts {
-    pub(super) const PORTABLE_URL: &str = "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_macos-aarch64_bin.tar.gz";
-    pub(super) const SHA256: &str =
-        "b949a3bc13e3c5152ab55d12e699dfa6c8b00bedeb8302b13be4aec3ee734351";
+    pub(super) const PORTABLE_URL: &str =
+        "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_macos-aarch64_bin.tar.gz";
+    pub(super) const SHA256: &str = "b949a3bc13e3c5152ab55d12e699dfa6c8b00bedeb8302b13be4aec3ee734351";
     pub(super) const ARCHIVE_FILENAME: &str = "openjdk-22.0.1_macos-aarch64_bin.tar.gz";
 }
 
 #[cfg(all(target_arch = "x86_64", target_os = "linux"))]
 mod consts {
-    pub(super) const PORTABLE_URL: &str = "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_linux-x64_bin.tar.gz";
-    pub(super) const SHA256: &str =
-        "133c8b65113304904cdef7c9103274d141cfb64b191ff48ceb6528aca25c67b1";
+    pub(super) const PORTABLE_URL: &str =
+        "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_linux-x64_bin.tar.gz";
+    pub(super) const SHA256: &str = "133c8b65113304904cdef7c9103274d141cfb64b191ff48ceb6528aca25c67b1";
     pub(super) const ARCHIVE_FILENAME: &str = "openjdk-22.0.1_linux-x64_bin.tar.gz";
 }
 
 #[cfg(all(target_arch = "aarch64", target_os = "linux"))]
 mod consts {
-    pub(super) const PORTABLE_URL: &str = "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_linux-aarch64_bin.tar.gz";
-    pub(super) const SHA256: &str =
-        "0887c42b9897f889415a6f7b88549d38af99f6ef2d1117199de012beab0631eb";
+    pub(super) const PORTABLE_URL: &str =
+        "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_linux-aarch64_bin.tar.gz";
+    pub(super) const SHA256: &str = "0887c42b9897f889415a6f7b88549d38af99f6ef2d1117199de012beab0631eb";
     pub(super) const ARCHIVE_FILENAME: &str = "openjdk-22.0.1_linux-aarch64_bin.tar.gz";
 }
 
@@ -154,49 +154,42 @@ mod tests {
     use super::*;
 
     mod consts0 {
-        pub(super) const PORTABLE_URL: &str = "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_windows-x64_bin.zip";
-        pub(super) const SHA256: &str =
-            "de7f00fd1bd0d3a4c678fff2681dfad19284d74d357218a4be6f623488d040da";
+        pub(super) const PORTABLE_URL: &str =
+            "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_windows-x64_bin.zip";
+        pub(super) const SHA256: &str = "de7f00fd1bd0d3a4c678fff2681dfad19284d74d357218a4be6f623488d040da";
         pub(super) const ARCHIVE_FILENAME: &str = "openjdk-22.0.1_windows-x64_bin.zip";
     }
 
     mod consts1 {
-        pub(super) const PORTABLE_URL: &str = "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_macos-x64_bin.tar.gz";
-        pub(super) const SHA256: &str =
-            "5daa4f9894cc3a617a5f9fe2c48e5391d3a2e672c91e1597041672f57696846f";
+        pub(super) const PORTABLE_URL: &str =
+            "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_macos-x64_bin.tar.gz";
+        pub(super) const SHA256: &str = "5daa4f9894cc3a617a5f9fe2c48e5391d3a2e672c91e1597041672f57696846f";
         pub(super) const ARCHIVE_FILENAME: &str = "openjdk-22.0.1_macos-x64_bin.tar.gz";
     }
 
     mod consts2 {
-        pub(super) const PORTABLE_URL: &str = "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_macos-aarch64_bin.tar.gz";
-        pub(super) const SHA256: &str =
-            "b949a3bc13e3c5152ab55d12e699dfa6c8b00bedeb8302b13be4aec3ee734351";
+        pub(super) const PORTABLE_URL: &str =
+            "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_macos-aarch64_bin.tar.gz";
+        pub(super) const SHA256: &str = "b949a3bc13e3c5152ab55d12e699dfa6c8b00bedeb8302b13be4aec3ee734351";
         pub(super) const ARCHIVE_FILENAME: &str = "openjdk-22.0.1_macos-aarch64_bin.tar.gz";
     }
 
     mod consts3 {
-        pub(super) const PORTABLE_URL: &str = "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_linux-x64_bin.tar.gz";
-        pub(super) const SHA256: &str =
-            "133c8b65113304904cdef7c9103274d141cfb64b191ff48ceb6528aca25c67b1";
+        pub(super) const PORTABLE_URL: &str =
+            "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_linux-x64_bin.tar.gz";
+        pub(super) const SHA256: &str = "133c8b65113304904cdef7c9103274d141cfb64b191ff48ceb6528aca25c67b1";
         pub(super) const ARCHIVE_FILENAME: &str = "openjdk-22.0.1_linux-x64_bin.tar.gz";
     }
 
     mod consts4 {
-        pub(super) const PORTABLE_URL: &str = "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_linux-aarch64_bin.tar.gz";
-        pub(super) const SHA256: &str =
-            "0887c42b9897f889415a6f7b88549d38af99f6ef2d1117199de012beab0631eb";
+        pub(super) const PORTABLE_URL: &str =
+            "https://download.java.net/java/GA/jdk22.0.1/c7ec1332f7bb44aeba2eb341ae18aca4/8/GPL/openjdk-22.0.1_linux-aarch64_bin.tar.gz";
+        pub(super) const SHA256: &str = "0887c42b9897f889415a6f7b88549d38af99f6ef2d1117199de012beab0631eb";
         pub(super) const ARCHIVE_FILENAME: &str = "openjdk-22.0.1_linux-aarch64_bin.tar.gz";
     }
 
-    async fn java_downloader_test_helper(
-        url: &str,
-        file_name: &str,
-        hash: &str,
-    ) -> anyhow::Result<bool> {
-        let downloader = FileDownloader::new(
-            url.to_owned(),
-            PathBuf::from("./java_downloader_test").join(file_name),
-        );
+    async fn java_downloader_test_helper(url: &str, file_name: &str, hash: &str) -> anyhow::Result<bool> {
+        let downloader = FileDownloader::new(url.to_owned(), PathBuf::from("./java_downloader_test").join(file_name));
 
         let (tx, mut rx) = tokio::sync::mpsc::channel(5);
 
@@ -204,10 +197,7 @@ mod tests {
 
         dbg!(rx.recv().await);
 
-        check_hash(
-            PathBuf::from("./java_downloader_test").join(file_name),
-            hash,
-        )
+        check_hash(PathBuf::from("./java_downloader_test").join(file_name), hash)
     }
 
     #[tokio::test]
@@ -232,9 +222,7 @@ mod tests {
             consts0 consts1 consts2 consts3 consts4
         }
 
-        tokio::fs::remove_dir_all("./java_downloader_test")
-            .await
-            .unwrap();
+        tokio::fs::remove_dir_all("./java_downloader_test").await.unwrap();
     }
 
     #[tokio::test]
@@ -248,10 +236,7 @@ mod tests {
             archive.unpack(target_path).map_err(Into::into)
         }
 
-        let downloader = FileDownloader::new(
-            consts3::PORTABLE_URL.to_owned(),
-            PathBuf::from("./").join(consts3::ARCHIVE_FILENAME),
-        );
+        let downloader = FileDownloader::new(consts3::PORTABLE_URL.to_owned(), PathBuf::from("./").join(consts3::ARCHIVE_FILENAME));
 
         let (tx, mut rx) = tokio::sync::mpsc::channel(5);
 
@@ -259,12 +244,7 @@ mod tests {
 
         dbg!(rx.recv().await);
 
-        if !check_hash(
-            PathBuf::from("./").join(consts3::ARCHIVE_FILENAME),
-            consts3::SHA256,
-        )
-        .unwrap()
-        {
+        if !check_hash(PathBuf::from("./").join(consts3::ARCHIVE_FILENAME), consts3::SHA256).unwrap() {
             panic!("Hashes does not match");
         }
 
@@ -272,12 +252,8 @@ mod tests {
 
         extract_tarball(file, &PathBuf::from("./java_test")).unwrap();
 
-        tokio::fs::remove_file(PathBuf::from("./").join(consts3::ARCHIVE_FILENAME))
-            .await
-            .unwrap();
+        tokio::fs::remove_file(PathBuf::from("./").join(consts3::ARCHIVE_FILENAME)).await.unwrap();
 
-        tokio::fs::remove_dir_all(PathBuf::from("./java_test"))
-            .await
-            .unwrap();
+        tokio::fs::remove_dir_all(PathBuf::from("./java_test")).await.unwrap();
     }
 }

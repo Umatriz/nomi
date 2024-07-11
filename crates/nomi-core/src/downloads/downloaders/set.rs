@@ -78,28 +78,20 @@ impl Downloader for DownloadSet {
 
                 if let Err(e) = download_status.0 {
                     match e {
-                        DownloadError::Error { url, path, .. } => self
-                            .failed_downloads
-                            .push(Box::new(FileDownloader::new(url, path))),
-                        DownloadError::HashDoesNotMatch {
-                            url, path, sha1, ..
-                        } => self
-                            .failed_downloads
-                            .push(Box::new(FileDownloader::new(url, path).with_sha1(sha1))),
+                        DownloadError::Error { url, path, .. } => self.failed_downloads.push(Box::new(FileDownloader::new(url, path))),
+                        DownloadError::HashDoesNotMatch { url, path, sha1, .. } => {
+                            self.failed_downloads.push(Box::new(FileDownloader::new(url, path).with_sha1(sha1)))
+                        }
                         DownloadError::JoinError => {
                             warn!("JoinError cannot be handled");
                         }
                     }
                 }
             } else {
-                sender
-                    .update(DownloadResult(Err(DownloadError::JoinError)))
-                    .await;
+                sender.update(DownloadResult(Err(DownloadError::JoinError))).await;
 
                 if let Some(sender) = self.helper.as_ref() {
-                    let _ = sender
-                        .send(DownloadResult(Err(DownloadError::JoinError)))
-                        .await;
+                    let _ = sender.send(DownloadResult(Err(DownloadError::JoinError))).await;
                 }
             };
         }

@@ -43,9 +43,7 @@ impl MyContext {
             versions: Vec::new(),
         };
 
-        let launcher_manifest_ref = pollster::block_on(get_launcher_manifest())
-            .report_error()
-            .unwrap_or(EMPTY_MANIFEST);
+        let launcher_manifest_ref = pollster::block_on(get_launcher_manifest()).report_error().unwrap_or(EMPTY_MANIFEST);
 
         Self {
             collector,
@@ -69,18 +67,8 @@ impl TabViewer for MyContext {
 
     fn force_close(&mut self, tab: &mut Self::Tab) -> bool {
         match tab {
-            TabKind::Mods { profile } => self
-                .states
-                .profiles
-                .profiles
-                .find_profile(profile.profile.id)
-                .is_none(),
-            TabKind::ProfileInfo { profile } => self
-                .states
-                .profiles
-                .profiles
-                .find_profile(profile.profile.id)
-                .is_none(),
+            TabKind::Mods { profile } => self.states.profiles.profiles.find_profile(profile.profile.id).is_none(),
+            TabKind::ProfileInfo { profile } => self.states.profiles.profiles.find_profile(profile.profile.id).is_none(),
             _ => false,
         }
     }
@@ -89,18 +77,11 @@ impl TabViewer for MyContext {
         if response.clicked() {
             if let TabKind::ProfileInfo { profile } = tab {
                 // PANICS: Will never panic since the tab cannot be opened if the profile does not exists
-                let prof = self
-                    .states
-                    .profiles
-                    .profiles
-                    .find_profile(profile.profile.id)
-                    .unwrap();
+                let prof = self.states.profiles.profiles.find_profile(profile.profile.id).unwrap();
 
                 self.states.tabs.0.remove(&*tab);
 
-                self.states.tabs.0.insert(TabKind::ProfileInfo {
-                    profile: prof.clone(),
-                });
+                self.states.tabs.0.insert(TabKind::ProfileInfo { profile: prof.clone() });
             }
         }
     }

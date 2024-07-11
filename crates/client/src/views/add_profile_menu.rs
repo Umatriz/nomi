@@ -65,11 +65,7 @@ impl AddProfileMenuState {
 
 impl View for AddProfileMenu<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
-        fn fabric_version_is(
-            selected_loader: &Loader,
-            loader: Loader,
-            func: impl Fn(Option<&String>) -> bool,
-        ) -> bool {
+        fn fabric_version_is(selected_loader: &Loader, loader: Loader, func: impl Fn(Option<&String>) -> bool) -> bool {
             matches!(loader, Loader::Fabric { .. })
                 && match selected_loader {
                     Loader::Fabric { version } => func(version.as_ref()),
@@ -84,46 +80,24 @@ impl View for AddProfileMenu<'_> {
             egui::ComboBox::from_label("Versions Filter")
                 .selected_text(format!("{:?}", self.menu_state.selected_version_type))
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(
-                        &mut self.menu_state.selected_version_type,
-                        VersionType::Release,
-                        "Release",
-                    );
-                    ui.selectable_value(
-                        &mut self.menu_state.selected_version_type,
-                        VersionType::Snapshot,
-                        "Snapshot",
-                    );
+                    ui.selectable_value(&mut self.menu_state.selected_version_type, VersionType::Release, "Release");
+                    ui.selectable_value(&mut self.menu_state.selected_version_type, VersionType::Snapshot, "Snapshot");
                 });
 
             let versions_iter = self.launcher_manifest.versions.iter();
             let versions = match self.menu_state.selected_version_type {
-                VersionType::Release => versions_iter
-                    .filter(|v| v.version_type == "release")
-                    .collect::<Vec<_>>(),
-                VersionType::Snapshot => versions_iter
-                    .filter(|v| v.version_type == "snapshot")
-                    .collect::<Vec<_>>(),
+                VersionType::Release => versions_iter.filter(|v| v.version_type == "release").collect::<Vec<_>>(),
+                VersionType::Snapshot => versions_iter.filter(|v| v.version_type == "snapshot").collect::<Vec<_>>(),
             };
 
             egui::ComboBox::from_label("Select version")
-                .selected_text(
-                    self.menu_state
-                        .selected_version_buf
-                        .as_ref()
-                        .map_or("No version selcted", |v| &v.id),
-                )
+                .selected_text(self.menu_state.selected_version_buf.as_ref().map_or("No version selected", |v| &v.id))
                 .show_ui(ui, |ui| {
                     for version in versions {
-                        let value = ui.selectable_value(
-                            &mut self.menu_state.selected_version_buf.as_ref(),
-                            Some(version),
-                            &version.id,
-                        );
+                        let value = ui.selectable_value(&mut self.menu_state.selected_version_buf.as_ref(), Some(version), &version.id);
                         if value.clicked() {
                             self.menu_state.selected_version_buf = Some(version.clone());
-                            if matches!(self.menu_state.selected_loader_buf, Loader::Fabric { .. })
-                            {
+                            if matches!(self.menu_state.selected_loader_buf, Loader::Fabric { .. }) {
                                 self.menu_state.request_fabric_versions(self.manager)
                             }
                         }
@@ -134,16 +108,8 @@ impl View for AddProfileMenu<'_> {
                 egui::ComboBox::from_label("Select the loader")
                     .selected_text(format!("{}", self.menu_state.selected_loader_buf))
                     .show_ui(ui, |ui| {
-                        ui.selectable_value(
-                            &mut self.menu_state.selected_loader_buf,
-                            Loader::Vanilla,
-                            "Vanilla",
-                        );
-                        let fabric = ui.selectable_value(
-                            &mut self.menu_state.selected_loader_buf,
-                            Loader::Fabric { version: None },
-                            "Fabric",
-                        );
+                        ui.selectable_value(&mut self.menu_state.selected_loader_buf, Loader::Vanilla, "Vanilla");
+                        let fabric = ui.selectable_value(&mut self.menu_state.selected_loader_buf, Loader::Fabric { version: None }, "Fabric");
 
                         if fabric.clicked() {
                             println!("Test!");
@@ -177,30 +143,20 @@ impl View for AddProfileMenu<'_> {
                                         ui.selectable_value(
                                             version,
                                             Some(fabric_version.loader.version.clone()),
-                                            RichText::new(&fabric_version.loader.version)
-                                                .color(stability_color),
+                                            RichText::new(&fabric_version.loader.version).color(stability_color),
                                         );
-                                        ui.label(RichText::new("❓").color(stability_color))
-                                            .on_hover_text(stability_text);
+                                        ui.label(RichText::new("❓").color(stability_color)).on_hover_text(stability_text);
                                     });
                                 }
                             });
                     }
-                } else if !self
-                    .manager
-                    .get_collection::<FabricDataCollection>()
-                    .tasks()
-                    .is_empty()
-                {
+                } else if !self.manager.get_collection::<FabricDataCollection>().tasks().is_empty() {
                     ui.horizontal(|ui| {
                         ui.spinner();
                         ui.label("Requesting available Fabric versions");
                     });
                 } else {
-                    ui.label(
-                        RichText::new("Fabric is not available for this version")
-                            .color(ui.visuals().error_fg_color),
-                    );
+                    ui.label(RichText::new("Fabric is not available for this version").color(ui.visuals().error_fg_color));
                 }
             }
         }
@@ -225,22 +181,15 @@ impl View for AddProfileMenu<'_> {
         let fabric_versions_non_empty = || !self.menu_state.fabric_versions.is_empty();
 
         if self.menu_state.profile_name_buf.trim().is_empty() {
-            ui.label(
-                RichText::new("You must enter the profile name").color(ui.visuals().error_fg_color),
-            );
+            ui.label(RichText::new("You must enter the profile name").color(ui.visuals().error_fg_color));
         }
 
         if self.menu_state.selected_version_buf.is_none() {
-            ui.label(
-                RichText::new("You must select the version").color(ui.visuals().error_fg_color),
-            );
+            ui.label(RichText::new("You must select the version").color(ui.visuals().error_fg_color));
         }
 
         if fabric_version_is_none() {
-            ui.label(
-                RichText::new("You must select the Fabric Version")
-                    .color(ui.visuals().error_fg_color),
-            );
+            ui.label(RichText::new("You must select the Fabric Version").color(ui.visuals().error_fg_color));
         }
 
         if ui
@@ -252,19 +201,17 @@ impl View for AddProfileMenu<'_> {
             )
             .clicked()
         {
-            self.profiles_state
-                .profiles
-                .add_profile(ModdedProfile::new(VersionProfile {
-                    id: self.profiles_state.profiles.create_id(),
-                    name: self.menu_state.profile_name_buf.trim_end().to_owned(),
-                    state: ProfileState::NotDownloaded {
-                        // PANICS: It will never panic because it's
-                        // unreachable for `selected_version_buf` to be `None`
-                        version: self.menu_state.selected_version_buf.clone().unwrap().id,
-                        loader: self.menu_state.selected_loader_buf.clone(),
-                        version_type: self.menu_state.selected_version_type.clone(),
-                    },
-                }));
+            self.profiles_state.profiles.add_profile(ModdedProfile::new(VersionProfile {
+                id: self.profiles_state.profiles.create_id(),
+                name: self.menu_state.profile_name_buf.trim_end().to_owned(),
+                state: ProfileState::NotDownloaded {
+                    // PANICS: It will never panic because it's
+                    // unreachable for `selected_version_buf` to be `None`
+                    version: self.menu_state.selected_version_buf.clone().unwrap().id,
+                    loader: self.menu_state.selected_loader_buf.clone(),
+                    version_type: self.menu_state.selected_version_type.clone(),
+                },
+            }));
             self.profiles_state.profiles.update_config().report_error();
         }
     }

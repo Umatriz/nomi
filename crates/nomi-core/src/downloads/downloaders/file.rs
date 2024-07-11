@@ -21,11 +21,7 @@ pub struct FileDownloader {
 
 impl FileDownloader {
     pub fn new(url: String, path: PathBuf) -> Self {
-        Self {
-            url,
-            path,
-            hash_sha1: None,
-        }
+        Self { url, path, hash_sha1: None }
     }
 
     #[must_use]
@@ -40,9 +36,7 @@ impl Downloadable for FileDownloader {
     type Out = DownloadResult;
 
     async fn download(self: Box<Self>) -> Self::Out {
-        let result = download_file(&self.path, &self.url)
-            .await
-            .map(|()| DownloadStatus::Success);
+        let result = download_file(&self.path, &self.url).await.map(|()| DownloadStatus::Success);
 
         let Ok(_) = result else {
             dbg!("Returning");
@@ -50,12 +44,10 @@ impl Downloadable for FileDownloader {
         };
 
         if let Some(hash) = self.hash_sha1 {
-            let file = match tokio::fs::read_to_string(&self.path).await.map_err(|e| {
-                DownloadError::Error {
-                    url: self.url.clone(),
-                    path: self.path.clone(),
-                    error: format!("Unable to open downloaded file. Original error: {e}"),
-                }
+            let file = match tokio::fs::read_to_string(&self.path).await.map_err(|e| DownloadError::Error {
+                url: self.url.clone(),
+                path: self.path.clone(),
+                error: format!("Unable to open downloaded file. Original error: {e}"),
             }) {
                 Ok(val) => val,
                 Err(e) => return DownloadResult(result.map_err(|_| e)),

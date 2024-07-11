@@ -8,8 +8,7 @@ use nomi_core::{
         traits::{Downloader, DownloaderIO, DownloaderIOExt},
     },
     fs::read_toml_config_sync,
-    DOT_NOMI_JAVA_DIR, DOT_NOMI_JAVA_EXECUTABLE, DOT_NOMI_PROFILES_CONFIG,
-    DOT_NOMI_SETTINGS_CONFIG,
+    DOT_NOMI_JAVA_DIR, DOT_NOMI_JAVA_EXECUTABLE, DOT_NOMI_PROFILES_CONFIG, DOT_NOMI_SETTINGS_CONFIG,
 };
 use tracing::info;
 
@@ -39,8 +38,7 @@ pub struct States {
 
 impl Default for States {
     fn default() -> Self {
-        let settings =
-            read_toml_config_sync::<SettingsState>(DOT_NOMI_SETTINGS_CONFIG).unwrap_or_default();
+        let settings = read_toml_config_sync::<SettingsState>(DOT_NOMI_SETTINGS_CONFIG).unwrap_or_default();
 
         Self {
             tabs: TabsState::new(),
@@ -48,8 +46,7 @@ impl Default for States {
             errors_pool: ErrorsPoolState::default(),
             profiles: ProfilesState {
                 currently_downloading_profiles: HashSet::new(),
-                profiles: read_toml_config_sync::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG)
-                    .unwrap_or_default(),
+                profiles: read_toml_config_sync::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG).unwrap_or_default(),
             },
             client_settings: settings.client_settings.clone(),
             settings,
