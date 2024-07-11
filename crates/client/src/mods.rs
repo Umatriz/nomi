@@ -26,7 +26,7 @@ use crate::{
     NOMI_LOADED_LOCK_FILE, NOMI_LOADED_LOCK_FILE_NAME,
 };
 
-#[derive(Serialize, Deserialize, Default, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, Default, PartialEq, Eq, Hash, Debug)]
 pub struct ModsConfig {
     pub mods: Vec<Mod>,
 }

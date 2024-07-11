@@ -1,5 +1,6 @@
 use std::marker::PhantomData;
 
+use anyhow::anyhow;
 use serde::de::DeserializeOwned;
 
 mod queries;
@@ -25,11 +26,21 @@ where
         }
     }
 
-    pub async fn query(&self) -> Result<T, reqwest::Error> {
-        reqwest::get(dbg!(self.data.builder().build()))
+    pub async fn query(&self) -> anyhow::Result<T> {
+        let s = reqwest::get(dbg!(self.data.builder().build()))
             .await?
-            .json()
-            .await
+            .text()
+            .await?;
+
+        let mut deserializer = serde_json::Deserializer::from_str(&s);
+
+        serde_path_to_error::deserialize(&mut deserializer).map_err(|e| {
+            anyhow!(
+                "Path: {}. Error: {}",
+                e.path().clone().to_string(),
+                e.into_inner().to_string()
+            )
+        })
     }
 }
 

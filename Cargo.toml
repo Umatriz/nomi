@@ -24,6 +24,7 @@ tokio = { version = "1.28.2", features = ["rt", "macros", "process"] }
 itertools = "0.13.0"
 typed-builder = "0.18.2"
 serde = { version = "1.0", features = ["derive", "rc"] }
+serde_path_to_error = "0.1"
 serde_json = "1.0"
 toml = "0.8.0"
 

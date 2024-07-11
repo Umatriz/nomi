@@ -21,7 +21,7 @@ pub struct Project {
     pub requested_status: Option<String>,
     pub additional_categories: Vec<String>,
     pub issues_url: String,
-    pub source_url: String,
+    pub source_url: Option<String>,
     pub wiki_url: Option<String>,
     pub discord_url: Option<String>,
     pub donation_urls: Vec<DonationUrl>,

@@ -79,6 +79,10 @@ impl ModdedProfile {
 }
 
 impl ProfilesConfig {
+    pub fn find_profile(&self, target_id: usize) -> Option<&Arc<ModdedProfile>> {
+        self.profiles.iter().find(|p| p.profile.id == target_id)
+    }
+
     pub fn read() -> Self {
         read_toml_config_sync::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG).unwrap_or_default()
     }

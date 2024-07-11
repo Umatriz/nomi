@@ -67,6 +67,44 @@ impl TabViewer for MyContext {
         tab.name().into()
     }
 
+    fn force_close(&mut self, tab: &mut Self::Tab) -> bool {
+        match tab {
+            TabKind::Mods { profile } => self
+                .states
+                .profiles
+                .profiles
+                .find_profile(profile.profile.id)
+                .is_none(),
+            TabKind::ProfileInfo { profile } => self
+                .states
+                .profiles
+                .profiles
+                .find_profile(profile.profile.id)
+                .is_none(),
+            _ => false,
+        }
+    }
+
+    fn on_tab_button(&mut self, tab: &mut Self::Tab, response: &egui::Response) {
+        if response.clicked() {
+            if let TabKind::ProfileInfo { profile } = tab {
+                // PANICS: Will never panic since the tab cannot be opened if the profile does not exists
+                let prof = self
+                    .states
+                    .profiles
+                    .profiles
+                    .find_profile(profile.profile.id)
+                    .unwrap();
+
+                self.states.tabs.0.remove(&*tab);
+
+                self.states.tabs.0.insert(TabKind::ProfileInfo {
+                    profile: prof.clone(),
+                });
+            }
+        }
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         match tab {
             TabKind::Profiles => ProfilesPage {
@@ -108,12 +146,10 @@ impl TabViewer for MyContext {
                 profile: profile.clone(),
             }
             .ui(ui),
-            TabKind::ProfileInfo { profile } => {
-                ProfileInfo {
-                    profile: profile.clone(),
-                    tabs_state: &mut self.states.tabs,
-                    profile_info_state: &mut self.states.profile_info,
-                }
+            TabKind::ProfileInfo { profile } => ProfileInfo {
+                profile: &*profile,
+                tabs_state: &mut self.states.tabs,
+                profile_info_state: &mut self.states.profile_info,
             }
             .ui(ui),
         };

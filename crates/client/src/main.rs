@@ -1,4 +1,6 @@
-use collections::{AssetsCollection, GameDownloadingCollection, JavaCollection};
+use collections::{
+    AssetsCollection, GameDownloadingCollection, GameRunnerCollection, JavaCollection,
+};
 use context::MyContext;
 use eframe::{
     egui::{self, Align, Align2, Button, Frame, Id, Layout, RichText, ScrollArea, ViewportBuilder},
@@ -194,7 +196,7 @@ impl eframe::App for MyTabs {
                                 Path::new(DOT_NOMI_DATA_PACKS_DIR).exists(),
                                 Button::new("Data Packs"),
                             )
-                            .on_disabled_hover_text("You did not downloaded any datapacks")
+                            .on_disabled_hover_text("You did not downloaded any datapacks.")
                             .clicked()
                         {
                             if let Ok(path) = std::fs::canonicalize(DOT_NOMI_DATA_PACKS_DIR) {
@@ -300,6 +302,7 @@ impl eframe::App for MyTabs {
             manager.get_collection::<AssetsCollection>(),
             manager.get_collection::<JavaCollection>(),
             manager.get_collection::<GameDownloadingCollection>(),
+            manager.get_collection::<GameRunnerCollection>(),
         ]
         .iter()
         .all(|c| c.tasks().is_empty());

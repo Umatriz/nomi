@@ -8,7 +8,7 @@ use crate::TabKind;
 use super::{ModdedProfile, SimpleProfile, TabsState, View};
 
 pub struct ProfileInfo<'a> {
-    pub profile: Arc<ModdedProfile>,
+    pub profile: &'a Arc<ModdedProfile>,
     pub tabs_state: &'a mut TabsState,
     pub profile_info_state: &'a mut ProfileInfoState,
 }
