@@ -186,3 +186,45 @@ impl<'c> TasksCollection<'c> for DependenciesCollection {
         })
     }
 }
+
+pub struct ModsDownloadingCollection;
+
+impl<'c> TasksCollection<'c> for ModsDownloadingCollection {
+    type Context = &'c mut ProfilesConfig;
+
+    type Target = Option<()>;
+
+    type Executor = executors::Linear;
+
+    fn name() -> &'static str {
+        "Mods downloading collection"
+    }
+
+    fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|value: Option<()>| {
+            if value.is_some() {
+                if let Ok(cfg) = ProfilesConfig::try_read() {
+                    *context = cfg
+                }
+            }
+        })
+    }
+}
+
+pub struct GameRunnerCollection;
+
+impl<'c> TasksCollection<'c> for GameRunnerCollection {
+    type Context = ();
+
+    type Target = Option<()>;
+
+    type Executor = executors::Linear;
+
+    fn name() -> &'static str {
+        "Game runner collection"
+    }
+
+    fn handle(_context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|_| ())
+    }
+}

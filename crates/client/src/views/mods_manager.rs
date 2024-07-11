@@ -10,9 +10,10 @@ use eframe::egui::{
 use egui_infinite_scroll::{InfiniteScroll, LoadingState};
 use egui_task_manager::{Caller, Progress, Task, TaskManager, TaskProgressShared};
 use itertools::Itertools;
-use nomi_core::{calculate_sha1, downloads::{
-    progress::MappedSender, traits::Downloader, DownloadSet, FileDownloader,
-}};
+use nomi_core::{
+    calculate_sha1,
+    downloads::{progress::MappedSender, traits::Downloader, DownloadSet, FileDownloader},
+};
 use nomi_modding::{
     capitalize_first_letters_whitespace_splitted,
     modrinth::{
@@ -24,16 +25,26 @@ use nomi_modding::{
     Query,
 };
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
 use crate::{
-    collections::{DependenciesCollection, ProjectCollection, ProjectVersionsCollection}, errors_pool::ErrorPoolExt, progress::UnitProgress, ui_ext::UiExt, DOT_NOMI_MODS_STASH_DIR
+    collections::{
+        DependenciesCollection, ModsDownloadingCollection, ProjectCollection,
+        ProjectVersionsCollection,
+    },
+    errors_pool::ErrorPoolExt,
+    progress::UnitProgress,
+    ui_ext::UiExt,
+    DOT_NOMI_MODS_STASH_DIR,
 };
 
 use super::{ModdedProfile, ProfilesConfig, View};
 
+pub use crate::mods::*;
+
 pub struct ModManager<'a> {
     pub task_manager: &'a mut TaskManager,
-    pub profiles_config: &'a ProfilesConfig,
+    pub profiles_config: &'a mut ProfilesConfig,
     pub profile: Arc<ModdedProfile>,
     pub mod_manager_state: &'a mut ModManagerState,
 }
@@ -309,57 +320,72 @@ impl View for ModManager<'_> {
                                     ui.label(&item.title);
                                     ui.label(&item.description);
 
-                                    if ui.button("Download").clicked() {
-                                        self.mod_manager_state.is_download_window_open = true;
+                                    ui.horizontal(|ui| {
+                                        if self
+                                            .profile
+                                            .mods
+                                            .mods
+                                            .iter()
+                                            .any(|m| m.project_id == item.project_id)
+                                        {
+                                            ui.colored_label(Color32::GREEN, "✅").on_hover_text("This mod is already downloaded. Downloading it again will replace files.");
+                                        }
 
-                                        let game_version =
-                                            self.profile.profile.version().to_owned();
+                                        if ui.button("Download").clicked() {
+                                            self.mod_manager_state.is_download_window_open = true;
 
-                                        let loader =
-                                            self.profile.profile.loader_name().to_lowercase();
+                                            let game_version =
+                                                self.profile.profile.version().to_owned();
 
-                                        self.mod_manager_state.download_window_state =
-                                            DownloadWindowState {
-                                                project_id: item.project_id.clone(),
-                                                game_version: game_version.clone(),
-                                                loader: loader.clone(),
-                                            };
+                                            let loader =
+                                                self.profile.profile.loader_name().to_lowercase();
 
-                                        let id = item.project_id.clone();
-                                        let get_project = Task::new(
-                                            "Get project",
-                                            Caller::standard({
-                                                async move {
-                                                    let query =
-                                                        Query::new(ProjectData::new(id.clone()));
+                                            self.mod_manager_state.download_window_state =
+                                                DownloadWindowState {
+                                                    project_id: item.project_id.clone(),
+                                                    game_version: game_version.clone(),
+                                                    loader: loader.clone(),
+                                                };
+
+                                            let id = item.project_id.clone();
+                                            let get_project = Task::new(
+                                                "Get project",
+                                                Caller::standard({
+                                                    async move {
+                                                        let query = Query::new(ProjectData::new(
+                                                            id.clone(),
+                                                        ));
+                                                        query.query().await.report_error()
+                                                    }
+                                                }),
+                                            );
+
+                                            self.task_manager
+                                                .push_task::<ProjectCollection>(get_project);
+
+                                            self.mod_manager_state.current_versions = Vec::new();
+
+                                            let id = item.project_id.clone();
+                                            let get_versions = Task::new(
+                                                "Get project",
+                                                Caller::standard(async move {
+                                                    let query = Query::new(
+                                                        ProjectVersionsData::builder()
+                                                            .id_or_slug(id)
+                                                            .game_versions(vec![game_version])
+                                                            .loaders(vec![loader])
+                                                            .build(),
+                                                    );
                                                     query.query().await.report_error()
-                                                }
-                                            }),
-                                        );
+                                                }),
+                                            );
 
-                                        self.task_manager
-                                            .push_task::<ProjectCollection>(get_project);
-
-                                        self.mod_manager_state.current_versions = Vec::new();
-
-                                        let id = item.project_id.clone();
-                                        let get_versions = Task::new(
-                                            "Get project",
-                                            Caller::standard(async move {
-                                                let query = Query::new(
-                                                    ProjectVersionsData::builder()
-                                                        .id_or_slug(id)
-                                                        .game_versions(vec![game_version])
-                                                        .loaders(vec![loader])
-                                                        .build(),
+                                            self.task_manager
+                                                .push_task::<ProjectVersionsCollection>(
+                                                    get_versions,
                                                 );
-                                                query.query().await.report_error()
-                                            }),
-                                        );
-
-                                        self.task_manager
-                                            .push_task::<ProjectVersionsCollection>(get_versions);
-                                    }
+                                        }
+                                    });
                                 });
                             });
                         });
@@ -367,7 +393,7 @@ impl View for ModManager<'_> {
             });
 
             if let LoadingState::Error(err) = self.mod_manager_state.scroll.bottom_loading_state() {
-                ui.label(RichText::new(err).color(ui.visuals().error_fg_color));
+                ui.error_label(err);
             }
 
             if self
@@ -383,12 +409,6 @@ impl View for ModManager<'_> {
         egui::Window::new("Mod")
             .open(&mut self.mod_manager_state.is_download_window_open)
             .show(ui.ctx(), |ui| {
-                let project_id = self
-                    .mod_manager_state
-                    .download_window_state
-                    .project_id
-                    .clone();
-
                 if let Some(project) = &self.mod_manager_state.current_project {
                     ui.vertical(|ui| {
                         ui.horizontal(|ui| {
@@ -431,7 +451,6 @@ impl View for ModManager<'_> {
                                                 let mut deps = Vec::new();
                                                 proceed_deps(
                                                     &mut deps,
-                                                    version.name.clone(),
                                                     version.clone(),
                                                     game_version,
                                                     loader,
@@ -455,6 +474,14 @@ impl View for ModManager<'_> {
                         }
 
                         for dep in &self.mod_manager_state.current_dependencies {
+                            let is_installed = self.profile.mods.mods.iter().any(|m| dep.versions.first().is_some_and(|d| m.project_id == d.project_id));
+
+                            let is_added = if is_installed {
+                                false
+                            } else {
+                                dep.is_required
+                            };
+
                             if !self
                                 .mod_manager_state
                                 .selected_dependencies
@@ -464,7 +491,7 @@ impl View for ModManager<'_> {
                                     dep.name.clone(),
                                     MaybeAddedDependency {
                                         version: None,
-                                        is_added: dep.is_required,
+                                        is_added,
                                     },
                                 );
                             }
@@ -475,64 +502,84 @@ impl View for ModManager<'_> {
                                 .unwrap();
 
                             ui.horizontal(|ui| {
-                                ui.add_enabled_ui(!dep.is_required, |ui| {
-                                    ui.checkbox(&mut val.is_added, "")
-                                        .on_hover_text("Include this dependency");
-                                });
+                                if is_installed {
+                                    ui.colored_label(Color32::GREEN, "✅").on_hover_text("This dependency is already downloaded. If you want to download it again do it manually.");
+                                }
 
-                                ui.add_enabled_ui(val.is_added, |ui| {
-                                    ui.label(&dep.name);
+                                ui.add_enabled_ui(!is_installed, |ui| {
+                                    ui.add_enabled_ui(!dep.is_required, |ui| {
+                                        ui.checkbox(&mut val.is_added, "")
+                                            .on_hover_text("Include this dependency");
+                                    });
     
-                                    ComboBox::from_id_source(Id::new(&dep.name))
-                                        .selected_text(
-                                            val.version
-                                                .clone()
-                                                .map_or("No version selected".to_owned(), |v| {
-                                                    v.version_number.clone()
-                                                })
-                                                .to_string(),
-                                        )
-                                        .show_ui(ui, |ui| {
-                                            for version in &dep.versions {
-                                                ui.horizontal(|ui| {
-                                                    if version.featured {
-                                                        ui.colored_label(Color32::GREEN, "✅")
-                                                            .on_hover_text(
-                                                            "This version is featured by the author",
+                                    ui.add_enabled_ui(val.is_added, |ui| {
+                                        ui.label(&dep.name);
+    
+                                        ComboBox::from_id_source(Id::new(&dep.name))
+                                            .selected_text(
+                                                val.version
+                                                    .clone()
+                                                    .map_or("No version selected".to_owned(), |v| {
+                                                        v.version_number.clone()
+                                                    })
+                                                    .to_string(),
+                                            )
+                                            .show_ui(ui, |ui| {
+                                                for version in &dep.versions {
+                                                    ui.horizontal(|ui| {
+                                                        if version.featured {
+                                                            ui.colored_label(Color32::GREEN, "✅")
+                                                                .on_hover_text(
+                                                                "This version is featured by the author",
+                                                            );
+                                                        }
+                                                        ui.selectable_value(
+                                                            &mut val.version,
+                                                            Some(version.clone()),
+                                                            version.version_number.clone(),
                                                         );
-                                                    }
-                                                    ui.selectable_value(
-                                                        &mut val.version,
-                                                        Some(version.clone()),
-                                                        version.version_number.clone(),
-                                                    );
-                                                });
-                                            }
-                                        });
+                                                    });
+                                                }
+                                            });
+                                    });
                                 });
                             });
                         }
 
-                        if self.mod_manager_state.selected_version.is_none() {
+                        let is_version_selected = self.mod_manager_state.selected_version.is_some();
+                        if !is_version_selected {
                             ui.error_label("You must select the version");
                         }
 
-                        if self.mod_manager_state.selected_dependencies.values().filter(|d| d.is_added).all(|d| d.version.is_some()) {
+                        let is_dependencies_selected = self.mod_manager_state.selected_dependencies.values().filter(|d| d.is_added).all(|d| d.version.is_some());
+                        if !is_dependencies_selected {
                             ui.error_label("Select version for all included dependencies");
                         }
 
-                        if ui.button("Download").clicked() {
+                        if ui.add_enabled(is_version_selected && is_dependencies_selected, Button::new("Download")).clicked() {
                             let directory = PathBuf::from(DOT_NOMI_MODS_STASH_DIR).join(format!("{}", self.profile.profile.id));
                             let mut versions = vec![self.mod_manager_state.selected_version.clone().unwrap()];
-                            versions.extend(self.mod_manager_state.selected_dependencies.values().filter_map(|d| d.version));
+                            versions.extend(self.mod_manager_state.selected_dependencies.values().filter(|d| d.is_added).filter_map(|d| d.version.clone()));
 
-                            self.profiles_config.update_config();
-                            let download_task = Task::new("Download mods", Caller::progressing(|progress| async move {
-                                let mods = download_mods(progress, directory, versions);
-                                let cfg = ProfilesConfig::read();
-                                
-                                // TODO
+                            let profile_id = self.profile.profile.id;
+
+                            let _ = self.profiles_config.update_config().report_error();
+                            let download_mod = Task::new("Download mods", Caller::progressing(move |progress| async move {
+                                let mods = download_mods(progress, directory, versions).await;
+                                let mut cfg = ProfilesConfig::read_async().await;
+
+                                // PANICS: Will never panic since this page cannot be accessed without profile.
+                                let profile = cfg.profiles.iter_mut().find(|p| p.profile.id == profile_id).unwrap();
+
+                                if let Some(profile) = Arc::get_mut(profile) {
+                                    profile.mods.mods.extend(mods);
+                                    debug!("Added mods to profile {profile_id} successfully");
+                                }
+
+                                cfg.update_config_async().await.report_error()
                             }));
+
+                           self.task_manager.push_task::<ModsDownloadingCollection>(download_mod);
                         };
                     });
                 }
@@ -540,129 +587,3 @@ impl View for ModManager<'_> {
     }
 }
 
-#[derive(Serialize, Deserialize, Default, PartialEq, Eq, Hash)]
-pub struct ModsConfig {
-    mods: Vec<Mod>,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
-struct Mod {
-    name: String,
-    version_id: VersionId,
-    is_installed: bool,
-    files: Vec<ModFile>,
-    dependencies: Vec<Dependency>,
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
-struct ModFile {
-    sha1: String,
-    url: String,
-    filename: String,
-}
-
-pub struct SimpleDependency {
-    pub name: String,
-    pub versions: Vec<Arc<Version>>,
-    pub is_required: bool,
-}
-
-async fn proceed_deps(
-    dist: &mut Vec<SimpleDependency>,
-    parent: String,
-    version: Arc<Version>,
-    game_version: String,
-    loader: String,
-) -> anyhow::Result<()> {
-    for dep in &version.dependencies {
-        let query = Query::new(
-            ProjectVersionsData::builder()
-                .id_or_slug(dep.project_id.clone())
-                .game_versions(vec![game_version.clone()])
-                .loaders(vec![loader.clone()])
-                .build(),
-        );
-
-        let data = query.query().await?;
-
-        let versions = data.into_iter().map(Arc::new).collect_vec();
-
-        dist.push(SimpleDependency {
-            name: versions
-                .first()
-                .map_or(format!("Dependency. {:?}", &dep.project_id), |v| {
-                    v.name.clone()
-                }),
-            versions: versions.clone(),
-            is_required: dep
-                .dependency_type
-                .as_ref()
-                .is_some_and(|d| d == "required")
-                || dep.dependency_type.is_none(),
-        });
-    }
-
-    Ok(())
-}
-
-async fn download_mods(
-    progress: TaskProgressShared,
-    dir: PathBuf,
-    versions: Vec<Arc<Version>>,
-) -> Vec<Mod> {
-    let _ = progress.set_total(
-        versions
-            .iter()
-            .map(|v| {
-                v.files
-                    .iter()
-                    .filter(|f| f.primary)
-                    .collect::<Vec<_>>()
-                    .len() as u32
-            })
-            .sum(),
-    );
-
-    let mut mods = Vec::new();
-    for version in versions {
-        let mod_value = download_mod(progress.sender(), dir.clone(), version).await;
-        mods.push(mod_value);
-    }
-    mods
-}
-
-async fn download_mod(sender: Sender<Box<dyn Progress>>, dir: PathBuf, version: Arc<Version>) -> Mod {
-    let mut set = DownloadSet::new();
-
-    let mut downloaded_files = Vec::new();
-
-    // We do not download any dependencies. Just the mod.
-    for file in version.files.iter().filter(|f| f.primary) {
-        if tokio::fs::read_to_string(dir.join(&file.filename)).await.is_ok_and(|s| calculate_sha1(s) == file.hashes.sha1) {
-            let _ = sender.send(Box::new(UnitProgress));
-            continue;
-        }
-
-        downloaded_files.push(ModFile {
-            sha1: file.hashes.sha1.clone(),
-            url: file.url.clone(),
-            filename: file.filename.clone(),
-        });
-
-        let downloader = FileDownloader::new(file.url.clone(), dir.join(&file.filename))
-            .with_sha1(file.hashes.sha1.clone());
-        set.add(Box::new(downloader));
-    }
-
-    let sender = MappedSender::new_progress_mapper(Box::new(sender));
-
-    Box::new(set).download(&sender).await;
-
-    Mod {
-        name: version.name.clone(),
-        version_id: version.id.clone(),
-        is_installed: true,
-        files: downloaded_files,
-        dependencies: version.dependencies.clone(),
-    }
-}

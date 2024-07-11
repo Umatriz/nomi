@@ -8,7 +8,7 @@ use egui_extras::{Column, TableBuilder};
 use egui_task_manager::{Caller, Task, TaskManager};
 use nomi_core::{
     configs::profile::{Loader, ProfileState, VersionProfile},
-    fs::{read_toml_config_sync, write_toml_config_sync},
+    fs::{read_toml_config, read_toml_config_sync, write_toml_config, write_toml_config_sync},
     instance::launch::arguments::UserData,
     repository::{launcher_manifest::LauncherManifest, username::Username},
     DOT_NOMI_PROFILES_CONFIG,
@@ -16,7 +16,9 @@ use nomi_core::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    collections::{AssetsCollection, GameDeletionCollection, GameDownloadingCollection},
+    collections::{
+        AssetsCollection, GameDeletionCollection, GameDownloadingCollection, GameRunnerCollection,
+    },
     download::{task_assets, task_download_version},
     errors_pool::ErrorPoolExt,
     utils::spawn_tokio_future,
@@ -25,6 +27,7 @@ use crate::{
 
 use super::{
     add_profile_menu::{AddProfileMenu, AddProfileMenuState},
+    load_mods,
     settings::SettingsState,
     ModsConfig, TabsState, View,
 };
@@ -80,6 +83,16 @@ impl ProfilesConfig {
         read_toml_config_sync::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG).unwrap_or_default()
     }
 
+    pub async fn read_async() -> Self {
+        read_toml_config::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG)
+            .await
+            .unwrap_or_default()
+    }
+
+    pub fn try_read() -> anyhow::Result<Self> {
+        read_toml_config_sync::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG)
+    }
+
     pub fn add_profile(&mut self, profile: ModdedProfile) {
         self.profiles.push(profile.into())
     }
@@ -97,6 +110,10 @@ impl ProfilesConfig {
 
     pub fn update_config(&self) -> anyhow::Result<()> {
         write_toml_config_sync(&self, DOT_NOMI_PROFILES_CONFIG)
+    }
+
+    pub async fn update_config_async(&self) -> anyhow::Result<()> {
+        write_toml_config(&self, DOT_NOMI_PROFILES_CONFIG).await
     }
 }
 
@@ -162,9 +179,6 @@ impl View for ProfilesPage<'_> {
                                     )
                                     .clicked()
                                 {
-                                    let instance = instance.clone();
-                                    let (tx, _rx) = tokio::sync::mpsc::channel(100);
-
                                     let user_data = UserData {
                                         username: Username::new(
                                             self.settings_state.username.clone(),
@@ -174,14 +188,24 @@ impl View for ProfilesPage<'_> {
                                         access_token: None,
                                     };
 
+                                    let instance = instance.clone();
                                     let java_runner = self.settings_state.java.clone();
 
-                                    spawn_tokio_future(tx, async move {
+                                    let should_load_mods = profile.profile.loader().is_fabric();
+                                    let profile_id = profile.profile.id;
+
+                                    let run_game = Task::new("Running the game", Caller::standard(async move {
+                                        if should_load_mods {
+                                            load_mods(profile_id).await.report_error();
+                                        }
+
                                         instance
                                             .launch(user_data, &java_runner)
                                             .await
                                             .report_error()
-                                    });
+                                    }));
+
+                                    self.manager.push_task::<GameRunnerCollection>(run_game)
                                 }
                             }
                             ProfileState::NotDownloaded { .. } => {

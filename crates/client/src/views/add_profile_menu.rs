@@ -269,12 +269,3 @@ impl View for AddProfileMenu<'_> {
         }
     }
 }
-
-#[test]
-fn feature() {
-    let ver = Loader::Fabric {
-        version: Some("123".into()),
-    };
-
-    assert!(matches!(ver, Loader::Fabric { .. }))
-}

@@ -39,14 +39,13 @@ impl FileDownloader {
 impl Downloadable for FileDownloader {
     type Out = DownloadResult;
 
-    #[tracing::instrument(name = "File download", res(level = Level::Trace))]
-    #[allow(clippy::blocks_in_conditions)]
     async fn download(self: Box<Self>) -> Self::Out {
         let result = download_file(&self.path, &self.url)
             .await
             .map(|()| DownloadStatus::Success);
 
         let Ok(_) = result else {
+            dbg!("Returning");
             return DownloadResult(result);
         };
 

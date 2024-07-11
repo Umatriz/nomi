@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use eframe::egui::Button;
 use nomi_core::configs::profile::VersionProfile;
 
 use crate::TabKind;
@@ -24,7 +25,18 @@ impl ProfileInfoState {
 
 impl View for ProfileInfo<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
-        if ui.button("Browse mod").clicked() {
+        for m in &self.profile.mods.mods {
+            ui.label(&m.name);
+        }
+
+        if ui
+            .add_enabled(
+                self.profile.profile.loader().is_fabric(),
+                Button::new("Browse mods"),
+            )
+            .on_disabled_hover_text("Profile must have a mod loader. For example Fabric")
+            .clicked()
+        {
             self.tabs_state.0.insert(TabKind::Mods {
                 profile: self.profile.clone(),
             });

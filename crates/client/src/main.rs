@@ -1,7 +1,7 @@
 use collections::{AssetsCollection, GameDownloadingCollection, JavaCollection};
 use context::MyContext;
 use eframe::{
-    egui::{self, Align, Align2, Frame, Id, Layout, RichText, ViewportBuilder},
+    egui::{self, Align, Align2, Frame, Id, Layout, RichText, ScrollArea, ViewportBuilder},
     epaint::Vec2,
 };
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
@@ -24,6 +24,8 @@ pub mod errors_pool;
 pub mod ui_ext;
 pub mod utils;
 pub mod views;
+
+pub mod mods;
 
 pub mod collections;
 pub mod progress;
@@ -144,7 +146,11 @@ impl eframe::App for MyTabs {
             )
             .add_collection::<collections::DependenciesCollection>(
                 &mut self.context.states.mod_manager.current_dependencies,
-            );
+            )
+            .add_collection::<collections::ModsDownloadingCollection>(
+                &mut self.context.states.profiles.profiles,
+            )
+            .add_collection::<collections::GameRunnerCollection>(());
 
         ctx.set_pixels_per_point(self.context.states.client_settings.pixels_per_point);
 
@@ -222,9 +228,14 @@ impl eframe::App for MyTabs {
                             if pool.is_empty() {
                                 ui.label("No errors");
                             }
-                            for error in pool.iter_errors() {
-                                ui.label(format!("{}", error));
-                            }
+                            ScrollArea::vertical().show(ui, |ui| {
+                                ui.vertical(|ui| {
+                                    for error in pool.iter_errors() {
+                                        ui.label(format!("{:#?}", error));
+                                        ui.separator();
+                                    }
+                                });
+                            });
                         }
                         Err(_) => {
                             ui.spinner();

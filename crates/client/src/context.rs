@@ -103,7 +103,7 @@ impl TabViewer for MyContext {
             }
             TabKind::Mods { profile } => ModManager {
                 task_manager: &mut self.manager,
-                profiles_config: &self.states.profiles.profiles,
+                profiles_config: &mut self.states.profiles.profiles,
                 mod_manager_state: &mut self.states.mod_manager,
                 profile: profile.clone(),
             }
