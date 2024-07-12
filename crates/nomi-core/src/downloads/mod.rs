@@ -1,65 +1,55 @@
-#[cfg(target_os = "windows")]
-pub mod jvm_dowload;
-
-pub mod downloaders;
-pub mod traits;
-
 pub use downloaders::*;
 
 use std::path::{Path, PathBuf};
 
 use futures_util::stream::StreamExt;
 use reqwest::Client;
-use tokio::{io::AsyncWriteExt, task::JoinError};
-use tracing::{debug, error};
+use tokio::io::AsyncWriteExt;
+use tracing::{error, trace};
 
-#[derive(Debug, thiserror::Error)]
+
+pub mod downloaders;
+pub mod progress;
+pub mod traits;
+
+#[derive(Debug, thiserror::Error, Clone)]
 pub enum DownloadError {
     #[error("DownloadError:\nurl: {url}\npath: {path}\nerror: {error:#?}")]
-    Error {
+    Error { url: String, path: PathBuf, error: String },
+
+    #[error("Hashes does not match.\nurl: {url}\npath: {path}\nerror: {error:#?}")]
+    HashDoesNotMatch {
         url: String,
         path: PathBuf,
+        sha1: String,
         error: String,
     },
 
-    #[error("{0}")]
-    JoinError(#[from] JoinError),
+    #[error("The task was cancelled or panicked")]
+    JoinError,
 }
 
-pub(crate) async fn download_file(
-    path: impl AsRef<Path>,
-    url: impl Into<String>,
-) -> Result<(), DownloadError> {
+pub(crate) async fn download_file(path: impl AsRef<Path>, url: impl Into<String>) -> Result<(), DownloadError> {
     let url = url.into();
     let path = path.as_ref();
 
     if let Some(path) = path.parent() {
-        tokio::fs::create_dir_all(path)
-            .await
-            .map_err(|err| DownloadError::Error {
-                url: url.clone(),
-                path: path.to_path_buf(),
-                error: err.to_string(),
-            })?;
-    }
-
-    let client = Client::new();
-    let res = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|err| DownloadError::Error {
+        tokio::fs::create_dir_all(path).await.map_err(|err| DownloadError::Error {
             url: url.clone(),
             path: path.to_path_buf(),
             error: err.to_string(),
         })?;
+    }
+
+    let client = Client::new();
+    let res = client.get(&url).send().await.map_err(|err| DownloadError::Error {
+        url: url.clone(),
+        path: path.to_path_buf(),
+        error: err.to_string(),
+    })?;
 
     let mut file = tokio::fs::File::create(path).await.map_err(|err| {
-        error!(
-            "Error occurred during file creating\nPath: {}\nError: {}",
-            path.to_string_lossy(),
-            err
-        );
+        error!("Error occurred during file creating\nPath: {}\nError: {}", path.to_string_lossy(), err);
         DownloadError::Error {
             url: url.clone(),
             path: path.to_path_buf(),
@@ -89,7 +79,7 @@ pub(crate) async fn download_file(
         })?;
     }
 
-    debug!("Downloaded successfully {}", path.to_string_lossy());
+    trace!("Downloaded successfully {}", path.to_string_lossy());
 
     Ok(())
 }

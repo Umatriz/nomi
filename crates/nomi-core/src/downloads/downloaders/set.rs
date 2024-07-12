@@ -1,17 +1,23 @@
 use std::fmt::Debug;
 
 use tokio::{sync::mpsc::Sender, task::JoinSet};
+use tracing::warn;
 
 use crate::downloads::{
+    progress::ProgressSender,
     traits::{DownloadResult, Downloadable, Downloader},
     DownloadError,
 };
+
+use super::file::FileDownloader;
 
 /// Downloader that starts downloading all provided [`Downloadable`] elements
 /// when [`Downloader::download`] is called
 #[derive(Default)]
 pub struct DownloadSet {
     set: Vec<Box<dyn Downloadable<Out = DownloadResult>>>,
+    failed_downloads: Vec<Box<dyn Downloadable<Out = DownloadResult>>>,
+    helper: Option<Sender<DownloadResult>>,
 }
 
 impl Debug for DownloadSet {
@@ -25,8 +31,18 @@ impl DownloadSet {
         Self::default()
     }
 
+    #[must_use]
+    pub fn with_helper(mut self, helper: Sender<DownloadResult>) -> Self {
+        self.helper = Some(helper);
+        self
+    }
+
     pub fn from_vec_dyn(vec: Vec<Box<dyn Downloadable<Out = DownloadResult>>>) -> Self {
-        Self { set: vec }
+        Self {
+            set: vec,
+            helper: None,
+            failed_downloads: Vec::new(),
+        }
     }
 
     pub fn add<D>(&mut self, downloader: Box<D>) -> &mut Self
@@ -46,7 +62,7 @@ impl Downloader for DownloadSet {
         self.set.len() as u32
     }
 
-    async fn download(mut self: Box<Self>, channel: Sender<Self::Data>) {
+    async fn download(mut self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
         let mut set = JoinSet::new();
 
         for downloader in self.set {
@@ -54,12 +70,28 @@ impl Downloader for DownloadSet {
         }
 
         while let Some(result) = set.join_next().await {
-            let _ = match result {
-                Ok(download_status) => channel.send(download_status).await,
-                Err(join_error) => {
-                    channel
-                        .send(Err(DownloadError::JoinError(join_error)))
-                        .await
+            if let Ok(download_status) = result {
+                sender.update(download_status.clone()).await;
+                if let Some(sender) = self.helper.as_ref() {
+                    let _ = sender.send(download_status.clone()).await;
+                }
+
+                if let Err(e) = download_status.0 {
+                    match e {
+                        DownloadError::Error { url, path, .. } => self.failed_downloads.push(Box::new(FileDownloader::new(url, path))),
+                        DownloadError::HashDoesNotMatch { url, path, sha1, .. } => {
+                            self.failed_downloads.push(Box::new(FileDownloader::new(url, path).with_sha1(sha1)));
+                        }
+                        DownloadError::JoinError => {
+                            warn!("JoinError cannot be handled");
+                        }
+                    }
+                }
+            } else {
+                sender.update(DownloadResult(Err(DownloadError::JoinError))).await;
+
+                if let Some(sender) = self.helper.as_ref() {
+                    let _ = sender.send(DownloadResult(Err(DownloadError::JoinError))).await;
                 }
             };
         }

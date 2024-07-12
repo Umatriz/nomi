@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::utils::path_to_string;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Hash)]
 #[must_use]
 pub enum JavaRunner {
     Command(String),

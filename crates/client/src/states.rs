@@ -1,48 +1,58 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, path::PathBuf};
 
-use nomi_core::fs::read_toml_config_sync;
+use egui_task_manager::{Caller, Task, TaskManager};
+use nomi_core::{
+    downloads::{
+        java::JavaDownloader,
+        progress::MappedSender,
+        traits::{Downloader, DownloaderIO, DownloaderIOExt},
+    },
+    fs::read_toml_config_sync,
+    DOT_NOMI_JAVA_DIR, DOT_NOMI_JAVA_EXECUTABLE, DOT_NOMI_PROFILES_CONFIG, DOT_NOMI_SETTINGS_CONFIG,
+};
+use tracing::info;
 
 use crate::{
-    components::{
+    collections::JavaCollection,
+    errors_pool::{ErrorPoolExt, ErrorsPoolState},
+    views::{
         add_tab_menu::TabsState,
-        download_progress::DownloadProgressState,
         profiles::ProfilesState,
         settings::{ClientSettingsState, SettingsState},
+        AddProfileMenuState, ModManagerState, ProfileInfoState, ProfilesConfig,
     },
-    errors_pool::ErrorsPoolState,
-    TabId,
 };
 
 pub struct States {
     pub tabs: TabsState,
     pub errors_pool: ErrorsPoolState,
 
+    pub java: JavaState,
     pub profiles: ProfilesState,
     pub settings: SettingsState,
     pub client_settings: ClientSettingsState,
-    pub download_progress: DownloadProgressState,
+    pub add_profile_menu_state: AddProfileMenuState,
+    pub mod_manager: ModManagerState,
+    pub profile_info: ProfileInfoState,
 }
 
 impl Default for States {
     fn default() -> Self {
-        let mut tabs = HashSet::new();
-
-        tabs.insert(TabId::PROFILES);
-        tabs.insert(TabId::LOGS);
-        tabs.insert(TabId::SETTINGS);
-        tabs.insert(TabId::DOWNLOAD_PROGRESS);
-
-        let settings = read_toml_config_sync::<SettingsState>("./.nomi/configs/Settings.toml")
-            .unwrap_or_default();
+        let settings = read_toml_config_sync::<SettingsState>(DOT_NOMI_SETTINGS_CONFIG).unwrap_or_default();
 
         Self {
-            tabs: TabsState(tabs),
+            tabs: TabsState::new(),
+            java: JavaState::new(),
             errors_pool: ErrorsPoolState::default(),
-            profiles: read_toml_config_sync::<ProfilesState>("./.nomi/configs/Profiles.toml")
-                .unwrap_or_default(),
+            profiles: ProfilesState {
+                currently_downloading_profiles: HashSet::new(),
+                profiles: read_toml_config_sync::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG).unwrap_or_default(),
+            },
             client_settings: settings.client_settings.clone(),
             settings,
-            download_progress: DownloadProgressState::default(),
+            add_profile_menu_state: AddProfileMenuState::default(),
+            mod_manager: ModManagerState::new(),
+            profile_info: ProfileInfoState::new(),
         }
     }
 }
@@ -50,5 +60,41 @@ impl Default for States {
 impl States {
     pub fn new() -> Self {
         Self::default()
+    }
+}
+
+#[derive(Default)]
+pub struct JavaState {
+    pub is_downloaded: bool,
+}
+
+impl JavaState {
+    pub fn new() -> Self {
+        let res = std::process::Command::new("java").arg("--version").spawn();
+        Self {
+            is_downloaded: res.is_ok() || PathBuf::from(DOT_NOMI_JAVA_EXECUTABLE).exists(),
+        }
+    }
+
+    pub fn download_java(&mut self, manager: &mut TaskManager) {
+        info!("Downloading Java");
+
+        self.is_downloaded = true;
+
+        let caller = Caller::progressing(|progress| async move {
+            let downloader = JavaDownloader::new(PathBuf::from(DOT_NOMI_JAVA_DIR));
+
+            let _ = progress.set_total(downloader.total());
+
+            let io = downloader.get_io();
+
+            let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress.sender()));
+
+            Box::new(downloader).download(&mapped_sender).await;
+
+            io.io().await.report_error();
+        });
+        let task = Task::new("Java downloading", caller);
+        manager.push_task::<JavaCollection>(task);
     }
 }

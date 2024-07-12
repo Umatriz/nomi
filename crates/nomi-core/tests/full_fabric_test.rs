@@ -1,10 +1,10 @@
 use nomi_core::{
-    configs::profile::{ProfileState, VersionProfileBuilder, VersionProfilesConfig},
+    configs::profile::{ProfileState, VersionProfile},
     downloads::traits::Downloader,
     game_paths::GamePaths,
     instance::{
         launch::{arguments::UserData, LaunchSettings},
-        InstanceBuilder,
+        Instance,
     },
     loaders::fabric::Fabric,
     repository::java_runner::JavaRunner,
@@ -25,16 +25,11 @@ async fn full_fabric_test() {
         libraries: "./minecraft/libraries".into(),
     };
 
-    let instance = InstanceBuilder::new()
+    let instance = Instance::builder()
         .name("Full-fabric-test".into())
         .version("1.19.4".into())
         .game_paths(game_paths.clone())
-        .instance(Box::new(
-            Fabric::new("1.19.4", None::<String>, game_paths)
-                .await
-                .unwrap(),
-        ))
-        .sender(tx.clone())
+        .instance(Box::new(Fabric::new("1.19.4", None::<String>, game_paths).await.unwrap()))
         .build();
 
     let mc_dir = current.join("minecraft");
@@ -53,20 +48,18 @@ async fn full_fabric_test() {
 
     let launch = instance.launch_instance(settings, None);
 
-    Box::new(instance.assets().await.unwrap())
-        .download(tx)
-        .await;
-    instance.download().await.unwrap();
+    Box::new(instance.assets().await.unwrap()).download(&tx).await;
 
-    let mock = VersionProfilesConfig { profiles: vec![] };
-    let profile = VersionProfileBuilder::new()
-        .id(mock.create_id())
+    let instance = instance.instance();
+    instance.get_io_dyn().io().await.unwrap();
+
+    instance.download(&tx).await;
+
+    let profile = VersionProfile::builder()
+        .id(1)
         .name("Full-fabric-test".into())
         .state(ProfileState::downloaded(launch))
         .build();
 
-    dbg!(profile)
-        .launch(UserData::default(), &JavaRunner::default())
-        .await
-        .unwrap();
+    dbg!(profile).launch(UserData::default(), &JavaRunner::default()).await.unwrap();
 }

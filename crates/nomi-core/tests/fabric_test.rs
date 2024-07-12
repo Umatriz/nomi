@@ -2,7 +2,7 @@ use nomi_core::{
     game_paths::GamePaths,
     instance::{
         launch::{arguments::UserData, LaunchSettings},
-        InstanceBuilder,
+        Instance,
     },
     loaders::fabric::Fabric,
     repository::java_runner::JavaRunner,
@@ -10,13 +10,8 @@ use nomi_core::{
 
 #[tokio::test]
 async fn vanilla_test() {
-    let subscriber = tracing_subscriber::fmt()
-        .pretty()
-        .with_max_level(tracing::Level::INFO)
-        .finish();
+    let subscriber = tracing_subscriber::fmt().pretty().with_max_level(tracing::Level::INFO).finish();
     tracing::subscriber::set_global_default(subscriber).unwrap();
-
-    let (tx, _) = tokio::sync::mpsc::channel(100);
 
     let game_paths = GamePaths {
         game: "./minecraft".into(),
@@ -25,17 +20,12 @@ async fn vanilla_test() {
         libraries: "./minecraft/libraries".into(),
     };
 
-    let builder = InstanceBuilder::new()
+    let builder = Instance::builder()
         .version("1.20".into())
         .game_paths(game_paths.clone())
-        .instance(Box::new(
-            Fabric::new("1.20", None::<String>, game_paths)
-                .await
-                .unwrap(),
-        ))
+        .instance(Box::new(Fabric::new("1.20", None::<String>, game_paths).await.unwrap()))
         // .instance(Inner::vanilla("1.20").await.unwrap())
         .name("1.20-fabric-test".into())
-        .sender(tx)
         .build();
 
     let _assets = builder.assets().await.unwrap();
@@ -58,7 +48,5 @@ async fn vanilla_test() {
     };
 
     let l = builder.launch_instance(settings, None);
-    l.launch(UserData::default(), &JavaRunner::default())
-        .await
-        .unwrap();
+    l.launch(UserData::default(), &JavaRunner::default()).await.unwrap();
 }

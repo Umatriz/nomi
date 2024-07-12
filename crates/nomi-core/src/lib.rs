@@ -17,5 +17,15 @@ pub mod game_paths;
 pub mod maven_data;
 pub mod state;
 
+pub mod consts;
+
+pub use consts::*;
+
 pub use regex;
+use sha1::Digest;
 pub use uuid::Uuid;
+
+pub fn calculate_sha1(data: impl AsRef<[u8]>) -> String {
+    let value = sha1::Sha1::digest(data);
+    base16ct::lower::encode_string(&value)
+}

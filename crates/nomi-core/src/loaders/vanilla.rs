@@ -1,7 +1,6 @@
 use std::path::Path;
 
 use reqwest::Client;
-use tokio::sync::mpsc::Sender;
 
 use tracing::error;
 
@@ -11,6 +10,7 @@ use crate::{
             file::FileDownloader,
             libraries::{LibrariesDownloader, LibrariesMapper},
         },
+        progress::ProgressSender,
         traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
         DownloadQueue,
     },
@@ -39,47 +39,25 @@ impl Vanilla {
             return Err(crate::error::Error::NoSuchVersion.into());
         };
 
-        let manifest = client
-            .get(&val.url)
-            .send()
-            .await?
-            .json::<Manifest>()
-            .await?;
+        let manifest = client.get(&val.url).send().await?.json::<Manifest>().await?;
 
-        let libraries_mapper = VanillaLibrariesMapper {
-            path: &game_paths.libraries,
-        };
+        let libraries_mapper = VanillaLibrariesMapper { path: &game_paths.libraries };
 
-        let native_libraries_mapper = VanillaNativeLibrariesMapper {
-            path: &game_paths.libraries,
-        };
+        let native_libraries_mapper = VanillaNativeLibrariesMapper { path: &game_paths.libraries };
 
         let queue = DownloadQueue::new()
-            .with_downloader(LibrariesDownloader::new(
-                &libraries_mapper,
-                &manifest.libraries,
-            ))
-            .with_downloader(LibrariesDownloader::new(
-                &native_libraries_mapper,
-                &manifest.libraries,
-            ))
+            .with_downloader(LibrariesDownloader::new(&libraries_mapper, &manifest.libraries))
+            .with_downloader(LibrariesDownloader::new(&native_libraries_mapper, &manifest.libraries))
             .with_downloader(FileDownloader::new(
                 manifest.downloads.client.url.clone(),
                 game_paths.version.join(format!("{}.jar", manifest.id)),
             ));
 
-        Ok(Self {
-            manifest,
-            game_paths,
-            queue,
-        })
+        Ok(Self { manifest, game_paths, queue })
     }
 }
 
-fn manifest_file_to_downloader(
-    manifest_file: &DownloadFile,
-    target_path: &Path,
-) -> Option<FileDownloader> {
+fn manifest_file_to_downloader(manifest_file: &DownloadFile, target_path: &Path) -> Option<FileDownloader> {
     manifest_file
         .path
         .as_ref()
@@ -152,8 +130,8 @@ impl Downloader for Vanilla {
         self.queue.total()
     }
 
-    async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
-        Box::new(self.queue).download(channel).await;
+    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
+        Box::new(self.queue).download(sender).await;
     }
 }
 

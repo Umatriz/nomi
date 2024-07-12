@@ -2,7 +2,6 @@ use std::path::{Path, PathBuf};
 
 use itertools::Itertools;
 use reqwest::Client;
-use tokio::sync::mpsc::Sender;
 
 use crate::{
     configs::profile::Loader,
@@ -11,6 +10,7 @@ use crate::{
             file::FileDownloader,
             libraries::{LibrariesDownloader, LibrariesMapper},
         },
+        progress::ProgressSender,
         traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
     },
     fs::write_to_file,
@@ -36,28 +36,18 @@ pub struct Fabric {
 }
 
 impl Fabric {
-    pub async fn new(
-        game_version: impl Into<String>,
-        loader_version: Option<impl Into<String>>,
-        game_paths: GamePaths,
-    ) -> anyhow::Result<Self> {
+    pub async fn new(game_version: impl Into<String>, loader_version: Option<impl Into<String>>, game_paths: GamePaths) -> anyhow::Result<Self> {
         let game_version = game_version.into();
 
         let client = Client::new();
         let launcher_manifest = get_launcher_manifest().await?;
 
-        if !launcher_manifest
-            .versions
-            .iter()
-            .any(|v| v.id == game_version)
-        {
+        if !launcher_manifest.versions.iter().any(|v| v.id == game_version) {
             return Err(crate::error::Error::NoSuchVersion.into());
         };
 
         let versions: FabricVersions = client
-            .get(format!(
-                "https://meta.fabricmc.net/v2/versions/loader/{game_version}"
-            ))
+            .get(format!("https://meta.fabricmc.net/v2/versions/loader/{game_version}"))
             .send()
             .await?
             .json()
@@ -141,10 +131,7 @@ impl LibrariesMapper<FabricLibrary> for FabricLibrariesMapper {
         let data = MavenData::new(&library.name);
         let path = self.libraries.join(&data.path);
 
-        (!path.exists()).then_some(FileDownloader::new(
-            format!("{}{}", library.url, data.url),
-            path,
-        ))
+        (!path.exists()).then_some(FileDownloader::new(format!("{}{}", library.url, data.url), path))
     }
 }
 
@@ -156,8 +143,8 @@ impl Downloader for Fabric {
         self.libraries_downloader.total()
     }
 
-    async fn download(self: Box<Self>, channel: Sender<Self::Data>) {
-        Box::new(self.libraries_downloader).download(channel).await;
+    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
+        Box::new(self.libraries_downloader).download(sender).await;
     }
 }
 

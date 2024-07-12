@@ -1,5 +1,6 @@
 pub mod assets;
 pub mod file;
+pub mod java;
 pub mod libraries;
 pub mod queue;
 pub mod set;

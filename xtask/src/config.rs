@@ -18,29 +18,3 @@ impl Config {
         Ok(toml::from_str(&s)?)
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use std::io::Write;
-
-    use super::*;
-
-    #[test]
-    fn example_config_test() {
-        let mut file = std::fs::File::create("./Xtask.toml").unwrap();
-        let c = Config {
-            move_folders: Some(BTreeMap::from([
-                (
-                    Path::new("./.nomi").to_path_buf(),
-                    Path::new("./.nomi").to_path_buf(),
-                ),
-                (
-                    Path::new("./.cfg").to_path_buf(),
-                    Path::new("./.cfg").to_path_buf(),
-                ),
-            ])),
-        };
-        let data = toml::to_string_pretty(&c).unwrap();
-        file.write_all(data.as_bytes()).unwrap();
-    }
-}

@@ -102,10 +102,10 @@ pub async fn download(
     instance.assets().await?.download().await?;
     // }
 
-    let confgis = dir.join(".nomi/configs");
+    let configs = dir.join(".nomi/configs");
 
-    let mut profiles: VersionProfilesConfig = if confgis.join("Profiles.toml").exists() {
-        read_toml_config(confgis.join("Profiles.toml")).await?
+    let mut profiles: VersionProfilesConfig = if configs.join("Profiles.toml").exists() {
+        read_toml_config(configs.join("Profiles.toml")).await?
     } else {
         VersionProfilesConfig { profiles: vec![] }
     };

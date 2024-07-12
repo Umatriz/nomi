@@ -3,31 +3,67 @@ on:
   push:
     tags:
       - '*'
+
+permissions:
+  contents: write
+
 jobs:
   publish:
-    runs-on: ubuntu-latest
-    permissions:
-        contents: write
+    name: Publish release
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - build: linux-x86_64
+            os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - build: linux-aarch64
+            os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+
+          - build: macos-x86_64
+            os: macos-latest
+            target: x86_64-apple-darwin
+          - build: macos-aarch64
+            os: macos-latest
+            target: aarch64-apple-darwin
+
+          - build: windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+
     steps:
       - name: Clone project
         uses: actions/checkout@v4
-      - name: Setup MinGW
-        uses: egor-tensin/setup-mingw@v2.2.0
-      - name: Setup GCC
-        uses: egor-tensin/setup-gcc@v1.3
+
       - name: Setup Rust
-        run: |
-          rustup default stable
-          rustup target add x86_64-pc-windows-gnu
-      - name: Build project
-        run: cargo build --target x86_64-pc-windows-gnu --release && cargo build --release
-      - name: Publish release
-        uses: ghalactic/github-release-from-tag@v5
+        uses: dtolnay/rust-toolchain@stable
         with:
-          generateReleaseNotes: "true"
-          prerelease: "false"
-          assets: |
-            - path: target/release/client
-              name: client-linux
-            - path: target/x86_64-pc-windows-gnu/release/client.exe
-              name: client-windows.exe
+          targets: ${{ matrix.target }}
+
+      - name: Build project
+        uses: actions-rs/cargo@v1.0.1
+        with:
+          use-cross: true
+          command: build
+          args: --verbose --release --target ${{ matrix.target }}
+      
+      - name: Make asset
+        shell: bash
+        run: |
+          name="client-${{ matrix.target }}"
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            mv "target/${{ matrix.target }}/release/client.exe" "$name.exe"
+            echo "ASSET=$name.exe" >> $GITHUB_ENV
+          else
+            mv "target/${{ matrix.target }}/release/client" "$name"
+            echo "ASSET=$name" >> $GITHUB_ENV
+          fi
+
+      - name:
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ${{ env.ASSET }}

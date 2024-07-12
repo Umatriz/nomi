@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::maven_data::MavenData;
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SimpleLib {
     pub jar: PathBuf,
 }

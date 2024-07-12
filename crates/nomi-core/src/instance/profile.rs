@@ -5,7 +5,7 @@ use crate::{
     repository::{simple_args::SimpleArgs, simple_lib::SimpleLib},
 };
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LoaderProfile {
     pub loader: Loader,
     pub main_class: String,

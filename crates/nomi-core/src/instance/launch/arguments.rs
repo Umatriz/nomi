@@ -1,8 +1,10 @@
 use std::{marker::PhantomData, path::PathBuf};
 
+use itertools::Itertools;
+
 use crate::{
     instance::{
-        launch::{macros::replace, rules::is_library_passes, LAUNCHER_NAME, LAUNCHER_VERSION},
+        launch::{macros::replace, rules::is_library_passes},
         profile::LoaderProfile,
     },
     repository::{
@@ -10,21 +12,25 @@ use crate::{
         username::Username,
     },
     utils::path_to_string,
+    NOMI_NAME, NOMI_VERSION,
 };
 
 use super::{rules::is_rule_passes, LaunchInstance, CLASSPATH_SEPARATOR};
 
 pub enum Undefined {}
-pub enum Defined {}
+pub enum WithUserData {}
+pub enum WithClasspath {}
 
-pub struct ArgumentsBuilder<'a, S = Undefined> {
+pub struct ArgumentsBuilder<'a, S = Undefined, U = Undefined> {
     instance: &'a LaunchInstance,
     manifest: &'a Manifest,
-    classpath: String,
+    classpath: Vec<PathBuf>,
+    classpath_string: String,
     native_libs: Vec<PathBuf>,
     user_data: UserData,
 
-    _marker: PhantomData<S>,
+    _classpath_marker: PhantomData<S>,
+    _user_data_marker: PhantomData<U>,
 }
 
 #[derive(Default)]
@@ -49,36 +55,62 @@ impl<'a> LoaderArguments<'a> {
     }
 }
 
-impl<'a> ArgumentsBuilder<'a, Undefined> {
-    pub fn new(
-        instance: &'a LaunchInstance,
-        manifest: &'a Manifest,
-        user_data: UserData,
-    ) -> ArgumentsBuilder<'a, Undefined> {
+impl<'a> ArgumentsBuilder<'a, Undefined, Undefined> {
+    pub fn new(instance: &'a LaunchInstance, manifest: &'a Manifest) -> ArgumentsBuilder<'a, Undefined, Undefined> {
         ArgumentsBuilder {
             instance,
             manifest,
-            classpath: String::new(),
+            classpath: Vec::new(),
+            classpath_string: String::new(),
             native_libs: Vec::new(),
-            user_data,
-            _marker: PhantomData,
+            user_data: UserData::default(),
+            _classpath_marker: PhantomData,
+            _user_data_marker: PhantomData,
         }
     }
+}
 
-    pub fn finish(self) -> ArgumentsBuilder<'a, Defined> {
+impl<'a, U> ArgumentsBuilder<'a, Undefined, U> {
+    pub fn with_classpath(self) -> ArgumentsBuilder<'a, WithClasspath, U> {
         let (classpath, native_libs) = dbg!(self.classpath());
         ArgumentsBuilder {
             instance: self.instance,
             manifest: self.manifest,
             user_data: self.user_data,
+            classpath_string: itertools::intersperse(classpath.iter().map(|p| p.display().to_string()), CLASSPATH_SEPARATOR.to_string())
+                .collect::<String>(),
             classpath,
             native_libs,
-            _marker: PhantomData,
+            _classpath_marker: PhantomData,
+            _user_data_marker: PhantomData,
         }
     }
 }
 
-impl<'a> ArgumentsBuilder<'a, Defined> {
+impl<'a, S> ArgumentsBuilder<'a, S, Undefined> {
+    pub fn with_userdata(self, user_data: UserData) -> ArgumentsBuilder<'a, S, WithUserData> {
+        ArgumentsBuilder {
+            instance: self.instance,
+            manifest: self.manifest,
+            user_data,
+            classpath_string: self.classpath_string,
+            classpath: self.classpath,
+            native_libs: self.native_libs,
+            _classpath_marker: PhantomData,
+            _user_data_marker: PhantomData,
+        }
+    }
+}
+
+impl<'a, U> ArgumentsBuilder<'a, WithClasspath, U> {
+    pub fn classpath_as_str(&self) -> &str {
+        &self.classpath_string
+    }
+
+    pub fn classpath_as_slice(&self) -> &[PathBuf] {
+        &self.classpath
+    }
+
     pub fn get_main_class(&self) -> &str {
         self.instance
             .loader_profile
@@ -91,33 +123,26 @@ impl<'a> ArgumentsBuilder<'a, Defined> {
     }
 
     pub fn custom_jvm_arguments(&self) -> &[String] {
-        self.instance
-            .jvm_args
-            .as_ref()
-            .map_or(&[], |args| args.as_slice())
+        self.instance.jvm_args.as_ref().map_or(&[], |args| args.as_slice())
     }
 
     pub fn loader_arguments(&self) -> LoaderArguments<'a> {
         LoaderArguments(self.instance.loader_profile.as_ref())
     }
+}
 
+impl<'a> ArgumentsBuilder<'a, WithClasspath, WithUserData> {
     pub fn manifest_jvm_arguments(&self) -> Vec<String> {
         self.arguments_parser(
             |JvmArguments(jvm), _| jvm.clone(),
             |_| {
                 vec![
-                    format!(
-                        "-Djava.library.path={}",
-                        &self.instance.settings.natives_dir.display()
-                    ),
+                    format!("-Djava.library.path={}", &self.instance.settings.natives_dir.display()),
                     "-Dminecraft.launcher.brand=${launcher_name}".into(),
                     "-Dminecraft.launcher.version=${launcher_version}".into(),
-                    format!(
-                        "-Dminecraft.client.jar={}",
-                        &self.instance.settings.version_jar_file.display()
-                    ),
+                    format!("-Dminecraft.client.jar={}", &self.instance.settings.version_jar_file.display()),
                     "-cp".to_string(),
-                    self.classpath.clone(),
+                    self.classpath_as_str().to_owned(),
                 ]
             },
         )
@@ -126,12 +151,7 @@ impl<'a> ArgumentsBuilder<'a, Defined> {
     pub fn manifest_game_arguments(&self) -> Vec<String> {
         self.arguments_parser(
             |_, GameArguments(game)| game.clone(),
-            |arguments| {
-                arguments
-                    .split_whitespace()
-                    .map(|arg| self.parse_args_from_str(arg))
-                    .collect()
-            },
+            |arguments| arguments.split_whitespace().map(|arg| self.parse_args_from_str(arg)).collect(),
         )
     }
 
@@ -141,8 +161,8 @@ impl<'a> ArgumentsBuilder<'a, Defined> {
             "${game_assets}" => &path_to_string(&self.instance.settings.assets),
             "${game_directory}" => &path_to_string(&self.instance.settings.game_dir),
             "${natives_directory}" => &path_to_string(&self.instance.settings.natives_dir),
-            "${launcher_name}" => LAUNCHER_NAME,
-            "${launcher_version}" => LAUNCHER_VERSION,
+            "${launcher_name}" => NOMI_NAME,
+            "${launcher_version}" => NOMI_VERSION,
             "${auth_access_token}" => self.user_data
                 .access_token
                 .clone()
@@ -159,7 +179,7 @@ impl<'a> ArgumentsBuilder<'a, Defined> {
             "${version_name}" => &self.instance.settings.version,
             "${assets_index_name}" => &self.manifest.asset_index.id,
             "${user_properties}" => "{}",
-            "${classpath}" => &self.classpath
+            "${classpath}" => &self.classpath_as_str()
         )
     }
 
@@ -169,10 +189,7 @@ impl<'a> ArgumentsBuilder<'a, Defined> {
         old_arguments_parser: impl Fn(String) -> Vec<String>,
     ) -> Vec<String> {
         match &self.manifest.arguments {
-            Arguments::New { jvm, game } => self.parse_arguments(new_arguments_parser(
-                JvmArguments(jvm.clone()),
-                GameArguments(game.clone()),
-            )),
+            Arguments::New { jvm, game } => self.parse_arguments(new_arguments_parser(JvmArguments(jvm.clone()), GameArguments(game.clone()))),
             Arguments::Old(arguments) => old_arguments_parser(arguments.clone()),
         }
     }
@@ -187,10 +204,7 @@ impl<'a> ArgumentsBuilder<'a, Defined> {
 
                     match value {
                         Value::String(v) => vec![self.parse_args_from_str(&v)],
-                        Value::Array(arr) => arr
-                            .into_iter()
-                            .map(|arg| self.parse_args_from_str(&arg))
-                            .collect(),
+                        Value::Array(arr) => arr.into_iter().map(|arg| self.parse_args_from_str(&arg)).collect(),
                     }
                 }
                 Argument::String(arg) => vec![self.parse_args_from_str(&arg)],
@@ -200,8 +214,8 @@ impl<'a> ArgumentsBuilder<'a, Defined> {
     }
 }
 
-impl<'a, S> ArgumentsBuilder<'a, S> {
-    fn classpath(&self) -> (String, Vec<PathBuf>) {
+impl<'a, S, U> ArgumentsBuilder<'a, S, U> {
+    fn classpath(&self) -> (Vec<PathBuf>, Vec<PathBuf>) {
         fn match_natives(natives: &Classifiers) -> Option<&DownloadFile> {
             match std::env::consts::OS {
                 "linux" => natives.natives_linux.as_ref(),
@@ -247,20 +261,13 @@ impl<'a, S> ArgumentsBuilder<'a, S> {
             .loader_profile
             .as_ref()
             .map(|p| &p.libraries)
-            .map(|libs| {
-                libs.iter()
-                    .map(|lib| self.instance.settings.libraries_dir.join(&lib.jar))
-            })
+            .map(|libs| libs.iter().map(|lib| self.instance.settings.libraries_dir.join(&lib.jar)))
         {
             classpath.extend(libs);
         }
 
-        let classpath_iter = classpath.iter().map(|p| p.display().to_string());
+        let classpath = classpath.iter().cloned().collect_vec();
 
-        let final_classpath =
-            itertools::intersperse(classpath_iter, CLASSPATH_SEPARATOR.to_string())
-                .collect::<String>();
-
-        (final_classpath, native_libs)
+        (classpath, native_libs)
     }
 }

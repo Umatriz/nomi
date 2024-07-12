@@ -1,16 +1,11 @@
-use const_typed_builder::Builder;
-use tokio::sync::mpsc::Sender;
+use typed_builder::TypedBuilder;
 
 pub mod builder_ext;
 pub mod launch;
 pub mod profile;
 pub mod version_marker;
 
-use crate::{
-    downloads::{downloaders::assets::AssetsDownloader, traits::DownloadResult},
-    game_paths::GamePaths,
-    state::get_launcher_manifest,
-};
+use crate::{downloads::downloaders::assets::AssetsDownloader, game_paths::GamePaths, state::get_launcher_manifest};
 
 use self::{
     launch::{LaunchInstance, LaunchInstanceBuilder, LaunchSettings},
@@ -20,10 +15,9 @@ use self::{
 #[derive(Default, Debug)]
 pub struct Undefined;
 
-#[derive(Debug, Builder)]
+#[derive(Debug, TypedBuilder)]
 pub struct Instance {
     instance: Box<dyn Version>,
-    sender: Sender<DownloadResult>,
     pub game_paths: GamePaths,
     pub version: String,
     pub name: String,
@@ -32,17 +26,6 @@ pub struct Instance {
 impl Instance {
     pub fn instance(self) -> Box<dyn Version> {
         self.instance
-    }
-
-    pub async fn download(self) -> anyhow::Result<()> {
-        {
-            let io = self.instance.get_io_dyn();
-            io.io().await?;
-        }
-
-        self.instance.download(self.sender.clone()).await;
-
-        Ok(())
     }
 
     pub async fn assets(&self) -> anyhow::Result<AssetsDownloader> {
@@ -59,11 +42,7 @@ impl Instance {
     }
 
     #[must_use]
-    pub fn launch_instance(
-        &self,
-        settings: LaunchSettings,
-        jvm_args: Option<Vec<String>>,
-    ) -> LaunchInstance {
+    pub fn launch_instance(&self, settings: LaunchSettings, jvm_args: Option<Vec<String>>) -> LaunchInstance {
         let builder = LaunchInstanceBuilder::new().settings(settings);
         let builder = match jvm_args {
             Some(jvm) => builder.jvm_args(jvm),

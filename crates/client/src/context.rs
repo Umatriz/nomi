@@ -1,15 +1,14 @@
+
 use crate::{
-    components::{
-        download_progress::DownloadProgress, profiles::ProfilesPage, settings::SettingsPage,
-        Component,
-    },
     errors_pool::ErrorPoolExt,
     states::States,
-    Tab, TabKind,
+    views::{self, profiles::ProfilesPage, settings::SettingsPage, ModManager, ProfileInfo, View},
+    TabKind,
 };
 use eframe::egui::{self, ScrollArea};
 use egui_dock::TabViewer;
 use egui_file_dialog::FileDialog;
+use egui_task_manager::TaskManager;
 use egui_tracing::EventCollector;
 use nomi_core::{
     repository::launcher_manifest::{Latest, LauncherManifest},
@@ -21,8 +20,10 @@ pub struct MyContext {
     pub launcher_manifest: &'static LauncherManifest,
     pub file_dialog: FileDialog,
 
+    pub manager: TaskManager,
     pub states: States,
 
+    pub is_allowed_to_take_action: bool,
     pub is_profile_window_open: bool,
 }
 
@@ -36,9 +37,7 @@ impl MyContext {
             versions: Vec::new(),
         };
 
-        let launcher_manifest_ref = pollster::block_on(get_launcher_manifest())
-            .report_error()
-            .unwrap_or(EMPTY_MANIFEST);
+        let launcher_manifest_ref = pollster::block_on(get_launcher_manifest()).report_error().unwrap_or(EMPTY_MANIFEST);
 
         Self {
             collector,
@@ -47,30 +46,44 @@ impl MyContext {
             is_profile_window_open: false,
 
             states: States::new(),
+            manager: TaskManager::new(),
+            is_allowed_to_take_action: true,
         }
     }
 }
 
 impl TabViewer for MyContext {
-    type Tab = Tab;
+    type Tab = TabKind;
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
-        tab.kind().name().into()
+        tab.name().into()
+    }
+
+    fn force_close(&mut self, tab: &mut Self::Tab) -> bool {
+        match tab {
+            TabKind::Mods { profile } => self.states.profiles.profiles.find_profile(profile.profile.id).is_none(),
+            TabKind::ProfileInfo { profile } => self.states.profiles.profiles.find_profile(profile.profile.id).is_none(),
+            _ => false,
+        }
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
-        match &mut tab.kind_mut() {
-            TabKind::Profiles { menu_state } => ProfilesPage {
-                download_progress: &mut self.states.download_progress,
+        match tab {
+            TabKind::Profiles => ProfilesPage {
+                is_allowed_to_take_action: self.is_allowed_to_take_action,
+                manager: &mut self.manager,
                 settings_state: &self.states.settings,
-                state: &mut self.states.profiles,
-                menu_state,
+                profiles_state: &mut self.states.profiles,
+                menu_state: &mut self.states.add_profile_menu_state,
+                tabs_state: &mut self.states.tabs,
 
                 launcher_manifest: self.launcher_manifest,
                 is_profile_window_open: &mut self.is_profile_window_open,
             }
             .ui(ui),
             TabKind::Settings => SettingsPage {
+                java_state: &mut self.states.java,
+                manager: &mut self.manager,
                 settings_state: &mut self.states.settings,
                 client_settings_state: &mut self.states.client_settings,
                 file_dialog: &mut self.file_dialog,
@@ -82,17 +95,32 @@ impl TabViewer for MyContext {
                 });
             }
             TabKind::DownloadProgress => {
-                DownloadProgress {
-                    download_progress_state: &mut self.states.download_progress,
+                views::DownloadingProgress {
+                    manager: &self.manager,
                     profiles_state: &mut self.states.profiles,
                 }
                 .ui(ui);
             }
+            TabKind::Mods { profile } => ModManager {
+                task_manager: &mut self.manager,
+                profiles_config: &mut self.states.profiles.profiles,
+                mod_manager_state: &mut self.states.mod_manager,
+                profile: profile.clone(),
+            }
+            .ui(ui),
+            TabKind::ProfileInfo { profile } => ProfileInfo {
+                profile: &*profile,
+                tabs_state: &mut self.states.tabs,
+                profile_info_state: &mut self.states.profile_info,
+            }
+            .ui(ui),
         };
     }
 
     fn on_close(&mut self, tab: &mut Self::Tab) -> bool {
-        self.states.tabs.0.remove(tab.id());
+        if let Some(index) = self.states.tabs.0.iter().position(|t| t == &*tab) {
+            self.states.tabs.0.remove(index);
+        }
         true
     }
 }

@@ -6,8 +6,7 @@ use std::{
 use once_cell::sync::Lazy;
 use tracing::error;
 
-pub static ERRORS_POOL: Lazy<Arc<RwLock<ErrorsPool>>> =
-    Lazy::new(|| Arc::new(RwLock::new(ErrorsPool::default())));
+pub static ERRORS_POOL: Lazy<Arc<RwLock<ErrorsPool>>> = Lazy::new(|| Arc::new(RwLock::new(ErrorsPool::default())));
 
 pub trait Error: Display + Debug {}
 
@@ -68,7 +67,7 @@ where
         match self {
             Ok(value) => Some(value),
             Err(error) => {
-                error!("{}", error);
+                error!("{:#?}", error);
                 if let Ok(mut pool) = ERRORS_POOL
                     .clone()
                     .write()
@@ -88,6 +87,7 @@ where
         match self {
             Ok(value) => Some(value),
             Err(error) => {
+                error!("{:#?}", error);
                 if let Ok(mut pool) = ERRORS_POOL
                     .clone()
                     .write()
