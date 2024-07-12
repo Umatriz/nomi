@@ -80,7 +80,7 @@ impl Downloader for DownloadSet {
                     match e {
                         DownloadError::Error { url, path, .. } => self.failed_downloads.push(Box::new(FileDownloader::new(url, path))),
                         DownloadError::HashDoesNotMatch { url, path, sha1, .. } => {
-                            self.failed_downloads.push(Box::new(FileDownloader::new(url, path).with_sha1(sha1)))
+                            self.failed_downloads.push(Box::new(FileDownloader::new(url, path).with_sha1(sha1)));
                         }
                         DownloadError::JoinError => {
                             warn!("JoinError cannot be handled");

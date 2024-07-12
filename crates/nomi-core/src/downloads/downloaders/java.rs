@@ -244,9 +244,10 @@ mod tests {
 
         dbg!(rx.recv().await);
 
-        if !check_hash(PathBuf::from("./").join(consts3::ARCHIVE_FILENAME), consts3::SHA256).unwrap() {
-            panic!("Hashes does not match");
-        }
+        assert!(
+            check_hash(PathBuf::from("./").join(consts3::ARCHIVE_FILENAME), consts3::SHA256).unwrap(),
+            "Hashes does not match"
+        );
 
         let file = File::open(consts3::ARCHIVE_FILENAME).unwrap();
 

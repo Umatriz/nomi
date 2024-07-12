@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use sha1::Digest;
 use tracing::{debug, error};
 
 use crate::{
