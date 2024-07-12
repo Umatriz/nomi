@@ -17,7 +17,6 @@ use crate::{
     collections::{AssetsCollection, GameDeletionCollection, GameDownloadingCollection, GameRunnerCollection},
     download::{task_assets, task_download_version},
     errors_pool::ErrorPoolExt,
-    utils::spawn_tokio_future,
     TabKind,
 };
 
@@ -201,6 +200,8 @@ impl View for ProfilesPage<'_> {
                                     )
                                     .clicked()
                                 {
+                                    self.profiles_state.currently_downloading_profiles.insert(profile.profile.id);
+
                                     let game_version = profile.profile.version().to_owned();
 
                                     let assets_task = Task::new(
@@ -222,7 +223,7 @@ impl View for ProfilesPage<'_> {
 
                         row.col(|ui| {
                             if ui.button("Details").clicked() {
-                                self.tabs_state.0.insert(TabKind::ProfileInfo { profile: profile.clone() });
+                                self.tabs_state.0.push(TabKind::ProfileInfo { profile: profile.clone() });
                             }
                         });
 

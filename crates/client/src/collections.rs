@@ -1,5 +1,6 @@
 use std::{collections::HashMap, marker::PhantomData, sync::Arc};
 
+use egui_dock::DockState;
 use egui_task_manager::*;
 use nomi_core::{configs::profile::VersionProfile, repository::fabric_meta::FabricVersions};
 use nomi_modding::modrinth::{
@@ -9,7 +10,8 @@ use nomi_modding::modrinth::{
 
 use crate::{
     errors_pool::ErrorPoolExt,
-    views::{ModdedProfile, ModsConfig, ProfilesConfig, SimpleDependency},
+    views::{ModdedProfile, ModsConfig, ProfilesConfig, SimpleDependency, TabsState},
+    TabKind,
 };
 
 pub struct FabricDataCollection;
@@ -186,9 +188,9 @@ impl<'c> TasksCollection<'c> for DependenciesCollection {
 pub struct ModsDownloadingCollection;
 
 impl<'c> TasksCollection<'c> for ModsDownloadingCollection {
-    type Context = &'c mut ProfilesConfig;
+    type Context = (&'c mut TabsState, &'c mut ProfilesConfig, &'c mut DockState<TabKind>);
 
-    type Target = Option<()>;
+    type Target = Option<Arc<ModdedProfile>>;
 
     type Executor = executors::Linear;
 
@@ -197,11 +199,13 @@ impl<'c> TasksCollection<'c> for ModsDownloadingCollection {
     }
 
     fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|value: Option<()>| {
-            if value.is_some() {
+        Handler::new(|value: Option<Arc<ModdedProfile>>| {
+            if let Some(profile) = value {
                 if let Ok(cfg) = ProfilesConfig::try_read() {
-                    *context = cfg
+                    *context.1 = cfg
                 }
+
+                context.0.update_profile_tabs(context.2, context.1, profile);
             }
         })
     }

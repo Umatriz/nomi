@@ -55,7 +55,7 @@ impl View for ProfileInfo<'_> {
             .on_disabled_hover_text("Profile must have a mod loader. For example Fabric")
             .clicked()
         {
-            self.tabs_state.0.insert(TabKind::Mods {
+            self.tabs_state.0.push(TabKind::Mods {
                 profile: self.profile.clone(),
             });
         }

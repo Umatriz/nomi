@@ -73,19 +73,6 @@ impl TabViewer for MyContext {
         }
     }
 
-    fn on_tab_button(&mut self, tab: &mut Self::Tab, response: &egui::Response) {
-        if response.clicked() {
-            if let TabKind::ProfileInfo { profile } = tab {
-                // PANICS: Will never panic since the tab cannot be opened if the profile does not exists
-                let prof = self.states.profiles.profiles.find_profile(profile.profile.id).unwrap();
-
-                self.states.tabs.0.remove(&*tab);
-
-                self.states.tabs.0.insert(TabKind::ProfileInfo { profile: prof.clone() });
-            }
-        }
-    }
-
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         match tab {
             TabKind::Profiles => ProfilesPage {
@@ -137,7 +124,9 @@ impl TabViewer for MyContext {
     }
 
     fn on_close(&mut self, tab: &mut Self::Tab) -> bool {
-        self.states.tabs.0.remove(tab);
+        if let Some(index) = self.states.tabs.0.iter().position(|t| t == &*tab) {
+            self.states.tabs.0.remove(index);
+        }
         true
     }
 }

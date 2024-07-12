@@ -297,8 +297,10 @@ impl View for ModManager<'_> {
                                     }
 
                                     if ui.button("Download").clicked() {
-                                        self.mod_manager_state.is_download_window_open = true;
+                                        self.mod_manager_state.selected_version = None;
+                                        self.mod_manager_state.selected_dependencies.clear();
 
+                                        self.mod_manager_state.is_download_window_open = true;
                                         let game_version = self.profile.profile.version().to_owned();
 
                                         let loader = self.profile.profile.loader_name().to_lowercase();
@@ -363,11 +365,15 @@ impl View for ModManager<'_> {
                 if let Some(project) = &self.mod_manager_state.current_project {
                     ui.vertical(|ui| {
                         ui.horizontal(|ui| {
-                            ui.add(Image::new(&project.icon_url).fit_to_exact_size(Vec2::splat(50.0)));
-                            ui.vertical(|ui| {
-                                ui.label(RichText::new(&project.title).heading());
-                                ui.label(&project.description)
-                            });
+                            if self.task_manager.get_collection::<ProjectCollection>().tasks().is_empty() {
+                                ui.add(Image::new(&project.icon_url).fit_to_exact_size(Vec2::splat(50.0)));
+                                ui.vertical(|ui| {
+                                    ui.label(RichText::new(&project.title).heading());
+                                    ui.label(&project.description)
+                                });
+                            } else {
+                                ui.spinner();
+                            }
                         });
 
                         ui.separator();
@@ -515,7 +521,7 @@ impl View for ModManager<'_> {
                                     .filter_map(|d| d.version.clone()),
                             );
 
-                            let profile_id = self.profile.profile.id;
+                            let profile = self.profile.clone();
 
                             let _ = self.profiles_config.update_config().report_error();
                             let download_mod = Task::new(
@@ -525,14 +531,18 @@ impl View for ModManager<'_> {
                                     let mut cfg = ProfilesConfig::read_async().await;
 
                                     // PANICS: Will never panic since this page cannot be accessed without profile.
-                                    let profile = cfg.profiles.iter_mut().find(|p| p.profile.id == profile_id).unwrap();
+                                    let prof = cfg.profiles.iter_mut().find(|p| p.profile.id == profile.profile.id).unwrap();
 
-                                    if let Some((profile, mods)) = Arc::get_mut(profile).and_then(|p| mods.map(|m| (p, m))) {
+                                    if let Some((profile, mods)) = Arc::get_mut(prof).and_then(|p| mods.map(|m| (p, m))) {
                                         profile.mods.mods.extend(mods);
-                                        debug!("Added mods to profile {profile_id} successfully");
+                                        profile.mods.mods.sort();
+                                        profile.mods.mods.dedup();
+                                        debug!("Added mods to profile {} successfully", profile.profile.id);
                                     }
 
-                                    cfg.update_config_async().await.report_error()
+                                    cfg.update_config_async().await.report_error();
+
+                                    Some(profile)
                                 }),
                             );
 

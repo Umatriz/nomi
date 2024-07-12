@@ -83,16 +83,6 @@ fn main() {
     info!("Exiting")
 }
 
-pub fn set_selected<T: Clone + Eq + Hash>(open: &mut HashSet<T>, key: &T, is_open: bool) {
-    if is_open {
-        if !open.contains(key) {
-            open.insert(key.to_owned());
-        }
-    } else {
-        open.remove(key);
-    }
-}
-
 struct MyTabs {
     context: MyContext,
     dock_state: DockState<TabKind>,
@@ -134,7 +124,11 @@ impl eframe::App for MyTabs {
             .add_collection::<collections::ProjectCollection>(&mut self.context.states.mod_manager.current_project)
             .add_collection::<collections::ProjectVersionsCollection>(&mut self.context.states.mod_manager.current_versions)
             .add_collection::<collections::DependenciesCollection>(&mut self.context.states.mod_manager.current_dependencies)
-            .add_collection::<collections::ModsDownloadingCollection>(&mut self.context.states.profiles.profiles)
+            .add_collection::<collections::ModsDownloadingCollection>((
+                &mut self.context.states.tabs,
+                &mut self.context.states.profiles.profiles,
+                &mut self.dock_state,
+            ))
             .add_collection::<collections::GameRunnerCollection>(());
 
         ctx.set_pixels_per_point(self.context.states.client_settings.pixels_per_point);
