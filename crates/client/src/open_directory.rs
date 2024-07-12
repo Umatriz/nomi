@@ -16,11 +16,11 @@ pub fn open_directory_native(dir: impl AsRef<Path>) -> anyhow::Result<Child> {
 
     #[cfg(target_os = "macos")]
     {
-        Command::new("open").arg(dir.as_ref()).spawn().map_err(Into::into)
+        Command::new("open").arg(dir).spawn().map_err(Into::into)
     }
 
     #[cfg(target_os = "linux")]
     {
-        Command::new("xdg-open").arg(dir.as_ref()).spawn().map_err(Into::into)
+        Command::new("xdg-open").arg(dir).spawn().map_err(Into::into)
     }
 }
