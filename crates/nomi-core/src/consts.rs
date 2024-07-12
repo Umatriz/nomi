@@ -10,5 +10,5 @@ pub const DOT_NOMI_DATA_PACKS_DIR: &str = "./.nomi/datapacks";
 
 pub const MINECRAFT_DIR: &str = "./minecraft";
 
-pub const NOMI_VERSION: &str = "0.1.2-pre1";
+pub const NOMI_VERSION: &str = "0.2.0";
 pub const NOMI_NAME: &str = "Nomi";
