@@ -21,7 +21,10 @@ use nomi_modding::{
 use serde::{Deserialize, Serialize};
 use tokio::{fs::File, io::AsyncWriteExt};
 
-use crate::{progress::UnitProgress, DOT_NOMI_MODS_STASH_DIR, MINECRAFT_MODS_DIRECTORY, NOMI_LOADED_LOCK_FILE, NOMI_LOADED_LOCK_FILE_NAME};
+use crate::{
+    errors_pool::ErrorPoolExt, progress::UnitProgress, DOT_NOMI_MODS_STASH_DIR, MINECRAFT_MODS_DIRECTORY, NOMI_LOADED_LOCK_FILE,
+    NOMI_LOADED_LOCK_FILE_NAME,
+};
 
 #[derive(Serialize, Deserialize, Default, PartialEq, Eq, Hash, Debug)]
 pub struct ModsConfig {
@@ -78,7 +81,7 @@ pub async fn proceed_deps(dist: &mut Vec<SimpleDependency>, version: Arc<Version
     Ok(())
 }
 
-pub async fn download_mods(progress: TaskProgressShared, dir: PathBuf, versions: Vec<Arc<Version>>) -> Vec<Mod> {
+pub async fn download_mods(progress: TaskProgressShared, dir: PathBuf, versions: Vec<Arc<Version>>) -> anyhow::Result<Vec<Mod>> {
     let _ = progress.set_total(
         versions
             .iter()
@@ -88,13 +91,14 @@ pub async fn download_mods(progress: TaskProgressShared, dir: PathBuf, versions:
 
     let mut mods = Vec::new();
     for version in versions {
-        let mod_value = download_mod(progress.sender(), dir.clone(), version).await;
+        let mod_value = download_mod(progress.sender(), dir.clone(), version).await?;
         mods.push(mod_value);
     }
-    mods
+
+    Ok(mods)
 }
 
-pub async fn download_mod(sender: Sender<Box<dyn Progress>>, dir: PathBuf, version: Arc<Version>) -> Mod {
+pub async fn download_mod(sender: Sender<Box<dyn Progress>>, dir: PathBuf, version: Arc<Version>) -> anyhow::Result<Mod> {
     let mut set = DownloadSet::new();
 
     let mut downloaded_files = Vec::new();
@@ -123,14 +127,17 @@ pub async fn download_mod(sender: Sender<Box<dyn Progress>>, dir: PathBuf, versi
 
     Box::new(set).download(&sender).await;
 
-    Mod {
-        name: version.name.clone(),
+    let query = Query::new(ProjectData::new(version.project_id.clone()));
+    let name = query.query().await?.title;
+
+    Ok(Mod {
+        name,
         version_id: version.id.clone(),
         is_installed: true,
         files: downloaded_files,
         dependencies: version.dependencies.clone(),
         project_id: version.project_id.clone(),
-    }
+    })
 }
 
 #[derive(Serialize, Deserialize)]

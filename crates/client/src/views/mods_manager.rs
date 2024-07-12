@@ -239,7 +239,13 @@ impl View for ModManager<'_> {
                             }
                         }
                         let facets = || {
-                            let mut parts = Parts::from_project_type(self.mod_manager_state.current_project_type);
+                            let mut parts = if matches!(self.mod_manager_state.current_project_type, ProjectType::Mod) {
+                                Parts::new()
+                                    .part(InnerPart::new().add_category(self.profile.profile.loader_name().to_lowercase()))
+                                    .add_project_type(ProjectType::Mod)
+                            } else {
+                                Parts::from_project_type(self.mod_manager_state.current_project_type)
+                            };
 
                             if !(*set).is_empty() {
                                 parts.add_part(InnerPart::from_vec(set.iter().map(InnerPart::format_category).collect()));
@@ -402,6 +408,12 @@ impl View for ModManager<'_> {
                                 }
                             });
 
+                        let is_dependencies_loaded = self.task_manager.get_collection::<DependenciesCollection>().tasks().is_empty();
+
+                        if !is_dependencies_loaded {
+                            ui.spinner();
+                        }
+
                         if !self.mod_manager_state.current_dependencies.is_empty() {
                             ui.separator();
 
@@ -478,7 +490,10 @@ impl View for ModManager<'_> {
                         }
 
                         if ui
-                            .add_enabled(is_version_selected && is_dependencies_selected, Button::new("Download"))
+                            .add_enabled(
+                                is_version_selected && is_dependencies_selected && is_dependencies_loaded,
+                                Button::new("Download"),
+                            )
                             .clicked()
                         {
                             let directory = match self.mod_manager_state.current_project_type {
@@ -506,13 +521,13 @@ impl View for ModManager<'_> {
                             let download_mod = Task::new(
                                 "Download mods",
                                 Caller::progressing(move |progress| async move {
-                                    let mods = download_mods(progress, directory, versions).await;
+                                    let mods = download_mods(progress, directory, versions).await.report_error();
                                     let mut cfg = ProfilesConfig::read_async().await;
 
                                     // PANICS: Will never panic since this page cannot be accessed without profile.
                                     let profile = cfg.profiles.iter_mut().find(|p| p.profile.id == profile_id).unwrap();
 
-                                    if let Some(profile) = Arc::get_mut(profile) {
+                                    if let Some((profile, mods)) = Arc::get_mut(profile).and_then(|p| mods.map(|m| (p, m))) {
                                         profile.mods.mods.extend(mods);
                                         debug!("Added mods to profile {profile_id} successfully");
                                     }

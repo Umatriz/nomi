@@ -1,7 +1,7 @@
 use collections::{AssetsCollection, GameDownloadingCollection, GameRunnerCollection, JavaCollection};
 use context::MyContext;
 use eframe::{
-    egui::{self, Align, Align2, Button, Frame, Id, Layout, RichText, ScrollArea, ViewportBuilder},
+    egui::{self, menu::bar, Align, Align2, Button, Frame, Id, Layout, RichText, ScrollArea, ViewportBuilder},
     epaint::Vec2,
 };
 use egui_dock::{DockArea, DockState, NodeIndex, Style};

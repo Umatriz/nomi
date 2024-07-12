@@ -37,11 +37,15 @@ impl View for ProfileInfo<'_> {
             .add_enabled(self.profile.profile.loader().is_fabric(), Button::new("Open mods folder"))
             .on_hover_text("Open a folder where mods for this profile are located.")
             .on_hover_text(
-                "You can add your own mods but they will not be shown in the list below.\nAlthough they still will be loaded automatically.",
+                "You can add your own mods but they will not be shown in the list above.\nAlthough they still will be loaded automatically.",
             )
             .clicked()
         {
-            if let Ok(path) = std::fs::canonicalize(Path::new(DOT_NOMI_MODS_STASH_DIR).join(format!("{}", self.profile.profile.id))) {
+            let path = Path::new(DOT_NOMI_MODS_STASH_DIR).join(format!("{}", self.profile.profile.id));
+            if !path.exists() {
+                std::fs::create_dir_all(&path).report_error();
+            }
+            if let Ok(path) = std::fs::canonicalize(path) {
                 open_directory_native(path).report_error();
             }
         }
