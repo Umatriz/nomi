@@ -7,7 +7,6 @@ use reqwest::Client;
 use tokio::io::AsyncWriteExt;
 use tracing::{error, trace};
 
-use crate::error;
 
 pub mod downloaders;
 pub mod progress;

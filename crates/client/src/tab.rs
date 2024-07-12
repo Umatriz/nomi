@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use nomi_core::configs::profile::VersionProfile;
 
-use crate::views::{ModdedProfile, SimpleProfile};
+use crate::views::{ModdedProfile};
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 pub enum TabKind {

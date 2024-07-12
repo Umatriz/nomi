@@ -18,7 +18,7 @@ use nomi_core::{
 
 use crate::{
     errors_pool::ErrorPoolExt,
-    views::{ModdedProfile, ModsConfig},
+    views::{ModdedProfile},
 };
 
 pub async fn task_download_version(profile: Arc<ModdedProfile>, progress_shared: TaskProgressShared) -> Option<ModdedProfile> {

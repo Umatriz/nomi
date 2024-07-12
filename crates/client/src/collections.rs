@@ -1,16 +1,13 @@
-use std::{collections::HashMap, marker::PhantomData, sync::Arc};
+use std::sync::Arc;
 
 use egui_dock::DockState;
 use egui_task_manager::*;
-use nomi_core::{configs::profile::VersionProfile, repository::fabric_meta::FabricVersions};
-use nomi_modding::modrinth::{
-    project::Project,
-    version::{Version, VersionId},
-};
+use nomi_core::repository::fabric_meta::FabricVersions;
+use nomi_modding::modrinth::{project::Project, version::Version};
 
 use crate::{
     errors_pool::ErrorPoolExt,
-    views::{ModdedProfile, ModsConfig, ProfilesConfig, SimpleDependency, TabsState},
+    views::{ModdedProfile, ProfilesConfig, SimpleDependency, TabsState},
     TabKind,
 };
 

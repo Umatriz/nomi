@@ -1,22 +1,19 @@
 use collections::{AssetsCollection, GameDownloadingCollection, GameRunnerCollection, JavaCollection};
 use context::MyContext;
 use eframe::{
-    egui::{self, menu::bar, Align, Align2, Button, Frame, Id, Layout, RichText, ScrollArea, ViewportBuilder},
+    egui::{self, Align, Align2, Button, Frame, Id, Layout, RichText, ScrollArea, ViewportBuilder},
     epaint::Vec2,
 };
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
-use egui_file_dialog::DialogMode;
 use egui_tracing::EventCollector;
 use open_directory::open_directory_native;
 use std::{
-    collections::HashSet,
-    hash::Hash,
-    path::{Path, PathBuf},
+    path::{Path},
 };
 use views::{add_tab_menu::AddTab, View};
 
 use errors_pool::{ErrorPoolExt, ERRORS_POOL};
-use nomi_core::{DOT_NOMI_DATA_PACKS_DIR, DOT_NOMI_DIR, DOT_NOMI_LOGS_DIR};
+use nomi_core::{DOT_NOMI_DATA_PACKS_DIR, DOT_NOMI_LOGS_DIR};
 use tracing::{info, Level};
 use tracing_subscriber::{
     fmt::{writer::MakeWriterExt, Layer},

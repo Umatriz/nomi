@@ -1,11 +1,10 @@
 use std::{path::Path, sync::Arc};
 
 use eframe::egui::Button;
-use nomi_core::configs::profile::VersionProfile;
 
 use crate::{errors_pool::ErrorPoolExt, open_directory::open_directory_native, TabKind, DOT_NOMI_MODS_STASH_DIR};
 
-use super::{ModdedProfile, SimpleProfile, TabsState, View};
+use super::{ModdedProfile, TabsState, View};
 
 pub struct ProfileInfo<'a> {
     pub profile: &'a Arc<ModdedProfile>,
@@ -13,6 +12,7 @@ pub struct ProfileInfo<'a> {
     pub profile_info_state: &'a mut ProfileInfoState,
 }
 
+#[derive(Default)]
 pub struct ProfileInfoState {
     // pub current_profile: VersionProfile,
 }

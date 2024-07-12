@@ -1,4 +1,3 @@
-use std::ops::Deref;
 
 use crate::{
     errors_pool::ErrorPoolExt,
@@ -9,16 +8,11 @@ use crate::{
 use eframe::egui::{self, ScrollArea};
 use egui_dock::TabViewer;
 use egui_file_dialog::FileDialog;
-use egui_infinite_scroll::InfiniteScroll;
 use egui_task_manager::TaskManager;
 use egui_tracing::EventCollector;
 use nomi_core::{
     repository::launcher_manifest::{Latest, LauncherManifest},
     state::get_launcher_manifest,
-};
-use nomi_modding::{
-    modrinth::search::{Hit, SearchData},
-    Query,
 };
 
 pub struct MyContext {

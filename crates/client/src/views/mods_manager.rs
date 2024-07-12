@@ -1,37 +1,30 @@
 use std::{
     collections::{HashMap, HashSet},
     path::PathBuf,
-    sync::{mpsc::Sender, Arc},
+    sync::Arc,
 };
 
 use eframe::egui::{self, Button, Color32, ComboBox, Id, Image, Layout, RichText, ScrollArea, SelectableLabel, Vec2};
 use egui_infinite_scroll::{InfiniteScroll, LoadingState};
-use egui_task_manager::{Caller, Progress, Task, TaskManager, TaskProgressShared};
-use itertools::Itertools;
-use nomi_core::{
-    calculate_sha1,
-    downloads::{progress::MappedSender, traits::Downloader, DownloadSet, FileDownloader},
-    DOT_NOMI_DATA_PACKS_DIR, MINECRAFT_DIR,
-};
+use egui_task_manager::{Caller, Task, TaskManager};
+use nomi_core::{DOT_NOMI_DATA_PACKS_DIR, MINECRAFT_DIR};
 use nomi_modding::{
     capitalize_first_letters_whitespace_split,
     modrinth::{
         categories::{Categories, CategoriesData, Header},
-        project::{Project, ProjectData, ProjectId},
+        project::{Project, ProjectData},
         search::{Facets, Hit, InnerPart, Parts, ProjectType, SearchData},
-        version::{Dependency, File, ProjectVersionsData, Version, VersionId},
+        version::{ProjectVersionsData, Version},
     },
     Query,
 };
-use serde::{Deserialize, Serialize};
 use tracing::debug;
 
 use crate::{
     collections::{DependenciesCollection, ModsDownloadingCollection, ProjectCollection, ProjectVersionsCollection},
     errors_pool::ErrorPoolExt,
-    progress::UnitProgress,
     ui_ext::UiExt,
-    DOT_NOMI_MODS_STASH_DIR, MINECRAFT_MODS_DIRECTORY,
+    DOT_NOMI_MODS_STASH_DIR,
 };
 
 use super::{ModdedProfile, ProfilesConfig, View};
@@ -58,7 +51,6 @@ pub struct ModManagerState {
     pub selected_categories: HashSet<String>,
 
     pub is_download_window_open: bool,
-    pub download_window_state: DownloadWindowState,
     pub current_project: Option<Project>,
     pub current_versions: Vec<Arc<Version>>,
     pub selected_version: Option<Arc<Version>>,
@@ -69,13 +61,6 @@ pub struct ModManagerState {
 pub struct MaybeAddedDependency {
     version: Option<Arc<Version>>,
     is_added: bool,
-}
-
-#[derive(Default)]
-pub struct DownloadWindowState {
-    project_id: ProjectId,
-    game_version: String,
-    loader: String,
 }
 
 fn fix_svg(text: &str, color: Color32) -> Option<String> {
@@ -106,7 +91,6 @@ impl ModManagerState {
             current_project_type: ProjectType::Mod,
             previous_project_type: ProjectType::Mod,
             scroll: Self::create_scroll(None, None),
-            download_window_state: DownloadWindowState::default(),
             is_download_window_open: false,
             current_project: None,
             current_versions: Vec::new(),
@@ -304,12 +288,6 @@ impl View for ModManager<'_> {
                                         let game_version = self.profile.profile.version().to_owned();
 
                                         let loader = self.profile.profile.loader_name().to_lowercase();
-
-                                        self.mod_manager_state.download_window_state = DownloadWindowState {
-                                            project_id: item.project_id.clone(),
-                                            game_version: game_version.clone(),
-                                            loader: loader.clone(),
-                                        };
 
                                         let id = item.project_id.clone();
                                         let get_project = Task::new(

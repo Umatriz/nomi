@@ -14,7 +14,7 @@ use nomi_core::{
 use nomi_modding::{
     modrinth::{
         project::{ProjectData, ProjectId},
-        version::{Dependency, ProjectVersionsData, Version, VersionId},
+        version::{ProjectVersionsData, Version, VersionId},
     },
     Query,
 };
@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use tokio::{fs::File, io::AsyncWriteExt};
 
 use crate::{
-    errors_pool::ErrorPoolExt, progress::UnitProgress, DOT_NOMI_MODS_STASH_DIR, MINECRAFT_MODS_DIRECTORY, NOMI_LOADED_LOCK_FILE,
+    progress::UnitProgress, DOT_NOMI_MODS_STASH_DIR, MINECRAFT_MODS_DIRECTORY, NOMI_LOADED_LOCK_FILE,
     NOMI_LOADED_LOCK_FILE_NAME,
 };
 

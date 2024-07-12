@@ -1,7 +1,6 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use eframe::egui::{self, popup_below_widget, Align2, Button, Id, PopupCloseBehavior, TextWrapMode, Ui};
-use egui_dock::DockState;
 use egui_extras::{Column, TableBuilder};
 use egui_task_manager::{Caller, Task, TaskManager};
 use nomi_core::{
