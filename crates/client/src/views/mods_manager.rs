@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    path::{Path, PathBuf},
+    path::PathBuf,
     sync::Arc,
 };
 
@@ -592,7 +592,7 @@ impl View for ModManager<'_> {
                                         } else {
                                             directory_from_project_type(project_type, profile.profile.id)
                                         };
-                                        
+
                                         let data = (
                                             version,
                                             path,

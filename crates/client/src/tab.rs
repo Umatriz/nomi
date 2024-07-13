@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
-
-use crate::views::{ModdedProfile};
+use crate::views::ModdedProfile;
 
 #[derive(PartialEq, Eq, Hash, Clone)]
 pub enum TabKind {
