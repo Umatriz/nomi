@@ -21,10 +21,7 @@ use nomi_modding::{
 use serde::{Deserialize, Serialize};
 use tokio::{fs::File, io::AsyncWriteExt};
 
-use crate::{
-    progress::UnitProgress, DOT_NOMI_MODS_STASH_DIR, MINECRAFT_MODS_DIRECTORY, NOMI_LOADED_LOCK_FILE,
-    NOMI_LOADED_LOCK_FILE_NAME,
-};
+use crate::{progress::UnitProgress, DOT_NOMI_MODS_STASH_DIR, MINECRAFT_MODS_DIRECTORY, NOMI_LOADED_LOCK_FILE, NOMI_LOADED_LOCK_FILE_NAME};
 
 #[derive(Serialize, Deserialize, Default, PartialEq, Eq, Hash, Debug)]
 pub struct ModsConfig {
@@ -80,24 +77,24 @@ pub async fn proceed_deps(dist: &mut Vec<SimpleDependency>, version: Arc<Version
     Ok(())
 }
 
-pub async fn download_mods(progress: TaskProgressShared, dir: PathBuf, versions: Vec<Arc<Version>>) -> anyhow::Result<Vec<Mod>> {
+pub async fn download_mods(progress: TaskProgressShared, versions: Vec<(Arc<Version>, PathBuf, String)>) -> anyhow::Result<Vec<Mod>> {
     let _ = progress.set_total(
         versions
             .iter()
-            .map(|v| v.files.iter().filter(|f| f.primary).collect::<Vec<_>>().len() as u32)
+            .map(|v| v.0.files.iter().filter(|f| f.primary).collect::<Vec<_>>().len() as u32)
             .sum(),
     );
 
     let mut mods = Vec::new();
-    for version in versions {
-        let mod_value = download_mod(progress.sender(), dir.clone(), version).await?;
+    for (version, path, name) in versions {
+        let mod_value = download_mod(progress.sender(), path, name, version).await?;
         mods.push(mod_value);
     }
 
     Ok(mods)
 }
 
-pub async fn download_mod(sender: Sender<Box<dyn Progress>>, dir: PathBuf, version: Arc<Version>) -> anyhow::Result<Mod> {
+pub async fn download_mod(sender: Sender<Box<dyn Progress>>, dir: PathBuf, name: String, version: Arc<Version>) -> anyhow::Result<Mod> {
     let mut set = DownloadSet::new();
 
     let mut downloaded_files = Vec::new();
@@ -125,9 +122,6 @@ pub async fn download_mod(sender: Sender<Box<dyn Progress>>, dir: PathBuf, versi
     let sender = MappedSender::new_progress_mapper(Box::new(sender));
 
     Box::new(set).download(&sender).await;
-
-    let query = Query::new(ProjectData::new(version.project_id.clone()));
-    let name = query.query().await?.title;
 
     Ok(Mod {
         name,

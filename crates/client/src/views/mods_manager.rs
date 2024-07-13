@@ -50,11 +50,30 @@ pub struct ModManagerState {
     pub selected_categories: HashSet<String>,
 
     pub is_download_window_open: bool,
+    pub is_datapack: bool,
+
+    pub data_pack_path: DataPackDownloadDirectory,
     pub current_project: Option<Project>,
     pub current_versions: Vec<Arc<Version>>,
     pub selected_version: Option<Arc<Version>>,
     pub current_dependencies: Vec<SimpleDependency>,
     pub selected_dependencies: HashMap<String, MaybeAddedDependency>,
+}
+
+#[derive(Default, Debug, PartialEq, Eq)]
+pub enum DataPackDownloadDirectory {
+    #[default]
+    Mods,
+    DataPacks,
+}
+
+impl DataPackDownloadDirectory {
+    pub fn as_path_buf(&self, profile_id: usize) -> PathBuf {
+        match self {
+            DataPackDownloadDirectory::Mods => PathBuf::from(DOT_NOMI_MODS_STASH_DIR).join(format!("{profile_id}")),
+            DataPackDownloadDirectory::DataPacks => PathBuf::from(DOT_NOMI_DATA_PACKS_DIR),
+        }
+    }
 }
 
 pub struct MaybeAddedDependency {
@@ -69,6 +88,16 @@ fn fix_svg(text: &str, color: Color32) -> Option<String> {
     let text = text.replace("currentColor", &color.to_hex()).replace(']', "");
     let s = &text[5..];
     Some(format!("<svg xmlns=\"http://www.w3.org/2000/svg\" {s}"))
+}
+
+fn directory_from_project_type(project_type: ProjectType, profile_id: usize) -> PathBuf {
+    match project_type {
+        ProjectType::Mod | ProjectType::Modpack => PathBuf::from(DOT_NOMI_MODS_STASH_DIR).join(format!("{}", profile_id)),
+        ProjectType::ResourcePack => PathBuf::from(MINECRAFT_DIR).join("resourcepacks"),
+        ProjectType::Shader => PathBuf::from(MINECRAFT_DIR).join("shaderpacks"),
+        ProjectType::DataPack => PathBuf::from(DOT_NOMI_DATA_PACKS_DIR),
+        _ => unreachable!("You cannot download plugins"),
+    }
 }
 
 impl ModManagerState {
@@ -95,6 +124,8 @@ impl ModManagerState {
             selected_version: None,
             current_dependencies: Vec::new(),
             selected_dependencies: HashMap::new(),
+            is_datapack: false,
+            data_pack_path: DataPackDownloadDirectory::DataPacks,
         }
     }
 
@@ -302,6 +333,10 @@ impl View for ModManager<'_> {
                                     if ui.button("Download").clicked() {
                                         self.mod_manager_state.selected_version = None;
                                         self.mod_manager_state.selected_dependencies.clear();
+                                        self.mod_manager_state.current_dependencies.clear();
+
+                                        self.mod_manager_state.is_datapack =
+                                            matches!(self.mod_manager_state.current_project_type, ProjectType::DataPack);
 
                                         self.mod_manager_state.is_download_window_open = true;
                                         let game_version = self.profile.profile.version().to_owned();
@@ -324,16 +359,21 @@ impl View for ModManager<'_> {
                                         self.mod_manager_state.current_versions = Vec::new();
 
                                         let id = item.project_id.clone();
+                                        let base_data = ProjectVersionsData::builder().id_or_slug(id).game_versions(vec![game_version]);
+
+                                        let versions_data = match self.mod_manager_state.current_project_type {
+                                            ProjectType::Mod => base_data.loaders(vec![loader]).build(),
+                                            ProjectType::Modpack => base_data.loaders(vec![loader]).build(),
+                                            ProjectType::ResourcePack => base_data.build(),
+                                            ProjectType::Shader => base_data.build(),
+                                            ProjectType::DataPack => base_data.build(),
+                                            ProjectType::Plugin => unreachable!(),
+                                        };
+
                                         let get_versions = Task::new(
                                             "Get project",
                                             Caller::standard(async move {
-                                                let query = Query::new(
-                                                    ProjectVersionsData::builder()
-                                                        .id_or_slug(id)
-                                                        .game_versions(vec![game_version])
-                                                        .loaders(vec![loader])
-                                                        .build(),
-                                                );
+                                                let query = Query::new(versions_data);
                                                 query.query().await.report_error()
                                             }),
                                         );
@@ -365,7 +405,13 @@ impl View for ModManager<'_> {
                             if self.task_manager.get_collection::<ProjectCollection>().tasks().is_empty() {
                                 ui.add(Image::new(&project.icon_url).fit_to_exact_size(Vec2::splat(50.0)));
                                 ui.vertical(|ui| {
-                                    ui.label(RichText::new(&project.title).heading());
+                                    ui.horizontal(|ui| {
+                                        if self.profile.mods.mods.iter().any(|m| m.project_id == project.id) {
+                                            ui.label(RichText::new("✅").color(Color32::GREEN).heading())
+                                                .on_hover_text("This mod is already downloaded. Downloading it again will replace files.");
+                                        }
+                                        ui.label(RichText::new(&project.title).heading());
+                                    });
                                     ui.label(&project.description)
                                 });
                             } else {
@@ -384,11 +430,9 @@ impl View for ModManager<'_> {
                             )
                             .show_ui(ui, |ui| {
                                 for version in &self.mod_manager_state.current_versions {
-                                    let response = ui.selectable_value(
-                                        &mut self.mod_manager_state.selected_version,
-                                        Some(version.clone()),
-                                        version.version_number.clone(),
-                                    );
+                                    let response = ui
+                                        .selectable_value(&mut self.mod_manager_state.selected_version, Some(version.clone()), version.name.clone())
+                                        .on_hover_text(version.version_number.clone());
 
                                     if response.clicked() {
                                         let game_version = self.profile.profile.version().to_owned();
@@ -410,6 +454,16 @@ impl View for ModManager<'_> {
                                     }
                                 }
                             });
+
+                        if self.mod_manager_state.is_datapack {
+                            ui.horizontal(|ui| {
+                                ui.heading("ℹ").on_hover_text("While downloading data packs you need to select where it will be downloaded. Because usually data packs are presented as a mods and as a data packs.\nTo understand what are you downloading take a look at the version name in the select menu.\nAdditional information is shown if the variant is hovered.").on_hover_text("If the data pack requires dependencies it is recommended to install them manually.");
+                                ComboBox::from_id_source("select_path").selected_text(format!("{:?}", self.mod_manager_state.data_pack_path)).show_ui(ui, |ui| {
+                                    ui.selectable_value(&mut self.mod_manager_state.data_pack_path, DataPackDownloadDirectory::Mods, "Mods directory");
+                                    ui.selectable_value(&mut self.mod_manager_state.data_pack_path, DataPackDownloadDirectory::DataPacks, "Data packs directory").on_hover_text("Can be accessed via Open -> Data Packs in the top menu.");
+                                });
+                            });
+                        }
 
                         let is_dependencies_loaded = self.task_manager.get_collection::<DependenciesCollection>().tasks().is_empty();
 
@@ -468,7 +522,8 @@ impl View for ModManager<'_> {
                                                             ui.colored_label(Color32::GREEN, "✅")
                                                                 .on_hover_text("This version is featured by the author");
                                                         }
-                                                        ui.selectable_value(&mut val.version, Some(version.clone()), version.version_number.clone());
+                                                        ui.selectable_value(&mut val.version, Some(version.clone()), version.name.clone())
+                                                            .on_hover_text(version.version_number.clone());
                                                     });
                                                 }
                                             });
@@ -492,23 +547,23 @@ impl View for ModManager<'_> {
                             ui.error_label("Select version for all included dependencies");
                         }
 
+                        let is_downloaded = self.task_manager.get_collection::<ModsDownloadingCollection>().tasks().is_empty();
+
+                        if !is_downloaded {
+                            ui.horizontal(|ui| {
+                                ui.spinner();
+                                ui.label("Downloading...")
+                                    .on_hover_text("You can see more detailed progress in the Progress tab.");
+                            });
+                        }
+
                         if ui
                             .add_enabled(
-                                is_version_selected && is_dependencies_selected && is_dependencies_loaded,
+                                is_version_selected && is_dependencies_selected && is_dependencies_loaded && is_downloaded,
                                 Button::new("Download"),
                             )
                             .clicked()
                         {
-                            let directory = match self.mod_manager_state.current_project_type {
-                                ProjectType::Mod | ProjectType::Modpack => {
-                                    PathBuf::from(DOT_NOMI_MODS_STASH_DIR).join(format!("{}", self.profile.profile.id))
-                                }
-                                ProjectType::ResourcePack => PathBuf::from(MINECRAFT_DIR).join("resourcepacks"),
-                                ProjectType::Shader => PathBuf::from(MINECRAFT_DIR).join("shaderpacks"),
-                                ProjectType::DataPack => PathBuf::from(DOT_NOMI_DATA_PACKS_DIR),
-                                _ => unreachable!("You cannot download plugins"),
-                            };
-
                             let mut versions = vec![self.mod_manager_state.selected_version.clone().unwrap()];
                             versions.extend(
                                 self.mod_manager_state
@@ -520,21 +575,45 @@ impl View for ModManager<'_> {
 
                             let profile = self.profile.clone();
 
+                            let project_type = project.project_type;
+                            let project_title = project.title.clone();
+
                             let _ = self.profiles_config.update_config().report_error();
+                            let is_data_pack = self.mod_manager_state.is_datapack;
+                            let data_pack_dir = self.mod_manager_state.data_pack_path.as_path_buf(profile.profile.id);
                             let download_mod = Task::new(
                                 "Download mods",
                                 Caller::progressing(move |progress| async move {
-                                    let mods = download_mods(progress, directory, versions).await.report_error();
+                                    let mut versions_with_paths = Vec::new();
+
+                                    for version in versions {
+                                        let path = if is_data_pack {
+                                            data_pack_dir.clone()
+                                        } else {
+                                            directory_from_project_type(project_type, profile.profile.id)
+                                        };
+
+                                        let data = (
+                                            version,
+                                            path,
+                                            project_title.clone(),
+                                        );
+                                        versions_with_paths.push(data);
+                                    }
+
+                                    let mods = download_mods(progress, versions_with_paths).await.report_error();
                                     let mut cfg = ProfilesConfig::read_async().await;
 
                                     // PANICS: Will never panic since this page cannot be accessed without profile.
                                     let prof = cfg.profiles.iter_mut().find(|p| p.profile.id == profile.profile.id).unwrap();
 
                                     if let Some((profile, mods)) = Arc::get_mut(prof).and_then(|p| mods.map(|m| (p, m))) {
-                                        profile.mods.mods.extend(mods);
-                                        profile.mods.mods.sort();
-                                        profile.mods.mods.dedup();
-                                        debug!("Added mods to profile {} successfully", profile.profile.id);
+                                        if matches!(project_type, ProjectType::Mod) {
+                                            profile.mods.mods.extend(mods);
+                                            profile.mods.mods.sort();
+                                            profile.mods.mods.dedup();
+                                            debug!("Added mods to profile {} successfully", profile.profile.id);
+                                        }
                                     }
 
                                     cfg.update_config_async().await.report_error();

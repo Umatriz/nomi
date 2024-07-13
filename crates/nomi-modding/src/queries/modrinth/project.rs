@@ -115,7 +115,7 @@ pub struct DonationUrl {
 pub struct Gallery {
     pub url: String,
     pub featured: bool,
-    pub title: String,
+    pub title: Option<String>,
     pub description: Option<String>,
     pub created: String,
     pub ordering: i64,

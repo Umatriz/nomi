@@ -1,4 +1,8 @@
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use eframe::egui::{self, popup_below_widget, Align2, Button, Id, PopupCloseBehavior, TextWrapMode, Ui};
 use egui_extras::{Column, TableBuilder};
@@ -16,7 +20,8 @@ use crate::{
     collections::{AssetsCollection, GameDeletionCollection, GameDownloadingCollection, GameRunnerCollection},
     download::{task_assets, task_download_version},
     errors_pool::ErrorPoolExt,
-    TabKind,
+    ui_ext::UiExt,
+    TabKind, DOT_NOMI_MODS_STASH_DIR,
 };
 
 use super::{
@@ -243,6 +248,7 @@ impl View for ProfilesPage<'_> {
                                     let delete_client_id = Id::new("delete_client");
                                     let delete_libraries_id = Id::new("delete_libraries");
                                     let delete_assets_id = Id::new("delete_assets");
+                                    let delete_mods_id = Id::new("delete_mods");
 
                                     let mut make_checkbox = |text: &str, id, default: bool| {
                                         let mut state = ui.data_mut(|map| *map.get_temp_mut_or_insert_with(id, move || default));
@@ -251,11 +257,15 @@ impl View for ProfilesPage<'_> {
                                     };
 
                                     make_checkbox("Delete profile's client", delete_client_id, true);
-                                    make_checkbox("Delete profile's libraries", delete_libraries_id, true);
+                                    make_checkbox("Delete profile's libraries", delete_libraries_id, false);
+                                    if profile.profile.loader().is_fabric() {
+                                        make_checkbox("Delete profile's mods", delete_mods_id, true);
+                                    }
                                     make_checkbox("Delete profile's assets", delete_assets_id, false);
 
                                     ui.label("Are you sure you want to delete this profile and it's data?");
                                     ui.horizontal(|ui| {
+                                        ui.warn_icon_with_hover_text("Deleting profile's assets and libraries might break other profiles.");
                                         if ui.button("Yes").clicked() {
                                             is_deleting.push(index);
 
@@ -266,15 +276,24 @@ impl View for ProfilesPage<'_> {
                                             let delete_client = checkbox_data(delete_client_id);
                                             let delete_libraries = checkbox_data(delete_libraries_id);
                                             let delete_assets = checkbox_data(delete_assets_id);
+                                            let delete_mods = checkbox_data(delete_mods_id);
+
+                                            let profile_id = profile.profile.id;
 
                                             let instance = instance.clone();
                                             let caller = Caller::standard(async move {
+                                                let path = Path::new(DOT_NOMI_MODS_STASH_DIR).join(format!("{}", profile_id));
+                                                if delete_mods && path.exists() {
+                                                    tokio::fs::remove_dir_all(path).await.report_error();
+                                                }
                                                 instance.delete(delete_client, delete_libraries, delete_assets).await.report_error();
                                             });
 
                                             let task = Task::new(format!("Deleting the game's files ({})", version), caller);
 
                                             self.manager.push_task::<GameDeletionCollection>(task);
+
+                                            self.tabs_state.remove_profile_related_tabs(profile);
 
                                             ui.memory_mut(|mem| mem.close_popup());
                                         }
