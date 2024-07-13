@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use eframe::egui::{self, Button, Color32, ComboBox, Id, Image, Layout, RichText, ScrollArea, SelectableLabel, Vec2};
+use eframe::egui::{self, Button, Color32, ComboBox, Id, Image, Key, Layout, RichText, ScrollArea, SelectableLabel, Vec2};
 use egui_infinite_scroll::{InfiniteScroll, LoadingState};
 use egui_task_manager::{Caller, Task, TaskManager};
 use nomi_core::{DOT_NOMI_DATA_PACKS_DIR, MINECRAFT_DIR};
@@ -42,8 +42,7 @@ pub struct ModManager<'a> {
 pub struct ModManagerState {
     pub previous_facets: Facets,
     pub previous_project_type: ProjectType,
-    pub previous_search: String,
-    pub current_search: String,
+    pub entered_search: String,
     pub scroll: InfiniteScroll<Hit, u32>,
     pub categories: Option<Categories>,
     pub current_project_type: ProjectType,
@@ -86,8 +85,7 @@ impl ModManagerState {
             headers,
             previous_facets: Facets::from_project_type(ProjectType::Mod),
             selected_categories: HashSet::new(),
-            previous_search: String::new(),
-            current_search: String::new(),
+            entered_search: String::new(),
             current_project_type: ProjectType::Mod,
             previous_project_type: ProjectType::Mod,
             scroll: Self::create_scroll(None, None),
@@ -129,7 +127,29 @@ impl ModManagerState {
 
     pub fn clear_filter(&mut self) {
         self.selected_categories = HashSet::new();
-        self.current_search = String::new();
+        self.entered_search = String::new();
+    }
+
+    pub fn facets(&self, profile: &Arc<ModdedProfile>) -> Facets {
+        let mut parts = if matches!(self.current_project_type, ProjectType::Mod) {
+            Parts::new()
+                .part(InnerPart::new().add_category(profile.profile.loader_name().to_lowercase()))
+                .add_project_type(ProjectType::Mod)
+        } else {
+            Parts::from_project_type(self.current_project_type)
+        };
+
+        if !self.selected_categories.is_empty() {
+            parts.add_part(InnerPart::from_vec(
+                self.selected_categories.iter().map(InnerPart::format_category).collect(),
+            ));
+        }
+
+        Facets::new(parts)
+    }
+
+    pub fn query(&self) -> Option<String> {
+        (!self.entered_search.is_empty()).then_some(self.entered_search.clone())
     }
 }
 
@@ -222,33 +242,15 @@ impl View for ModManager<'_> {
                                 }
                             }
                         }
-                        let facets = || {
-                            let mut parts = if matches!(self.mod_manager_state.current_project_type, ProjectType::Mod) {
-                                Parts::new()
-                                    .part(InnerPart::new().add_category(self.profile.profile.loader_name().to_lowercase()))
-                                    .add_project_type(ProjectType::Mod)
-                            } else {
-                                Parts::from_project_type(self.mod_manager_state.current_project_type)
-                            };
 
-                            if !(*set).is_empty() {
-                                parts.add_part(InnerPart::from_vec(set.iter().map(InnerPart::format_category).collect()));
-                            }
-
-                            Facets::new(parts)
-                        };
-
-                        let query = || (!self.mod_manager_state.current_search.is_empty()).then_some(self.mod_manager_state.current_search.clone());
-
-                        if self.mod_manager_state.previous_facets != facets() {
-                            self.mod_manager_state.previous_facets = facets();
-                            self.mod_manager_state.scroll = ModManagerState::create_scroll(Some(facets()), query());
+                        let facets = self.mod_manager_state.facets(&self.profile);
+                        let query = self.mod_manager_state.query();
+                        if self.mod_manager_state.previous_facets != facets {
+                            self.mod_manager_state.previous_facets = facets.clone();
+                            self.mod_manager_state.scroll = ModManagerState::create_scroll(Some(facets), query);
                         } else if self.mod_manager_state.previous_project_type != self.mod_manager_state.current_project_type {
                             self.mod_manager_state.previous_project_type = self.mod_manager_state.current_project_type;
-                            self.mod_manager_state.scroll = ModManagerState::create_scroll(Some(facets()), query());
-                        } else if self.mod_manager_state.previous_search != self.mod_manager_state.current_search {
-                            self.mod_manager_state.previous_search.clone_from(&self.mod_manager_state.current_search);
-                            self.mod_manager_state.scroll = ModManagerState::create_scroll(Some(facets()), query())
+                            self.mod_manager_state.scroll = ModManagerState::create_scroll(Some(facets), query);
                         }
                     } else {
                         ui.error_label("Unable to get categories");
@@ -263,7 +265,24 @@ impl View for ModManager<'_> {
             ui.with_layout(Layout::top_down_justified(egui::Align::Center), |ui| {
                 ui.set_width(ui.available_width() / 2.0);
 
-                ui.text_edit_singleline(&mut self.mod_manager_state.current_search);
+                ui.horizontal(|ui| {
+                    let resp = ui.text_edit_singleline(&mut self.mod_manager_state.entered_search);
+
+                    let mut set_query = || {
+                        let facets = self.mod_manager_state.facets(&self.profile);
+                        let query = self.mod_manager_state.query();
+
+                        self.mod_manager_state.scroll = ModManagerState::create_scroll(Some(facets), query)
+                    };
+
+                    if resp.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
+                        set_query()
+                    }
+
+                    if ui.button("Search").clicked() {
+                        set_query()
+                    }
+                });
 
                 self.mod_manager_state.scroll.ui(ui, 10, |ui, _index, item| {
                     ui.group(|ui| {
