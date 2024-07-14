@@ -28,6 +28,7 @@ egui_tracing = { git = "https://github.com/Umatriz/egui_tracing", branch = "bump
 egui_task_manager = { git = "https://github.com/Umatriz/egui-task-manager" }
 egui_extras = { version = "0.28.0", features = ["all_loaders", "svg"] }
 egui_infinite_scroll = { version = "0.4.0", features = ["tokio"] }
+egui_commonmark = "0.17"
 garde = { version = "0.18.0", features = ["derive", "regex"] }
 image = { version = "0.25", default-features = false, features = ["webp"] }
 

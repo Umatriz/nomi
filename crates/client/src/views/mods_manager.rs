@@ -399,233 +399,239 @@ impl View for ModManager<'_> {
         egui::Window::new("Mod")
             .open(&mut self.mod_manager_state.is_download_window_open)
             .show(ui.ctx(), |ui| {
-                if let Some(project) = &self.mod_manager_state.current_project {
-                    ui.vertical(|ui| {
-                        ui.horizontal(|ui| {
-                            if self.task_manager.get_collection::<ProjectCollection>().tasks().is_empty() {
-                                ui.add(Image::new(&project.icon_url).fit_to_exact_size(Vec2::splat(50.0)));
-                                ui.vertical(|ui| {
-                                    ui.horizontal(|ui| {
-                                        if self.profile.mods.mods.iter().any(|m| m.project_id == project.id) {
-                                            ui.label(RichText::new("✅").color(Color32::GREEN).heading())
-                                                .on_hover_text("This mod is already downloaded. Downloading it again will replace files.");
-                                        }
-                                        ui.label(RichText::new(&project.title).heading());
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    if let Some(project) = &self.mod_manager_state.current_project {
+                        ui.vertical(|ui| {
+                            ui.horizontal(|ui| {
+                                if self.task_manager.get_collection::<ProjectCollection>().tasks().is_empty() {
+                                    ui.add(Image::new(&project.icon_url).fit_to_exact_size(Vec2::splat(50.0)));
+                                    ui.vertical(|ui| {
+                                        ui.horizontal(|ui| {
+                                            if self.profile.mods.mods.iter().any(|m| m.project_id == project.id) {
+                                                ui.label(RichText::new("✅").color(Color32::GREEN).heading())
+                                                    .on_hover_text("This mod is already downloaded. Downloading it again will replace files.");
+                                            }
+                                            ui.label(RichText::new(&project.title).heading());
+                                        });
+                                        ui.label(&project.description)
                                     });
-                                    ui.label(&project.description)
-                                });
-                            } else {
-                                ui.spinner();
-                            }
-                        });
-
-                        ui.separator();
-
-                        ComboBox::from_label("Select mod version")
-                            .selected_text(
-                                self.mod_manager_state
-                                    .selected_version
-                                    .as_ref()
-                                    .map_or("Select version from the list", |v| &v.version_number),
-                            )
-                            .show_ui(ui, |ui| {
-                                for version in &self.mod_manager_state.current_versions {
-                                    let response = ui
-                                        .selectable_value(&mut self.mod_manager_state.selected_version, Some(version.clone()), version.name.clone())
-                                        .on_hover_text(version.version_number.clone());
-
-                                    if response.clicked() {
-                                        let game_version = self.profile.profile.version().to_owned();
-                                        let loader = self.profile.profile.loader_name().to_lowercase();
-                                        let version = version.clone();
-
-                                        let get_dependencies = Task::new(
-                                            "Get dependencies",
-                                            Caller::standard(async move {
-                                                let mut deps = Vec::new();
-                                                proceed_deps(&mut deps, version.clone(), game_version, loader)
-                                                    .await
-                                                    .report_error()
-                                                    .map(|_| deps)
-                                            }),
-                                        );
-
-                                        self.task_manager.push_task::<DependenciesCollection>(get_dependencies);
-                                    }
+                                } else {
+                                    ui.spinner();
                                 }
                             });
 
-                        if self.mod_manager_state.is_datapack {
-                            ui.horizontal(|ui| {
-                                ui.heading("ℹ").on_hover_text("While downloading data packs you need to select where it will be downloaded. Because usually data packs are presented as a mods and as a data packs.\nTo understand what are you downloading take a look at the version name in the select menu.\nAdditional information is shown if the variant is hovered.").on_hover_text("If the data pack requires dependencies it is recommended to install them manually.");
-                                ComboBox::from_id_source("select_path").selected_text(format!("{:?}", self.mod_manager_state.data_pack_path)).show_ui(ui, |ui| {
-                                    ui.selectable_value(&mut self.mod_manager_state.data_pack_path, DataPackDownloadDirectory::Mods, "Mods directory");
-                                    ui.selectable_value(&mut self.mod_manager_state.data_pack_path, DataPackDownloadDirectory::DataPacks, "Data packs directory").on_hover_text("Can be accessed via Open -> Data Packs in the top menu.");
-                                });
-                            });
-                        }
+                            ui.style_mut().url_in_tooltip = true;
 
-                        let is_dependencies_loaded = self.task_manager.get_collection::<DependenciesCollection>().tasks().is_empty();
+                            egui::CollapsingHeader::new("Full description").default_open(true).show(ui, |ui| ui.markdown_ui(Id::new("mod_full_description_markdown"), project.body.as_str()));
 
-                        if !is_dependencies_loaded {
-                            ui.spinner();
-                        }
-
-                        if !self.mod_manager_state.current_dependencies.is_empty() {
                             ui.separator();
 
-                            ui.label(RichText::new("Dependencies").strong());
-                        }
+                            ComboBox::from_label("Select mod version")
+                                .selected_text(
+                                    self.mod_manager_state
+                                        .selected_version
+                                        .as_ref()
+                                        .map_or("Select version from the list", |v| &v.version_number),
+                                )
+                                .show_ui(ui, |ui| {
+                                    for version in &self.mod_manager_state.current_versions {
+                                        let response = ui
+                                            .selectable_value(&mut self.mod_manager_state.selected_version, Some(version.clone()), version.name.clone())
+                                            .on_hover_text(version.version_number.clone());
 
-                        for dep in &self.mod_manager_state.current_dependencies {
-                            let is_installed = self
-                                .profile
-                                .mods
-                                .mods
-                                .iter()
-                                .any(|m| dep.versions.first().is_some_and(|d| m.project_id == d.project_id));
+                                        if response.clicked() {
+                                            let game_version = self.profile.profile.version().to_owned();
+                                            let loader = self.profile.profile.loader_name().to_lowercase();
+                                            let version = version.clone();
 
-                            let is_added = if is_installed { false } else { dep.is_required };
+                                            let get_dependencies = Task::new(
+                                                "Get dependencies",
+                                                Caller::standard(async move {
+                                                    let mut deps = Vec::new();
+                                                    proceed_deps(&mut deps, version.clone(), game_version, loader)
+                                                        .await
+                                                        .report_error()
+                                                        .map(|_| deps)
+                                                }),
+                                            );
 
-                            if !self.mod_manager_state.selected_dependencies.contains_key(&dep.name) {
-                                self.mod_manager_state
-                                    .selected_dependencies
-                                    .insert(dep.name.clone(), MaybeAddedDependency { version: None, is_added });
-                            }
-                            let val = self.mod_manager_state.selected_dependencies.get_mut(&dep.name).unwrap();
-
-                            ui.horizontal(|ui| {
-                                if is_installed {
-                                    ui.colored_label(Color32::GREEN, "✅")
-                                        .on_hover_text("This dependency is already downloaded. If you want to download it again do it manually.");
-                                }
-
-                                ui.add_enabled_ui(!is_installed, |ui| {
-                                    ui.add_enabled_ui(!dep.is_required, |ui| {
-                                        ui.checkbox(&mut val.is_added, "").on_hover_text("Include this dependency");
-                                    });
-
-                                    ui.add_enabled_ui(val.is_added, |ui| {
-                                        ui.label(&dep.name);
-
-                                        ComboBox::from_id_source(Id::new(&dep.name))
-                                            .selected_text(
-                                                val.version
-                                                    .clone()
-                                                    .map_or("No version selected".to_owned(), |v| v.version_number.clone())
-                                                    .to_string(),
-                                            )
-                                            .show_ui(ui, |ui| {
-                                                for version in &dep.versions {
-                                                    ui.horizontal(|ui| {
-                                                        if version.featured {
-                                                            ui.colored_label(Color32::GREEN, "✅")
-                                                                .on_hover_text("This version is featured by the author");
-                                                        }
-                                                        ui.selectable_value(&mut val.version, Some(version.clone()), version.name.clone())
-                                                            .on_hover_text(version.version_number.clone());
-                                                    });
-                                                }
-                                            });
-                                    });
-                                });
-                            });
-                        }
-
-                        let is_version_selected = self.mod_manager_state.selected_version.is_some();
-                        if !is_version_selected {
-                            ui.error_label("You must select the version");
-                        }
-
-                        let is_dependencies_selected = self
-                            .mod_manager_state
-                            .selected_dependencies
-                            .values()
-                            .filter(|d| d.is_added)
-                            .all(|d| d.version.is_some());
-                        if !is_dependencies_selected {
-                            ui.error_label("Select version for all included dependencies");
-                        }
-
-                        let is_downloaded = self.task_manager.get_collection::<ModsDownloadingCollection>().tasks().is_empty();
-
-                        if !is_downloaded {
-                            ui.horizontal(|ui| {
-                                ui.spinner();
-                                ui.label("Downloading...")
-                                    .on_hover_text("You can see more detailed progress in the Progress tab.");
-                            });
-                        }
-
-                        if ui
-                            .add_enabled(
-                                is_version_selected && is_dependencies_selected && is_dependencies_loaded && is_downloaded,
-                                Button::new("Download"),
-                            )
-                            .clicked()
-                        {
-                            let mut versions = vec![self.mod_manager_state.selected_version.clone().unwrap()];
-                            versions.extend(
-                                self.mod_manager_state
-                                    .selected_dependencies
-                                    .values()
-                                    .filter(|d| d.is_added)
-                                    .filter_map(|d| d.version.clone()),
-                            );
-
-                            let profile = self.profile.clone();
-
-                            let project_type = project.project_type;
-                            let project_title = project.title.clone();
-
-                            let _ = self.profiles_config.update_config().report_error();
-                            let is_data_pack = self.mod_manager_state.is_datapack;
-                            let data_pack_dir = self.mod_manager_state.data_pack_path.as_path_buf(profile.profile.id);
-                            let download_mod = Task::new(
-                                "Download mods",
-                                Caller::progressing(move |progress| async move {
-                                    let mut versions_with_paths = Vec::new();
-
-                                    for version in versions {
-                                        let path = if is_data_pack {
-                                            data_pack_dir.clone()
-                                        } else {
-                                            directory_from_project_type(project_type, profile.profile.id)
-                                        };
-
-                                        let data = (
-                                            version,
-                                            path,
-                                            project_title.clone(),
-                                        );
-                                        versions_with_paths.push(data);
-                                    }
-
-                                    let mods = download_mods(progress, versions_with_paths).await.report_error();
-                                    let mut cfg = ProfilesConfig::read_async().await;
-
-                                    // PANICS: Will never panic since this page cannot be accessed without profile.
-                                    let prof = cfg.profiles.iter_mut().find(|p| p.profile.id == profile.profile.id).unwrap();
-
-                                    if let Some((profile, mods)) = Arc::get_mut(prof).and_then(|p| mods.map(|m| (p, m))) {
-                                        if matches!(project_type, ProjectType::Mod) {
-                                            profile.mods.mods.extend(mods);
-                                            profile.mods.mods.sort();
-                                            profile.mods.mods.dedup();
-                                            debug!("Added mods to profile {} successfully", profile.profile.id);
+                                            self.task_manager.push_task::<DependenciesCollection>(get_dependencies);
                                         }
                                     }
+                                });
 
-                                    cfg.update_config_async().await.report_error();
+                            if self.mod_manager_state.is_datapack {
+                                ui.horizontal(|ui| {
+                                    ui.heading("ℹ").on_hover_text("While downloading data packs you need to select where it will be downloaded. Because usually data packs are presented as a mods and as a data packs.\nTo understand what are you downloading take a look at the version name in the select menu.\nAdditional information is shown if the variant is hovered.").on_hover_text("If the data pack requires dependencies it is recommended to install them manually.");
+                                    ComboBox::from_id_source("select_path").selected_text(format!("{:?}", self.mod_manager_state.data_pack_path)).show_ui(ui, |ui| {
+                                        ui.selectable_value(&mut self.mod_manager_state.data_pack_path, DataPackDownloadDirectory::Mods, "Mods directory");
+                                        ui.selectable_value(&mut self.mod_manager_state.data_pack_path, DataPackDownloadDirectory::DataPacks, "Data packs directory").on_hover_text("Can be accessed via Open -> Data Packs in the top menu.");
+                                    });
+                                });
+                            }
 
-                                    Some(profile)
-                                }),
-                            );
+                            let is_dependencies_loaded = self.task_manager.get_collection::<DependenciesCollection>().tasks().is_empty();
 
-                            self.task_manager.push_task::<ModsDownloadingCollection>(download_mod);
-                        };
-                    });
-                }
+                            if !is_dependencies_loaded {
+                                ui.spinner();
+                            }
+
+                            if !self.mod_manager_state.current_dependencies.is_empty() {
+                                ui.separator();
+
+                                ui.label(RichText::new("Dependencies").strong());
+                            }
+
+                            for dep in &self.mod_manager_state.current_dependencies {
+                                let is_installed = self
+                                    .profile
+                                    .mods
+                                    .mods
+                                    .iter()
+                                    .any(|m| dep.versions.first().is_some_and(|d| m.project_id == d.project_id));
+
+                                let is_added = if is_installed { false } else { dep.is_required };
+
+                                if !self.mod_manager_state.selected_dependencies.contains_key(&dep.name) {
+                                    self.mod_manager_state
+                                        .selected_dependencies
+                                        .insert(dep.name.clone(), MaybeAddedDependency { version: None, is_added });
+                                }
+                                let val = self.mod_manager_state.selected_dependencies.get_mut(&dep.name).unwrap();
+
+                                ui.horizontal(|ui| {
+                                    if is_installed {
+                                        ui.colored_label(Color32::GREEN, "✅")
+                                            .on_hover_text("This dependency is already downloaded. If you want to download it again do it manually.");
+                                    }
+
+                                    ui.add_enabled_ui(!is_installed, |ui| {
+                                        ui.add_enabled_ui(!dep.is_required, |ui| {
+                                            ui.checkbox(&mut val.is_added, "").on_hover_text("Include this dependency");
+                                        });
+
+                                        ui.add_enabled_ui(val.is_added, |ui| {
+                                            ui.label(&dep.name);
+
+                                            ComboBox::from_id_source(Id::new(&dep.name))
+                                                .selected_text(
+                                                    val.version
+                                                        .clone()
+                                                        .map_or("No version selected".to_owned(), |v| v.version_number.clone())
+                                                        .to_string(),
+                                                )
+                                                .show_ui(ui, |ui| {
+                                                    for version in &dep.versions {
+                                                        ui.horizontal(|ui| {
+                                                            if version.featured {
+                                                                ui.colored_label(Color32::GREEN, "✅")
+                                                                    .on_hover_text("This version is featured by the author");
+                                                            }
+                                                            ui.selectable_value(&mut val.version, Some(version.clone()), version.name.clone())
+                                                                .on_hover_text(version.version_number.clone());
+                                                        });
+                                                    }
+                                                });
+                                        });
+                                    });
+                                });
+                            }
+
+                            let is_version_selected = self.mod_manager_state.selected_version.is_some();
+                            if !is_version_selected {
+                                ui.error_label("You must select the version");
+                            }
+
+                            let is_dependencies_selected = self
+                                .mod_manager_state
+                                .selected_dependencies
+                                .values()
+                                .filter(|d| d.is_added)
+                                .all(|d| d.version.is_some());
+                            if !is_dependencies_selected {
+                                ui.error_label("Select version for all included dependencies");
+                            }
+
+                            let is_downloaded = self.task_manager.get_collection::<ModsDownloadingCollection>().tasks().is_empty();
+
+                            if !is_downloaded {
+                                ui.horizontal(|ui| {
+                                    ui.spinner();
+                                    ui.label("Downloading...")
+                                        .on_hover_text("You can see more detailed progress in the Progress tab.");
+                                });
+                            }
+
+                            if ui
+                                .add_enabled(
+                                    is_version_selected && is_dependencies_selected && is_dependencies_loaded && is_downloaded,
+                                    Button::new("Download"),
+                                )
+                                .clicked()
+                            {
+                                let mut versions = vec![self.mod_manager_state.selected_version.clone().unwrap()];
+                                versions.extend(
+                                    self.mod_manager_state
+                                        .selected_dependencies
+                                        .values()
+                                        .filter(|d| d.is_added)
+                                        .filter_map(|d| d.version.clone()),
+                                );
+
+                                let profile = self.profile.clone();
+
+                                let project_type = project.project_type;
+                                let project_title = project.title.clone();
+
+                                let _ = self.profiles_config.update_config().report_error();
+                                let is_data_pack = self.mod_manager_state.is_datapack;
+                                let data_pack_dir = self.mod_manager_state.data_pack_path.as_path_buf(profile.profile.id);
+                                let download_mod = Task::new(
+                                    "Download mods",
+                                    Caller::progressing(move |progress| async move {
+                                        let mut versions_with_paths = Vec::new();
+
+                                        for version in versions {
+                                            let path = if is_data_pack {
+                                                data_pack_dir.clone()
+                                            } else {
+                                                directory_from_project_type(project_type, profile.profile.id)
+                                            };
+
+                                            let data = (
+                                                version,
+                                                path,
+                                                project_title.clone(),
+                                            );
+                                            versions_with_paths.push(data);
+                                        }
+
+                                        let mods = download_mods(progress, versions_with_paths).await.report_error();
+                                        let mut cfg = ProfilesConfig::read_async().await;
+
+                                        // PANICS: Will never panic since this page cannot be accessed without profile.
+                                        let prof = cfg.profiles.iter_mut().find(|p| p.profile.id == profile.profile.id).unwrap();
+
+                                        if let Some((profile, mods)) = Arc::get_mut(prof).and_then(|p| mods.map(|m| (p, m))) {
+                                            if matches!(project_type, ProjectType::Mod) {
+                                                profile.mods.mods.extend(mods);
+                                                profile.mods.mods.sort();
+                                                profile.mods.mods.dedup();
+                                                debug!("Added mods to profile {} successfully", profile.profile.id);
+                                            }
+                                        }
+
+                                        cfg.update_config_async().await.report_error();
+
+                                        Some(profile)
+                                    }),
+                                );
+
+                                self.task_manager.push_task::<ModsDownloadingCollection>(download_mod);
+                            };
+                        });
+                    }
+                });
             });
     }
 }

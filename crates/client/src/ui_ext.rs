@@ -1,4 +1,4 @@
-use eframe::egui::{Response, RichText, Ui, WidgetText};
+use eframe::egui::{self, Response, RichText, Ui, WidgetText};
 
 pub trait UiExt {
     fn ui(&self) -> &Ui;
@@ -22,6 +22,20 @@ pub trait UiExt {
     fn warn_label_with_icon_before(&mut self, text: impl Into<String>) -> Response {
         let ui = self.ui_mut();
         ui.label(RichText::new(format!("⚠ {}", text.into())).color(ui.visuals().warn_fg_color))
+    }
+
+    fn markdown_ui(&mut self, id: egui::Id, markdown: &str) {
+        use std::sync::{Arc, Mutex};
+
+        let ui = self.ui_mut();
+        let commonmark_cache = ui.data_mut(|data| {
+            data.get_temp_mut_or_default::<Arc<Mutex<egui_commonmark::CommonMarkCache>>>(egui::Id::new("global_egui_commonmark_cache"))
+                .clone()
+        });
+
+        let mut locked = commonmark_cache.lock().unwrap();
+
+        egui_commonmark::CommonMarkViewer::new(id).show(ui, &mut locked, markdown);
     }
 }
 
