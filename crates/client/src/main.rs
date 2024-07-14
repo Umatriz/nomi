@@ -7,9 +7,7 @@ use eframe::{
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
 use egui_tracing::EventCollector;
 use open_directory::open_directory_native;
-use std::{
-    path::{Path},
-};
+use std::path::Path;
 use views::{add_tab_menu::AddTab, View};
 
 use errors_pool::{ErrorPoolExt, ERRORS_POOL};
