@@ -3,6 +3,7 @@ use std::path::Path;
 use serde::{de::DeserializeOwned, Serialize};
 use tokio::io::AsyncWriteExt;
 
+#[tracing::instrument(skip_all, fields(path = path.as_ref().to_string_lossy().to_string()), err)]
 pub async fn write_toml_config<T>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>
 where
     T: Serialize + ?Sized,
@@ -16,6 +17,7 @@ where
     Ok(())
 }
 
+#[tracing::instrument(skip_all, fields(path = path.as_ref().to_string_lossy().to_string()), err)]
 pub async fn read_toml_config<T>(path: impl AsRef<Path>) -> anyhow::Result<T>
 where
     T: DeserializeOwned + ?Sized,
@@ -30,6 +32,7 @@ where
     Ok(body)
 }
 
+#[tracing::instrument(skip_all, fields(path = path.as_ref().to_string_lossy().to_string()), err)]
 pub fn read_toml_config_sync<T>(path: impl AsRef<Path>) -> anyhow::Result<T>
 where
     T: DeserializeOwned + ?Sized,
@@ -38,6 +41,7 @@ where
     runtime.block_on(read_toml_config::<T>(path))
 }
 
+#[tracing::instrument(skip_all, fields(path = path.as_ref().to_string_lossy().to_string()), err)]
 pub fn write_toml_config_sync<T>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>
 where
     T: Serialize + ?Sized,
@@ -46,14 +50,17 @@ where
     runtime.block_on(write_toml_config::<T>(data, path))
 }
 
+#[tracing::instrument(skip_all, fields(path = path.as_ref().to_string_lossy().to_string()), err)]
 pub async fn read_json_config<T>(path: impl AsRef<Path>) -> anyhow::Result<T>
 where
     T: DeserializeOwned + ?Sized,
 {
+    let path = path.as_ref();
     let s = tokio::fs::read_to_string(path).await?;
     Ok(serde_json::from_str::<T>(&s)?)
 }
 
+#[tracing::instrument(skip_all, fields(path = path.as_ref().to_string_lossy().to_string()), err)]
 pub async fn write_json_config<T>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>
 where
     T: Serialize + ?Sized,
@@ -68,6 +75,7 @@ where
     Ok(())
 }
 
+#[tracing::instrument(skip_all, fields(path = path.as_ref().to_string_lossy().to_string()), err)]
 pub async fn write_to_file(data: &[u8], path: impl AsRef<Path>) -> anyhow::Result<()> {
     let path = path.as_ref();
     if let Some(dir) = path.parent() {

@@ -9,6 +9,11 @@ pub trait UiExt {
         ui.label(RichText::new(text).color(ui.visuals().error_fg_color))
     }
 
+    fn warn_icon_with_hover_text(&mut self, text: impl Into<WidgetText>) -> Response {
+        let ui = self.ui_mut();
+        ui.label(RichText::new("⚠").color(ui.visuals().warn_fg_color)).on_hover_text(text)
+    }
+
     fn warn_label(&mut self, text: impl Into<String>) -> Response {
         let ui = self.ui_mut();
         ui.label(RichText::new(text).color(ui.visuals().warn_fg_color))

@@ -1,4 +1,4 @@
-use std::{sync::Arc};
+use std::sync::Arc;
 
 use egui_dock::DockState;
 
@@ -45,6 +45,14 @@ impl TabsState {
             *profile = prof.clone();
             *dock_profile = prof.clone();
         }
+    }
+
+    pub fn remove_profile_related_tabs(&mut self, profile_to_remove: &Arc<ModdedProfile>) {
+        self.0.retain(|p| match p {
+            TabKind::Mods { profile } => profile != profile_to_remove,
+            TabKind::ProfileInfo { profile } => profile != profile_to_remove,
+            _ => true,
+        });
     }
 }
 

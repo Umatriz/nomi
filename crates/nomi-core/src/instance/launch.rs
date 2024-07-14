@@ -53,7 +53,7 @@ pub struct LaunchInstance {
 }
 
 impl LaunchInstance {
-    #[tracing::instrument(err)]
+    #[tracing::instrument(skip(self), err)]
     pub async fn delete(&self, delete_client: bool, delete_libraries: bool, delete_assets: bool) -> anyhow::Result<()> {
         let manifest = read_json_config::<Manifest>(&self.settings.manifest_file).await?;
         let arguments_builder = ArgumentsBuilder::new(self, &manifest).with_classpath();
