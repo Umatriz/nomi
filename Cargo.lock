@@ -1373,7 +1373,7 @@ dependencies = [
 [[package]]
 name = "egui_tracing"
 version = "0.2.2"
-source = "git+https://github.com/Umatriz/egui_tracing?branch=bump_egui#7604668cb94e1b60b9d6291f15e22bd3fe70dbca"
+source = "git+https://github.com/Umatriz/egui_tracing#347001769583bf22ee919152f86dfc19de717f32"
 dependencies = [
  "chrono",
  "egui",
@@ -2436,7 +2436,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e310b3a6b5907f99202fcdb4960ff45b93735d7c7d96b760fcff8db2dc0e103d"
 dependencies = [
  "cfg-if",
- "windows-targets 0.52.6",
+ "windows-targets 0.48.5",
 ]
 
 [[package]]
