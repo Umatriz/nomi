@@ -7,7 +7,6 @@ use reqwest::Client;
 use tokio::io::AsyncWriteExt;
 use tracing::{error, trace};
 
-
 pub mod downloaders;
 pub mod progress;
 pub mod traits;

@@ -3,7 +3,10 @@ use std::sync::Arc;
 use egui_dock::DockState;
 use egui_task_manager::*;
 use nomi_core::repository::fabric_meta::FabricVersions;
-use nomi_modding::modrinth::{project::Project, version::Version};
+use nomi_modding::modrinth::{
+    project::{Project, ProjectId},
+    version::Version,
+};
 
 use crate::{
     errors_pool::ErrorPoolExt,
@@ -163,7 +166,7 @@ impl<'c> TasksCollection<'c> for ProjectVersionsCollection {
 pub struct DependenciesCollection;
 
 impl<'c> TasksCollection<'c> for DependenciesCollection {
-    type Context = &'c mut Vec<SimpleDependency>;
+    type Context = (&'c mut Vec<SimpleDependency>, Option<&'c ProjectId>);
 
     type Target = Option<Vec<SimpleDependency>>;
 
@@ -174,9 +177,14 @@ impl<'c> TasksCollection<'c> for DependenciesCollection {
     }
 
     fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|value| {
+        Handler::new(move |value| {
             if let Some(deps) = value {
-                *context = deps
+                context.0.extend(deps);
+                context.0.sort();
+                context.0.dedup();
+                if let Some(id) = context.1 {
+                    context.0.retain(|d| d.project_id != *id);
+                }
             }
         })
     }

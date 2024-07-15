@@ -404,7 +404,9 @@ impl View for ModManager<'_> {
                         ui.vertical(|ui| {
                             ui.horizontal(|ui| {
                                 if self.task_manager.get_collection::<ProjectCollection>().tasks().is_empty() {
-                                    ui.add(Image::new(&project.icon_url).fit_to_exact_size(Vec2::splat(50.0)));
+                                    if let Some(icon) = &project.icon_url {
+                                        ui.add(Image::new(icon).fit_to_exact_size(Vec2::splat(50.0)));
+                                    }
                                     ui.vertical(|ui| {
                                         ui.horizontal(|ui| {
                                             if self.profile.mods.mods.iter().any(|m| m.project_id == project.id) {
@@ -446,13 +448,7 @@ impl View for ModManager<'_> {
 
                                             let get_dependencies = Task::new(
                                                 "Get dependencies",
-                                                Caller::standard(async move {
-                                                    let mut deps = Vec::new();
-                                                    proceed_deps(&mut deps, version.clone(), game_version, loader)
-                                                        .await
-                                                        .report_error()
-                                                        .map(|_| deps)
-                                                }),
+                                                Caller::standard(get_and_proceed_deps(version, game_version, loader)),
                                             );
 
                                             self.task_manager.push_task::<DependenciesCollection>(get_dependencies);
@@ -527,8 +523,22 @@ impl View for ModManager<'_> {
                                                                 ui.colored_label(Color32::GREEN, "✅")
                                                                     .on_hover_text("This version is featured by the author");
                                                             }
-                                                            ui.selectable_value(&mut val.version, Some(version.clone()), version.name.clone())
+
+                                                            let response = ui.selectable_value(&mut val.version, Some(version.clone()), version.name.clone())
                                                                 .on_hover_text(version.version_number.clone());
+
+                                                                if response.clicked() {
+                                                                    let game_version = self.profile.profile.version().to_owned();
+                                                                    let loader = self.profile.profile.loader_name().to_lowercase();
+                                                                    let version = version.clone();
+
+                                                                    let get_dependencies = Task::new(
+                                                                        "Get dependencies",
+                                                                        Caller::standard(get_and_proceed_deps(version, game_version, loader)),
+                                                                    );
+
+                                                                    self.task_manager.push_task::<DependenciesCollection>(get_dependencies);
+                                                                }
                                                         });
                                                     }
                                                 });
@@ -569,19 +579,20 @@ impl View for ModManager<'_> {
                                 )
                                 .clicked()
                             {
-                                let mut versions = vec![self.mod_manager_state.selected_version.clone().unwrap()];
+                                let project_title = project.title.clone();
+
+                                let mut versions = vec![(project_title, self.mod_manager_state.selected_version.clone().unwrap())];
                                 versions.extend(
                                     self.mod_manager_state
                                         .selected_dependencies
-                                        .values()
-                                        .filter(|d| d.is_added)
-                                        .filter_map(|d| d.version.clone()),
+                                        .iter()
+                                        .filter(|d| d.1.is_added)
+                                        .filter_map(|d| d.1.version.clone().map(|v| (d.0.clone(), v))),
                                 );
 
                                 let profile = self.profile.clone();
 
                                 let project_type = project.project_type;
-                                let project_title = project.title.clone();
 
                                 let _ = self.profiles_config.update_config().report_error();
                                 let is_data_pack = self.mod_manager_state.is_datapack;
@@ -591,7 +602,7 @@ impl View for ModManager<'_> {
                                     Caller::progressing(move |progress| async move {
                                         let mut versions_with_paths = Vec::new();
 
-                                        for version in versions {
+                                        for (name, version) in versions {
                                             let path = if is_data_pack {
                                                 data_pack_dir.clone()
                                             } else {
@@ -601,7 +612,7 @@ impl View for ModManager<'_> {
                                             let data = (
                                                 version,
                                                 path,
-                                                project_title.clone(),
+                                                name,
                                             );
                                             versions_with_paths.push(data);
                                         }

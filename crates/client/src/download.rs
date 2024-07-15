@@ -16,10 +16,7 @@ use nomi_core::{
     state::get_launcher_manifest,
 };
 
-use crate::{
-    errors_pool::ErrorPoolExt,
-    views::{ModdedProfile},
-};
+use crate::{errors_pool::ErrorPoolExt, views::ModdedProfile};
 
 pub async fn task_download_version(profile: Arc<ModdedProfile>, progress_shared: TaskProgressShared) -> Option<ModdedProfile> {
     try_download_version(profile, progress_shared).await.report_error()

@@ -10,7 +10,7 @@ use crate::{bool_as_str, format_list, QueryData};
 
 pub type ProjectVersions = Vec<Version>;
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Version {
     pub name: String,
     pub version_number: String,
@@ -42,7 +42,7 @@ impl Deref for VersionId {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Hash, Clone, PartialOrd, Ord)]
 pub struct Dependency {
     pub version_id: Option<VersionId>,
     pub project_id: ProjectId,
@@ -50,7 +50,7 @@ pub struct Dependency {
     pub dependency_type: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct File {
     pub hashes: Hashes,
     pub url: String,
@@ -60,7 +60,7 @@ pub struct File {
     pub file_type: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Hashes {
     pub sha512: String,
     pub sha1: String,

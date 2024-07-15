@@ -118,7 +118,10 @@ impl eframe::App for MyTabs {
             .add_collection::<collections::JavaCollection>(())
             .add_collection::<collections::ProjectCollection>(&mut self.context.states.mod_manager.current_project)
             .add_collection::<collections::ProjectVersionsCollection>(&mut self.context.states.mod_manager.current_versions)
-            .add_collection::<collections::DependenciesCollection>(&mut self.context.states.mod_manager.current_dependencies)
+            .add_collection::<collections::DependenciesCollection>((
+                &mut self.context.states.mod_manager.current_dependencies,
+                self.context.states.mod_manager.current_project.as_ref().map(|p| &p.id),
+            ))
             .add_collection::<collections::ModsDownloadingCollection>((
                 &mut self.context.states.tabs,
                 &mut self.context.states.profiles.profiles,

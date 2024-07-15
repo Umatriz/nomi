@@ -21,7 +21,10 @@ use nomi_modding::{
 use serde::{Deserialize, Serialize};
 use tokio::{fs::File, io::AsyncWriteExt};
 
-use crate::{progress::UnitProgress, DOT_NOMI_MODS_STASH_DIR, MINECRAFT_MODS_DIRECTORY, NOMI_LOADED_LOCK_FILE, NOMI_LOADED_LOCK_FILE_NAME};
+use crate::{
+    errors_pool::ErrorPoolExt, progress::UnitProgress, DOT_NOMI_MODS_STASH_DIR, MINECRAFT_MODS_DIRECTORY, NOMI_LOADED_LOCK_FILE,
+    NOMI_LOADED_LOCK_FILE_NAME,
+};
 
 #[derive(Serialize, Deserialize, Default, PartialEq, Eq, Hash, Debug)]
 pub struct ModsConfig {
@@ -44,10 +47,17 @@ pub struct ModFile {
     pub filename: String,
 }
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct SimpleDependency {
     pub name: String,
     pub versions: Vec<Arc<Version>>,
+    pub project_id: ProjectId,
     pub is_required: bool,
+}
+
+pub async fn get_and_proceed_deps(version: Arc<Version>, game_version: String, loader: String) -> Option<Vec<SimpleDependency>> {
+    let mut deps = Vec::new();
+    proceed_deps(&mut deps, version, game_version, loader).await.report_error().map(|_| deps)
 }
 
 pub async fn proceed_deps(dist: &mut Vec<SimpleDependency>, version: Arc<Version>, game_version: String, loader: String) -> anyhow::Result<()> {
@@ -65,12 +75,13 @@ pub async fn proceed_deps(dist: &mut Vec<SimpleDependency>, version: Arc<Version
         let versions = data.into_iter().map(Arc::new).collect_vec();
 
         let query = Query::new(ProjectData::new(dep.project_id.clone()));
-        let name = query.query().await?.title;
+        let project = query.query().await?;
 
         dist.push(SimpleDependency {
-            name,
+            name: project.title.clone(),
             versions: versions.clone(),
             is_required: dep.dependency_type.as_ref().is_some_and(|d| d == "required") || dep.dependency_type.is_none(),
+            project_id: project.id,
         });
     }
 
