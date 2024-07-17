@@ -15,7 +15,7 @@ use nomi_core::{
     DOT_NOMI_PROFILES_CONFIG,
 };
 use parking_lot::RwLock;
-use serde::{de::Visitor, ser::SerializeSeq, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     collections::{AssetsCollection, GameDeletionCollection, GameDownloadingCollection, GameRunnerCollection},

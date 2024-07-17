@@ -41,9 +41,7 @@ impl View for AddTab<'_> {
                 ui.toggle_value(&mut is_open, &*tab.id());
 
                 if is_open {
-                    if !tabs_state.contains_key(&id) {
-                        tabs_state.insert(id, tab.to_owned());
-                    }
+                    tabs_state.entry(id).or_insert_with(|| tab.to_owned());
                 } else {
                     tabs_state.remove(&id);
                 }

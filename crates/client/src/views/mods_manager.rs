@@ -186,7 +186,7 @@ impl ModManagerState {
 }
 
 impl View for ModManager<'_> {
-    fn ui(mut self, ui: &mut eframe::egui::Ui) {
+    fn ui(self, ui: &mut eframe::egui::Ui) {
         egui::TopBottomPanel::top("mod_manager_top_panel").show_inside(ui, |ui| {
             ui.horizontal(|ui| {
                 for project_type in ProjectType::iter().filter(|t| !matches!(t, ProjectType::Plugin)) {

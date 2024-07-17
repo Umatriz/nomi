@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use egui_dock::DockState;
 use egui_task_manager::*;
 use nomi_core::repository::fabric_meta::FabricVersions;
 use nomi_modding::modrinth::{
@@ -8,11 +7,7 @@ use nomi_modding::modrinth::{
     version::Version,
 };
 
-use crate::{
-    errors_pool::ErrorPoolExt,
-    views::{ModdedProfile, ProfilesConfig, SimpleDependency, TabsState},
-    TabKind,
-};
+use crate::views::SimpleDependency;
 
 pub struct FabricDataCollection;
 

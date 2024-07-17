@@ -1,14 +1,12 @@
 use std::{path::Path, sync::Arc};
 
-use eframe::egui::{Button, Color32};
-use egui_task_manager::{Caller, Task, TaskManager};
+use eframe::egui::Button;
+use egui_task_manager::TaskManager;
 use parking_lot::RwLock;
 
-use crate::{
-    collections::DownloadAddedModsCollection, errors_pool::ErrorPoolExt, open_directory::open_directory_native, TabKind, DOT_NOMI_MODS_STASH_DIR,
-};
+use crate::{errors_pool::ErrorPoolExt, open_directory::open_directory_native, TabKind, DOT_NOMI_MODS_STASH_DIR};
 
-use super::{download_added_mod, ModdedProfile, TabsState, View};
+use super::{ModdedProfile, TabsState, View};
 
 pub struct ProfileInfo<'a> {
     pub task_manager: &'a mut TaskManager,
