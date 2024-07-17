@@ -2,7 +2,7 @@ use crate::{
     errors_pool::ErrorPoolExt,
     states::States,
     views::{self, profiles::ProfilesPage, settings::SettingsPage, ModManager, ProfileInfo, View},
-    TabKind,
+    Tab, TabKind,
 };
 use eframe::egui::{self, ScrollArea};
 use egui_dock::TabViewer;
@@ -52,22 +52,28 @@ impl MyContext {
 }
 
 impl TabViewer for MyContext {
-    type Tab = TabKind;
+    type Tab = Tab;
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
-        tab.name().into()
+        (&*tab.kind.id()).into()
     }
 
     fn force_close(&mut self, tab: &mut Self::Tab) -> bool {
-        match tab {
-            TabKind::Mods { profile } => self.states.profiles.profiles.find_profile(profile.profile.id).is_none(),
-            TabKind::ProfileInfo { profile } => self.states.profiles.profiles.find_profile(profile.profile.id).is_none(),
+        match &tab.kind {
+            TabKind::Mods { profile } => {
+                let profile = profile.read();
+                self.states.profiles.profiles.find_profile(profile.profile.id).is_none()
+            }
+            TabKind::ProfileInfo { profile } => {
+                let profile = profile.read();
+                self.states.profiles.profiles.find_profile(profile.profile.id).is_none()
+            }
             _ => false,
         }
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
-        match tab {
+        match &tab.kind {
             TabKind::Profiles => ProfilesPage {
                 is_allowed_to_take_action: self.is_allowed_to_take_action,
                 manager: &mut self.manager,
@@ -108,7 +114,8 @@ impl TabViewer for MyContext {
             }
             .ui(ui),
             TabKind::ProfileInfo { profile } => ProfileInfo {
-                profile: &*profile,
+                task_manager: &mut self.manager,
+                profile: profile.clone(),
                 tabs_state: &mut self.states.tabs,
                 profile_info_state: &mut self.states.profile_info,
             }
@@ -117,9 +124,7 @@ impl TabViewer for MyContext {
     }
 
     fn on_close(&mut self, tab: &mut Self::Tab) -> bool {
-        if let Some(index) = self.states.tabs.0.iter().position(|t| t == &*tab) {
-            self.states.tabs.0.remove(index);
-        }
+        self.states.tabs.0.remove(&tab.id);
         true
     }
 }

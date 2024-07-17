@@ -1,56 +1,32 @@
-use std::sync::Arc;
+use std::collections::HashMap;
 
 use egui_dock::DockState;
 
-use crate::TabKind;
+use crate::{Tab, TabId, TabKind};
 
-use super::{ModdedProfile, ProfilesConfig, View};
+use super::{ModdedProfile, View};
 
 pub struct AddTab<'a> {
-    pub dock_state: &'a DockState<TabKind>,
+    pub dock_state: &'a DockState<Tab>,
     pub tabs_state: &'a mut TabsState,
 }
 
 #[derive(Default)]
-pub struct TabsState(pub Vec<TabKind>);
+pub struct TabsState(pub HashMap<TabId, TabKind>);
 
 impl TabsState {
     pub fn new() -> Self {
-        let tabs = vec![TabKind::Profiles, TabKind::Logs, TabKind::Settings, TabKind::DownloadProgress];
+        let tabs = [TabKind::Profiles, TabKind::Logs, TabKind::Settings, TabKind::DownloadProgress]
+            .map(|t| (t.id(), t))
+            .into_iter()
+            .collect();
         Self(tabs)
     }
 
-    pub fn update_profile_tabs(&mut self, dock_state: &mut DockState<TabKind>, profiles: &ProfilesConfig, old: Arc<ModdedProfile>) {
-        // PANICS: Will never panic since the tab cannot be opened if the profile does not exists
-        let prof = profiles.find_profile(old.profile.id).unwrap();
-
-        let mut iter = self.0.iter_mut();
-
-        let mut tabs_iter = dock_state.iter_all_tabs_mut().map(|t| t.1);
-
-        let target = TabKind::ProfileInfo { profile: old.clone() };
-        if let Some((TabKind::ProfileInfo { profile }, TabKind::ProfileInfo { profile: dock_profile })) = iter
-            .find(|t| *t == &target)
-            .and_then(|t| tabs_iter.find(|tab| *tab == &target).map(|dock_tab| (t, dock_tab)))
-        {
-            *profile = prof.clone();
-            *dock_profile = prof.clone();
-        }
-
-        let target = TabKind::Mods { profile: old.clone() };
-        if let Some((TabKind::Mods { profile }, TabKind::Mods { profile: dock_profile })) = iter
-            .find(|t| *t == &target)
-            .and_then(|t| tabs_iter.find(|tab| *tab == &target).map(|dock_tab| (t, dock_tab)))
-        {
-            *profile = prof.clone();
-            *dock_profile = prof.clone();
-        }
-    }
-
-    pub fn remove_profile_related_tabs(&mut self, profile_to_remove: &Arc<ModdedProfile>) {
-        self.0.retain(|p| match p {
-            TabKind::Mods { profile } => profile != profile_to_remove,
-            TabKind::ProfileInfo { profile } => profile != profile_to_remove,
+    pub fn remove_profile_related_tabs(&mut self, profile_to_remove: &ModdedProfile) {
+        self.0.retain(|_id, k| match k {
+            TabKind::Mods { profile } => *profile.read() != *profile_to_remove,
+            TabKind::ProfileInfo { profile } => *profile.read() != *profile_to_remove,
             _ => true,
         });
     }
@@ -60,16 +36,16 @@ impl View for AddTab<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
         ui.menu_button("View", |ui| {
             let tabs_state = &mut self.tabs_state.0;
-            for tab in TabKind::AVAILABLE_TABS_TO_OPEN {
-                let mut is_open = tabs_state.contains(tab);
-                ui.toggle_value(&mut is_open, tab.name());
+            for (id, tab) in TabKind::AVAILABLE_TABS_TO_OPEN.iter().map(|kind| (kind.id(), kind)) {
+                let mut is_open = tabs_state.contains_key(&id);
+                ui.toggle_value(&mut is_open, &*tab.id());
 
                 if is_open {
-                    if !tabs_state.contains(tab) {
-                        tabs_state.push(tab.to_owned());
+                    if !tabs_state.contains_key(&id) {
+                        tabs_state.insert(id, tab.to_owned());
                     }
-                } else if let Some(index) = tabs_state.iter().position(|t| t == tab) {
-                    tabs_state.remove(index);
+                } else {
+                    tabs_state.remove(&id);
                 }
             }
         })

@@ -80,17 +80,26 @@ fn main() {
 
 struct MyTabs {
     context: MyContext,
-    dock_state: DockState<TabKind>,
+    dock_state: DockState<Tab>,
 }
 
 impl MyTabs {
     pub fn new(collector: EventCollector) -> Self {
-        let tabs = vec![TabKind::Profiles, TabKind::Logs, TabKind::Settings];
+        let tabs = [TabKind::Profiles, TabKind::Logs, TabKind::Settings]
+            .map(|kind| Tab { id: kind.id(), kind })
+            .into();
 
         let mut dock_state = DockState::new(tabs);
 
         let surface = dock_state.main_surface_mut();
-        surface.split_right(NodeIndex::root(), 0.60, vec![TabKind::DownloadProgress]);
+        surface.split_right(
+            NodeIndex::root(),
+            0.60,
+            vec![Tab {
+                id: TabKind::DownloadProgress.id(),
+                kind: TabKind::DownloadProgress,
+            }],
+        );
 
         Self {
             context: MyContext::new(collector),
@@ -114,7 +123,7 @@ impl eframe::App for MyTabs {
             .add_collection::<collections::AssetsCollection>(())
             .add_collection::<collections::FabricDataCollection>(&mut self.context.states.add_profile_menu_state.fabric_versions)
             .add_collection::<collections::GameDeletionCollection>(())
-            .add_collection::<collections::GameDownloadingCollection>(&mut self.context.states.profiles.profiles)
+            .add_collection::<collections::GameDownloadingCollection>(())
             .add_collection::<collections::JavaCollection>(())
             .add_collection::<collections::ProjectCollection>(&mut self.context.states.mod_manager.current_project)
             .add_collection::<collections::ProjectVersionsCollection>(&mut self.context.states.mod_manager.current_versions)
@@ -122,11 +131,7 @@ impl eframe::App for MyTabs {
                 &mut self.context.states.mod_manager.current_dependencies,
                 self.context.states.mod_manager.current_project.as_ref().map(|p| &p.id),
             ))
-            .add_collection::<collections::ModsDownloadingCollection>((
-                &mut self.context.states.tabs,
-                &mut self.context.states.profiles.profiles,
-                &mut self.dock_state,
-            ))
+            .add_collection::<collections::ModsDownloadingCollection>(())
             .add_collection::<collections::GameRunnerCollection>(());
 
         ctx.set_pixels_per_point(self.context.states.client_settings.pixels_per_point);
@@ -220,17 +225,26 @@ impl eframe::App for MyTabs {
             .frame(Frame::central_panel(ctx.style().as_ref()).inner_margin(0.0))
             .show(ctx, |ui| self.ui(ui));
 
-        let opened_tabs = self.dock_state.iter_all_tabs().map(|(_, tab)| tab.clone()).collect::<Vec<_>>();
+        let opened_tabs = self.dock_state.iter_all_tabs().map(|(_, tab)| tab.id.clone()).collect::<Vec<_>>();
 
-        for tab in &self.context.states.tabs.0 {
-            if !opened_tabs.contains(tab) {
-                self.dock_state.push_to_first_leaf(tab.clone())
+        for (id, kind) in &self.context.states.tabs.0 {
+            if !opened_tabs.contains(id) {
+                self.dock_state.push_to_first_leaf(Tab {
+                    id: id.clone(),
+                    kind: kind.clone(),
+                })
             }
         }
 
-        for tab in &opened_tabs {
-            if !self.context.states.tabs.0.contains(tab) {
-                self.dock_state.find_tab(tab).and_then(|tab_info| self.dock_state.remove_tab(tab_info));
+        for id in &opened_tabs {
+            if !self.context.states.tabs.0.contains_key(id) {
+                // `TabKind` here does not matter since when comparing `Tab`s you're comparing their `id`s
+                self.dock_state
+                    .find_tab(&Tab {
+                        id: id.clone(),
+                        kind: TabKind::Logs,
+                    })
+                    .and_then(|tab_info| self.dock_state.remove_tab(tab_info));
             }
         }
 

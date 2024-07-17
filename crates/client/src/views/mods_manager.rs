@@ -18,6 +18,7 @@ use nomi_modding::{
     },
     Query,
 };
+use parking_lot::RwLock;
 use tracing::debug;
 
 use crate::{
@@ -34,7 +35,7 @@ pub use crate::mods::*;
 pub struct ModManager<'a> {
     pub task_manager: &'a mut TaskManager,
     pub profiles_config: &'a mut ProfilesConfig,
-    pub profile: Arc<ModdedProfile>,
+    pub profile: Arc<RwLock<ModdedProfile>>,
     pub mod_manager_state: &'a mut ModManagerState,
 }
 
@@ -161,7 +162,7 @@ impl ModManagerState {
         self.entered_search = String::new();
     }
 
-    pub fn facets(&self, profile: &Arc<ModdedProfile>) -> Facets {
+    pub fn facets(&self, profile: &ModdedProfile) -> Facets {
         let mut parts = if matches!(self.current_project_type, ProjectType::Mod) {
             Parts::new()
                 .part(InnerPart::new().add_category(profile.profile.loader_name().to_lowercase()))
@@ -185,7 +186,7 @@ impl ModManagerState {
 }
 
 impl View for ModManager<'_> {
-    fn ui(self, ui: &mut eframe::egui::Ui) {
+    fn ui(mut self, ui: &mut eframe::egui::Ui) {
         egui::TopBottomPanel::top("mod_manager_top_panel").show_inside(ui, |ui| {
             ui.horizontal(|ui| {
                 for project_type in ProjectType::iter().filter(|t| !matches!(t, ProjectType::Plugin)) {
@@ -274,14 +275,16 @@ impl View for ModManager<'_> {
                             }
                         }
 
-                        let facets = self.mod_manager_state.facets(&self.profile);
-                        let query = self.mod_manager_state.query();
-                        if self.mod_manager_state.previous_facets != facets {
-                            self.mod_manager_state.previous_facets = facets.clone();
-                            self.mod_manager_state.scroll = ModManagerState::create_scroll(Some(facets), query);
-                        } else if self.mod_manager_state.previous_project_type != self.mod_manager_state.current_project_type {
-                            self.mod_manager_state.previous_project_type = self.mod_manager_state.current_project_type;
-                            self.mod_manager_state.scroll = ModManagerState::create_scroll(Some(facets), query);
+                        {
+                            let facets = self.mod_manager_state.facets(&self.profile.read());
+                            let query = self.mod_manager_state.query();
+                            if self.mod_manager_state.previous_facets != facets {
+                                self.mod_manager_state.previous_facets = facets.clone();
+                                self.mod_manager_state.scroll = ModManagerState::create_scroll(Some(facets), query);
+                            } else if self.mod_manager_state.previous_project_type != self.mod_manager_state.current_project_type {
+                                self.mod_manager_state.previous_project_type = self.mod_manager_state.current_project_type;
+                                self.mod_manager_state.scroll = ModManagerState::create_scroll(Some(facets), query);
+                            }
                         }
                     } else {
                         ui.error_label("Unable to get categories");
@@ -300,7 +303,7 @@ impl View for ModManager<'_> {
                     let resp = ui.text_edit_singleline(&mut self.mod_manager_state.entered_search);
 
                     let mut set_query = || {
-                        let facets = self.mod_manager_state.facets(&self.profile);
+                        let facets = self.mod_manager_state.facets(&self.profile.read());
                         let query = self.mod_manager_state.query();
 
                         self.mod_manager_state.scroll = ModManagerState::create_scroll(Some(facets), query)
@@ -325,7 +328,8 @@ impl View for ModManager<'_> {
                                 ui.label(&item.description);
 
                                 ui.horizontal(|ui| {
-                                    if self.profile.mods.mods.iter().any(|m| m.project_id == item.project_id) {
+                                    let profile = self.profile.read();
+                                    if profile.mods.mods.iter().any(|m| m.project_id == item.project_id) {
                                         ui.colored_label(Color32::GREEN, "✅")
                                             .on_hover_text("This mod is already downloaded. Downloading it again will replace files.");
                                     }
@@ -339,9 +343,9 @@ impl View for ModManager<'_> {
                                             matches!(self.mod_manager_state.current_project_type, ProjectType::DataPack);
 
                                         self.mod_manager_state.is_download_window_open = true;
-                                        let game_version = self.profile.profile.version().to_owned();
+                                        let game_version = profile.profile.version().to_owned();
 
-                                        let loader = self.profile.profile.loader_name().to_lowercase();
+                                        let loader = profile.profile.loader_name().to_lowercase();
 
                                         let id = item.project_id.clone();
                                         let get_project = Task::new(
@@ -409,7 +413,7 @@ impl View for ModManager<'_> {
                                     }
                                     ui.vertical(|ui| {
                                         ui.horizontal(|ui| {
-                                            if self.profile.mods.mods.iter().any(|m| m.project_id == project.id) {
+                                            if self.profile.read().mods.mods.iter().any(|m| m.project_id == project.id) {
                                                 ui.label(RichText::new("✅").color(Color32::GREEN).heading())
                                                     .on_hover_text("This mod is already downloaded. Downloading it again will replace files.");
                                             }
@@ -442,16 +446,7 @@ impl View for ModManager<'_> {
                                             .on_hover_text(version.version_number.clone());
 
                                         if response.clicked() {
-                                            let game_version = self.profile.profile.version().to_owned();
-                                            let loader = self.profile.profile.loader_name().to_lowercase();
-                                            let version = version.clone();
-
-                                            let get_dependencies = Task::new(
-                                                "Get dependencies",
-                                                Caller::standard(get_and_proceed_deps(version, game_version, loader)),
-                                            );
-
-                                            self.task_manager.push_task::<DependenciesCollection>(get_dependencies);
+                                            get_dependencies(self.task_manager, &self.profile, version);
                                         }
                                     }
                                 });
@@ -481,6 +476,7 @@ impl View for ModManager<'_> {
                             for dep in &self.mod_manager_state.current_dependencies {
                                 let is_installed = self
                                     .profile
+                                    .read()
                                     .mods
                                     .mods
                                     .iter()
@@ -528,16 +524,7 @@ impl View for ModManager<'_> {
                                                                 .on_hover_text(version.version_number.clone());
 
                                                                 if response.clicked() {
-                                                                    let game_version = self.profile.profile.version().to_owned();
-                                                                    let loader = self.profile.profile.loader_name().to_lowercase();
-                                                                    let version = version.clone();
-
-                                                                    let get_dependencies = Task::new(
-                                                                        "Get dependencies",
-                                                                        Caller::standard(get_and_proceed_deps(version, game_version, loader)),
-                                                                    );
-
-                                                                    self.task_manager.push_task::<DependenciesCollection>(get_dependencies);
+                                                                    get_dependencies(self.task_manager, &self.profile, version);
                                                                 }
                                                         });
                                                     }
@@ -596,7 +583,7 @@ impl View for ModManager<'_> {
 
                                 let _ = self.profiles_config.update_config().report_error();
                                 let is_data_pack = self.mod_manager_state.is_datapack;
-                                let data_pack_dir = self.mod_manager_state.data_pack_path.as_path_buf(profile.profile.id);
+                                let data_pack_dir = self.mod_manager_state.data_pack_path.as_path_buf(profile.read().profile.id);
                                 let download_mod = Task::new(
                                     "Download mods",
                                     Caller::progressing(move |progress| async move {
@@ -606,7 +593,7 @@ impl View for ModManager<'_> {
                                             let path = if is_data_pack {
                                                 data_pack_dir.clone()
                                             } else {
-                                                directory_from_project_type(project_type, profile.profile.id)
+                                                directory_from_project_type(project_type, profile.read().profile.id)
                                             };
 
                                             let data = (
@@ -618,12 +605,8 @@ impl View for ModManager<'_> {
                                         }
 
                                         let mods = download_mods(progress, versions_with_paths).await.report_error();
-                                        let mut cfg = ProfilesConfig::read_async().await;
 
-                                        // PANICS: Will never panic since this page cannot be accessed without profile.
-                                        let prof = cfg.profiles.iter_mut().find(|p| p.profile.id == profile.profile.id).unwrap();
-
-                                        if let Some((profile, mods)) = Arc::get_mut(prof).and_then(|p| mods.map(|m| (p, m))) {
+                                        if let Some((mut profile, mods)) = mods.map(|mods| (profile.write(), mods)) {
                                             if matches!(project_type, ProjectType::Mod) {
                                                 profile.mods.mods.extend(mods);
                                                 profile.mods.mods.sort();
@@ -632,9 +615,7 @@ impl View for ModManager<'_> {
                                             }
                                         }
 
-                                        cfg.update_config_async().await.report_error();
-
-                                        Some(profile)
+                                        Some(())
                                     }),
                                 );
 
@@ -645,4 +626,15 @@ impl View for ModManager<'_> {
                 });
             });
     }
+}
+
+fn get_dependencies(task_manager: &mut TaskManager, profile: &Arc<RwLock<ModdedProfile>>, version: &Arc<Version>) {
+    let profile = profile.read();
+    let game_version = profile.profile.version().to_owned();
+    let loader = profile.profile.loader_name().to_lowercase();
+    let version = version.clone();
+
+    let get_dependencies = Task::new("Get dependencies", Caller::standard(get_and_proceed_deps(version, game_version, loader)));
+
+    task_manager.push_task::<DependenciesCollection>(get_dependencies);
 }

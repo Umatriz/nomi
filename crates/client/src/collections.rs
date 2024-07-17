@@ -75,9 +75,9 @@ impl<'c> TasksCollection<'c> for JavaCollection {
 pub struct GameDownloadingCollection;
 
 impl<'c> TasksCollection<'c> for GameDownloadingCollection {
-    type Context = &'c mut ProfilesConfig;
+    type Context = ();
 
-    type Target = Option<ModdedProfile>;
+    type Target = Option<()>;
 
     type Executor = executors::Linear;
 
@@ -85,19 +85,8 @@ impl<'c> TasksCollection<'c> for GameDownloadingCollection {
         "Game downloading collection"
     }
 
-    fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|opt: Option<ModdedProfile>| {
-            let Some(profile) = opt else {
-                return;
-            };
-
-            // PANICS: It will never panic because the profile
-            // cannot be downloaded if it doesn't exists
-            let prof = context.profiles.iter_mut().find(|prof| prof.profile.id == profile.profile.id).unwrap();
-
-            *prof = Arc::new(profile);
-            context.update_config().report_error();
-        })
+    fn handle(_context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|_| ())
     }
 }
 
@@ -193,9 +182,9 @@ impl<'c> TasksCollection<'c> for DependenciesCollection {
 pub struct ModsDownloadingCollection;
 
 impl<'c> TasksCollection<'c> for ModsDownloadingCollection {
-    type Context = (&'c mut TabsState, &'c mut ProfilesConfig, &'c mut DockState<TabKind>);
+    type Context = ();
 
-    type Target = Option<Arc<ModdedProfile>>;
+    type Target = Option<()>;
 
     type Executor = executors::Linear;
 
@@ -203,16 +192,8 @@ impl<'c> TasksCollection<'c> for ModsDownloadingCollection {
         "Mods downloading collection"
     }
 
-    fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|value: Option<Arc<ModdedProfile>>| {
-            if let Some(profile) = value {
-                if let Ok(cfg) = ProfilesConfig::try_read() {
-                    *context.1 = cfg
-                }
-
-                context.0.update_profile_tabs(context.2, context.1, profile);
-            }
-        })
+    fn handle(_context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|_| ())
     }
 }
 
@@ -231,5 +212,23 @@ impl<'c> TasksCollection<'c> for GameRunnerCollection {
 
     fn handle(_context: Self::Context) -> Handler<'c, Self::Target> {
         Handler::new(|_| ())
+    }
+}
+
+pub struct DownloadAddedModsCollection;
+
+impl<'c> TasksCollection<'c> for DownloadAddedModsCollection {
+    type Context = ();
+
+    type Target = ();
+
+    type Executor = executors::Parallel;
+
+    fn name() -> &'static str {
+        todo!()
+    }
+
+    fn handle(_context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|()| ())
     }
 }

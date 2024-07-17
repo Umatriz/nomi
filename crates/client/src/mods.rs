@@ -36,11 +36,11 @@ pub struct Mod {
     pub project_id: ProjectId,
     pub name: String,
     pub version_id: VersionId,
-    pub is_installed: bool,
+    pub is_downloaded: bool,
     pub files: Vec<ModFile>,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
 pub struct ModFile {
     pub sha1: String,
     pub url: String,
@@ -53,6 +53,22 @@ pub struct SimpleDependency {
     pub versions: Vec<Arc<Version>>,
     pub project_id: ProjectId,
     pub is_required: bool,
+}
+
+pub async fn download_added_mod(progress: TaskProgressShared, profile_id: usize, files: Vec<ModFile>) {
+    let _ = progress.set_total(files.len() as u32);
+
+    let mut set = DownloadSet::new();
+
+    let mods_stash = Path::new(DOT_NOMI_MODS_STASH_DIR).join(format!("{profile_id}"));
+    for file in files {
+        let downloader = FileDownloader::new(file.url, mods_stash.join(file.filename)).with_sha1(file.sha1);
+        set.add(Box::new(downloader));
+    }
+
+    let sender = MappedSender::new_progress_mapper(Box::new(progress.sender()));
+
+    Box::new(set).download(&sender).await;
 }
 
 pub async fn get_and_proceed_deps(version: Arc<Version>, game_version: String, loader: String) -> Option<Vec<SimpleDependency>> {
@@ -137,7 +153,7 @@ pub async fn download_mod(sender: Sender<Box<dyn Progress>>, dir: PathBuf, name:
     Ok(Mod {
         name,
         version_id: version.id.clone(),
-        is_installed: true,
+        is_downloaded: true,
         files: downloaded_files,
         project_id: version.project_id.clone(),
     })

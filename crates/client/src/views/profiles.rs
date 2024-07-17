@@ -14,7 +14,8 @@ use nomi_core::{
     repository::{launcher_manifest::LauncherManifest, username::Username},
     DOT_NOMI_PROFILES_CONFIG,
 };
-use serde::{Deserialize, Serialize};
+use parking_lot::RwLock;
+use serde::{de::Visitor, ser::SerializeSeq, Deserialize, Deserializer, Serialize};
 
 use crate::{
     collections::{AssetsCollection, GameDeletionCollection, GameDownloadingCollection, GameRunnerCollection},
@@ -59,7 +60,7 @@ pub struct SimpleProfile {
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct ProfilesConfig {
-    pub profiles: Vec<Arc<ModdedProfile>>,
+    pub profiles: Vec<Arc<RwLock<ModdedProfile>>>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -78,8 +79,8 @@ impl ModdedProfile {
 }
 
 impl ProfilesConfig {
-    pub fn find_profile(&self, target_id: usize) -> Option<&Arc<ModdedProfile>> {
-        self.profiles.iter().find(|p| p.profile.id == target_id)
+    pub fn find_profile(&self, target_id: usize) -> Option<&Arc<RwLock<ModdedProfile>>> {
+        self.profiles.iter().find(|p| p.read().profile.id == target_id)
     }
 
     pub fn read() -> Self {
@@ -95,12 +96,12 @@ impl ProfilesConfig {
     }
 
     pub fn add_profile(&mut self, profile: ModdedProfile) {
-        self.profiles.push(profile.into())
+        self.profiles.push(RwLock::new(profile).into())
     }
 
     pub fn create_id(&self) -> usize {
-        match &self.profiles.iter().max_by_key(|profile| profile.profile.id) {
-            Some(v) => v.profile.id + 1,
+        match &self.profiles.iter().max_by_key(|profile| profile.read().profile.id) {
+            Some(v) => v.read().profile.id + 1,
             None => 0,
         }
     }
@@ -156,8 +157,9 @@ impl View for ProfilesPage<'_> {
             .body(|mut body| {
                 let mut is_deleting = vec![];
 
-                for (index, profile) in self.profiles_state.profiles.profiles.iter().enumerate() {
+                for (index, profile_lock) in self.profiles_state.profiles.profiles.iter().enumerate() {
                     body.row(30.0, |mut row| {
+                        let profile = profile_lock.read();
                         row.col(|ui| {
                             ui.add(egui::Label::new(&profile.profile.name).truncate());
                         });
@@ -214,11 +216,11 @@ impl View for ProfilesPage<'_> {
                                     );
                                     self.manager.push_task::<AssetsCollection>(assets_task);
 
-                                    let profile = profile.clone();
+                                    let profile_clone = profile_lock.clone();
 
                                     let game_task = Task::new(
                                         format!("Downloading version {}", profile.profile.version()),
-                                        Caller::progressing(|progress| task_download_version(profile, progress)),
+                                        Caller::progressing(|progress| task_download_version(profile_clone, progress)),
                                     );
                                     self.manager.push_task::<GameDownloadingCollection>(game_task);
                                 }
@@ -227,7 +229,10 @@ impl View for ProfilesPage<'_> {
 
                         row.col(|ui| {
                             if ui.button("Details").clicked() {
-                                self.tabs_state.0.push(TabKind::ProfileInfo { profile: profile.clone() });
+                                let kind = TabKind::ProfileInfo {
+                                    profile: profile_lock.clone(),
+                                };
+                                self.tabs_state.0.insert(kind.id(), kind);
                             }
                         });
 
@@ -293,7 +298,7 @@ impl View for ProfilesPage<'_> {
 
                                             self.manager.push_task::<GameDeletionCollection>(task);
 
-                                            self.tabs_state.remove_profile_related_tabs(profile);
+                                            self.tabs_state.remove_profile_related_tabs(&profile);
 
                                             ui.memory_mut(|mem| mem.close_popup());
                                         }

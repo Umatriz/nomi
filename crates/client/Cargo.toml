@@ -19,7 +19,7 @@ toml.workspace = true
 nomi-core = { path = "../nomi-core" }
 nomi-modding = { path = "../nomi-modding" }
 
-eframe = "0.28.0"
+eframe = { version = "0.28.0" }
 egui_dock = "0.13.0"
 egui_form = { version = "0.2.0", features = ["validator_garde"] }
 egui-file-dialog = "0.6.0"
@@ -35,3 +35,4 @@ image = { version = "0.25", default-features = false, features = ["webp"] }
 pollster = "0.3.0"
 tracing-appender = "0.2.2"
 once_cell = "1.19.0"
+parking_lot = { version = "0.12.3", features = ["serde"] }
