@@ -5,9 +5,11 @@ use eframe::{
     epaint::Vec2,
 };
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
+use egui_notify::Toasts;
 use egui_tracing::EventCollector;
 use open_directory::open_directory_native;
 use std::path::Path;
+use ui_ext::TOASTS_ID;
 use views::{add_tab_menu::AddTab, View};
 
 use errors_pool::{ErrorPoolExt, ERRORS_POOL};
@@ -118,6 +120,17 @@ impl MyTabs {
 
 impl eframe::App for MyTabs {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        {
+            use parking_lot::Mutex;
+            use std::sync::Arc;
+
+            let toasts = ctx.data_mut(|data| data.get_temp_mut_or_default::<Arc<Mutex<Toasts>>>(egui::Id::new(TOASTS_ID)).clone());
+
+            let mut locked = toasts.lock();
+
+            locked.show(ctx);
+        }
+
         self.context
             .manager
             .add_collection::<collections::AssetsCollection>(())
@@ -131,8 +144,12 @@ impl eframe::App for MyTabs {
                 &mut self.context.states.mod_manager.current_dependencies,
                 self.context.states.mod_manager.current_project.as_ref().map(|p| &p.id),
             ))
-            .add_collection::<collections::ModsDownloadingCollection>(())
-            .add_collection::<collections::GameRunnerCollection>(());
+            .add_collection::<collections::ModsDownloadingCollection>(&self.context.states.profiles.profiles)
+            .add_collection::<collections::GameRunnerCollection>(())
+            .add_collection::<collections::DownloadAddedModsCollection>((
+                &mut self.context.states.profile_info.currently_downloading_mods,
+                &self.context.states.profiles.profiles,
+            ));
 
         ctx.set_pixels_per_point(self.context.states.client_settings.pixels_per_point);
 

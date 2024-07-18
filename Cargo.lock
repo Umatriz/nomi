@@ -794,6 +794,7 @@ dependencies = [
  "anyhow",
  "eframe",
  "egui-file-dialog",
+ "egui-notify",
  "egui_commonmark",
  "egui_dock",
  "egui_extras",
@@ -810,6 +811,7 @@ dependencies = [
  "parking_lot",
  "pollster",
  "serde",
+ "serde_json",
  "tokio",
  "toml",
  "tracing",
@@ -1222,6 +1224,15 @@ dependencies = [
  "egui",
  "serde",
  "sysinfo",
+]
+
+[[package]]
+name = "egui-notify"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0c6c49d9c02771e28f3b40289c16b4473308807b1ed09a878713d7f11e3dcad"
+dependencies = [
+ "egui",
 ]
 
 [[package]]
@@ -2437,7 +2448,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e310b3a6b5907f99202fcdb4960ff45b93735d7c7d96b760fcff8db2dc0e103d"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.6",
 ]
 
 [[package]]

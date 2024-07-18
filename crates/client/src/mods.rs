@@ -31,11 +31,13 @@ pub struct ModsConfig {
     pub mods: Vec<Mod>,
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Debug, PartialOrd, Ord, Clone)]
 pub struct Mod {
     pub project_id: ProjectId,
     pub name: String,
     pub version_id: VersionId,
+    pub version_name: String,
+    pub version_number: String,
     pub is_downloaded: bool,
     pub files: Vec<ModFile>,
 }
@@ -153,6 +155,8 @@ pub async fn download_mod(sender: Sender<Box<dyn Progress>>, dir: PathBuf, name:
     Ok(Mod {
         name,
         version_id: version.id.clone(),
+        version_name: version.name.clone(),
+        version_number: version.version_number.clone(),
         is_downloaded: true,
         files: downloaded_files,
         project_id: version.project_id.clone(),

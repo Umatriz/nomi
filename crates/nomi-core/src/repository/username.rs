@@ -16,7 +16,7 @@ struct UsernameVisitor;
 impl<'de> Visitor<'de> for UsernameVisitor {
     type Value = Username;
 
-    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str("string")
     }
 

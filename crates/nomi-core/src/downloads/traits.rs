@@ -91,7 +91,7 @@ pub trait DownloaderIOExt<'a> {
     fn get_io(&'a self) -> Self::IO;
 }
 
-const _: Option<Box<dyn DownloaderIOExt<IO = AssetsDownloaderIo>>> = None;
+const _: Option<Box<dyn DownloaderIOExt<'_, IO = AssetsDownloaderIo<'_>>>> = None;
 
 pub trait ObjectSafeDownloaderIOExt<'a> {
     fn get_io_dyn(&'a self) -> Box<dyn DownloaderIO + Send + 'a>;

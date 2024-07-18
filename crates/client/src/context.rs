@@ -114,6 +114,7 @@ impl TabViewer for MyContext {
             }
             .ui(ui),
             TabKind::ProfileInfo { profile } => ProfileInfo {
+                profiles: &self.states.profiles.profiles,
                 task_manager: &mut self.manager,
                 profile: profile.clone(),
                 tabs_state: &mut self.states.tabs,

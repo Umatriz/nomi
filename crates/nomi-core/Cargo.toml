@@ -34,3 +34,6 @@ uuid = {version = "1.5.0", features = ["v4"]}
 flate2 = "1.0.30"
 sha1 = "0.10.6"
 base16ct = { version = "0.2.0", features = ["std"] }
+
+[lints.rust]
+rust_2018_idioms = "deny"

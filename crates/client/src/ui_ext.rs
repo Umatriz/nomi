@@ -1,4 +1,7 @@
-use eframe::egui::{self, Response, RichText, Ui, WidgetText};
+use eframe::egui::{self, popup_below_widget, PopupCloseBehavior, Response, RichText, Ui, WidgetText};
+use egui_notify::{Toast, Toasts};
+
+pub const TOASTS_ID: &str = "global_egui_notify_toasts";
 
 pub trait UiExt {
     fn ui(&self) -> &Ui;
@@ -25,7 +28,8 @@ pub trait UiExt {
     }
 
     fn markdown_ui(&mut self, id: egui::Id, markdown: &str) {
-        use std::sync::{Arc, Mutex};
+        use parking_lot::Mutex;
+        use std::sync::Arc;
 
         let ui = self.ui_mut();
         let commonmark_cache = ui.data_mut(|data| {
@@ -33,9 +37,44 @@ pub trait UiExt {
                 .clone()
         });
 
-        let mut locked = commonmark_cache.lock().unwrap();
+        let mut locked = commonmark_cache.lock();
 
         egui_commonmark::CommonMarkViewer::new(id).show(ui, &mut locked, markdown);
+    }
+
+    fn toggle_button(&mut self, selected: &mut bool, text: impl Into<WidgetText>) -> Response {
+        let mut response = self.ui_mut().button(text);
+        if response.clicked() {
+            *selected = !*selected;
+            response.mark_changed();
+        }
+        response
+    }
+
+    fn button_with_confirm_popup<R>(&mut self, button_text: impl Into<WidgetText>, add_content: impl FnOnce(&mut Ui) -> R) -> Response {
+        let ui = self.ui_mut();
+        let popup_id = ui.id().with("button_confirm_popup");
+        let button = ui.button(button_text);
+
+        if button.clicked() {
+            ui.memory_mut(|mem| mem.toggle_popup(popup_id));
+        }
+
+        popup_below_widget(ui, popup_id, &button, PopupCloseBehavior::CloseOnClickOutside, add_content);
+
+        button
+    }
+
+    fn toasts(&mut self, writer: impl FnOnce(&mut Toasts) -> &mut Toast) {
+        use parking_lot::Mutex;
+        use std::sync::Arc;
+
+        let ui = self.ui_mut();
+        let toasts = ui.data_mut(|data| data.get_temp_mut_or_default::<Arc<Mutex<Toasts>>>(egui::Id::new(TOASTS_ID)).clone());
+
+        let mut locked = toasts.lock();
+
+        writer(&mut locked);
     }
 }
 

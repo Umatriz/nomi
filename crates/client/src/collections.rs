@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 
 use egui_task_manager::*;
 use nomi_core::repository::fabric_meta::FabricVersions;
@@ -7,7 +7,10 @@ use nomi_modding::modrinth::{
     version::Version,
 };
 
-use crate::views::SimpleDependency;
+use crate::{
+    errors_pool::ErrorPoolExt,
+    views::{ProfilesConfig, SimpleDependency},
+};
 
 pub struct FabricDataCollection;
 
@@ -177,7 +180,7 @@ impl<'c> TasksCollection<'c> for DependenciesCollection {
 pub struct ModsDownloadingCollection;
 
 impl<'c> TasksCollection<'c> for ModsDownloadingCollection {
-    type Context = ();
+    type Context = &'c ProfilesConfig;
 
     type Target = Option<()>;
 
@@ -187,8 +190,10 @@ impl<'c> TasksCollection<'c> for ModsDownloadingCollection {
         "Mods downloading collection"
     }
 
-    fn handle(_context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|_| ())
+    fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|_| {
+            context.update_config().report_error();
+        })
     }
 }
 
@@ -213,17 +218,20 @@ impl<'c> TasksCollection<'c> for GameRunnerCollection {
 pub struct DownloadAddedModsCollection;
 
 impl<'c> TasksCollection<'c> for DownloadAddedModsCollection {
-    type Context = ();
+    type Context = (&'c mut HashSet<ProjectId>, &'c ProfilesConfig);
 
-    type Target = ();
+    type Target = ProjectId;
 
     type Executor = executors::Parallel;
 
     fn name() -> &'static str {
-        todo!()
+        "Download added mod collection"
     }
 
-    fn handle(_context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|()| ())
+    fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|id| {
+            context.0.remove(&id);
+            context.1.update_config().report_error();
+        })
     }
 }
