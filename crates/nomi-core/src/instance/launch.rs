@@ -133,6 +133,7 @@ impl LaunchInstance {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self), err)]
     pub async fn launch(&self, user_data: UserData, java_runner: &JavaRunner) -> anyhow::Result<()> {
         let manifest = read_json_config::<Manifest>(&self.settings.manifest_file).await?;
 
@@ -158,6 +159,9 @@ impl LaunchInstance {
             .arg(main_class)
             .args(dbg!(manifest_game_arguments))
             .args(loader_game_arguments)
+            // Works incorrectly so let's ignore it for now.
+            // It will work when the instances are implemented.
+            // .current_dir(std::fs::canonicalize(MINECRAFT_DIR)?)
             .spawn()?;
 
         child.wait().await?.code().inspect(|code| info!("Minecraft exit code: {}", code));

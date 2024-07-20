@@ -33,7 +33,7 @@ pub struct ArgumentsBuilder<'a, S = Undefined, U = Undefined> {
     _user_data_marker: PhantomData<U>,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct UserData {
     pub username: Username,
     pub uuid: Option<String>,
@@ -72,7 +72,7 @@ impl<'a> ArgumentsBuilder<'a, Undefined, Undefined> {
 
 impl<'a, U> ArgumentsBuilder<'a, Undefined, U> {
     pub fn with_classpath(self) -> ArgumentsBuilder<'a, WithClasspath, U> {
-        let (classpath, native_libs) = dbg!(self.classpath());
+        let (classpath, native_libs) = self.classpath();
         ArgumentsBuilder {
             instance: self.instance,
             manifest: self.manifest,
@@ -215,6 +215,7 @@ impl<'a> ArgumentsBuilder<'a, WithClasspath, WithUserData> {
 }
 
 impl<'a, S, U> ArgumentsBuilder<'a, S, U> {
+    #[tracing::instrument(skip(self), fields(result))]
     fn classpath(&self) -> (Vec<PathBuf>, Vec<PathBuf>) {
         fn match_natives(natives: &Classifiers) -> Option<&DownloadFile> {
             match std::env::consts::OS {
