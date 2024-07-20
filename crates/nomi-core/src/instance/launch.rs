@@ -16,7 +16,6 @@ use crate::{
         java_runner::JavaRunner,
         manifest::{Manifest, VersionType},
     },
-    MINECRAFT_DIR,
 };
 
 use self::arguments::ArgumentsBuilder;
@@ -160,7 +159,9 @@ impl LaunchInstance {
             .arg(main_class)
             .args(dbg!(manifest_game_arguments))
             .args(loader_game_arguments)
-            .current_dir(std::fs::canonicalize(MINECRAFT_DIR)?)
+            // Works incorrectly so let's ignore it for now.
+            // It will work when the instances are implemented.
+            // .current_dir(std::fs::canonicalize(MINECRAFT_DIR)?)
             .spawn()?;
 
         child.wait().await?.code().inspect(|code| info!("Minecraft exit code: {}", code));
