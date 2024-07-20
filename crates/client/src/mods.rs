@@ -195,18 +195,22 @@ pub async fn load_mods(profile_id: usize) -> anyhow::Result<()> {
 
     let mut loaded = read_toml_config::<CurrentlyLoaded>(NOMI_LOADED_LOCK_FILE).await?;
 
+    let target_dir = PathBuf::from(MINECRAFT_MODS_DIRECTORY)
+        .read_dir()?
+        .filter_map(|r| r.ok())
+        .map(|e| (e.file_name(), e.path()))
+        .collect::<Vec<_>>();
+
     if loaded.id == profile_id {
         let path = PathBuf::from(DOT_NOMI_MODS_STASH_DIR).join(format!("{profile_id}"));
         let mut dir = tokio::fs::read_dir(path).await?;
 
-        let target_dir = PathBuf::from(MINECRAFT_MODS_DIRECTORY)
-            .read_dir()?
-            .filter_map(|r| r.ok())
-            .map(|e| e.file_name())
-            .collect::<Vec<_>>();
+        let mut mods_in_the_stash = Vec::new();
 
         while let Ok(Some(entry)) = dir.next_entry().await {
-            if target_dir.contains(&entry.file_name()) {
+            mods_in_the_stash.push(entry.file_name());
+
+            if target_dir.iter().any(|i| i.0 == entry.file_name()) {
                 continue;
             }
 
@@ -217,6 +221,18 @@ pub async fn load_mods(profile_id: usize) -> anyhow::Result<()> {
             };
 
             make_link(&path, file_name).await?;
+        }
+
+        for (file_name, path) in target_dir {
+            if file_name == NOMI_LOADED_LOCK_FILE_NAME {
+                continue;
+            }
+
+            if mods_in_the_stash.contains(&file_name) {
+                continue;
+            }
+
+            tokio::fs::remove_file(path).await.report_error();
         }
 
         return Ok(());
