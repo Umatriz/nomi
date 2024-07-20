@@ -61,7 +61,7 @@ impl Downloader for Chunk {
         let (helper_sender, mut helper_receiver) = tokio::sync::mpsc::channel(100);
         let downloader = self.set.with_helper(helper_sender);
         Box::new(downloader).download(sender).await;
-        if let Some(result) = helper_receiver.recv().await {
+        while let Some(result) = helper_receiver.recv().await {
             match result.0 {
                 Ok(_) => self.ok += 1,
                 Err(_) => self.err += 1,

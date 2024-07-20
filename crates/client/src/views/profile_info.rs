@@ -42,7 +42,14 @@ pub struct ImportConflict {
 
 impl ImportConflict {
     pub fn ui(&mut self, ui: &mut egui::Ui) {
-        fn show_variant(ui: &mut egui::Ui, conflict_resolved: &mut Option<ImportConflictSolution>, variant: &Mod, grid_id: impl std::hash::Hash) {
+        fn show_variant(
+            ui: &mut egui::Ui,
+            is_selected: bool,
+            conflict_resolved: &mut Option<ImportConflictSolution>,
+            variant: &Mod,
+            solution: ImportConflictSolution,
+            grid_id: impl std::hash::Hash,
+        ) {
             ui.vertical(|ui| {
                 egui::Grid::new(Id::new(grid_id).with(ui.id())).show(ui, |ui| {
                     ui.label("Name:");
@@ -65,28 +72,48 @@ impl ImportConflict {
                     });
                 });
 
-                ui.button_with_confirm_popup("Accept", |ui| {
-                    ui.label("Are you sure you wanna accept this variant to solve the conflict?");
-                    ui.horizontal(|ui| {
-                        let yes_button = ui.button("Yes");
-                        let no_button = ui.button("No");
+                ui.horizontal(|ui| {
+                    ui.button_with_confirm_popup(Id::new(&variant.version_id), "Accept", |ui| {
+                        ui.label("Are you sure you wanna accept this variant to solve the conflict?");
+                        ui.horizontal(|ui| {
+                            let yes_button = ui.button("Yes");
+                            let no_button = ui.button("No");
 
-                        if ui.button("Yes").clicked() {
-                            *conflict_resolved = Some(ImportConflictSolution::Existing)
-                        };
+                            if yes_button.clicked() {
+                                *conflict_resolved = Some(solution)
+                            };
 
-                        if yes_button.clicked() || no_button.clicked() {
-                            ui.memory_mut(|mem| mem.close_popup());
-                        }
+                            if yes_button.clicked() || no_button.clicked() {
+                                ui.memory_mut(|mem| mem.close_popup());
+                            }
+                        });
                     });
-                })
+
+                    if is_selected {
+                        ui.colored_label(Color32::GREEN, "Selected");
+                    }
+                });
             });
         }
 
         ui.horizontal(|ui| {
-            show_variant(ui, &mut self.resolved, &self.existing, "conflict_existing_id");
+            show_variant(
+                ui,
+                self.resolved.as_ref().is_some_and(|s| matches!(s, ImportConflictSolution::Existing)),
+                &mut self.resolved,
+                &self.existing,
+                ImportConflictSolution::Existing,
+                "conflict_existing_id",
+            );
             ui.separator();
-            show_variant(ui, &mut self.resolved, &self.incoming, "conflict_incoming_id");
+            show_variant(
+                ui,
+                self.resolved.as_ref().is_some_and(|s| matches!(s, ImportConflictSolution::Incoming)),
+                &mut self.resolved,
+                &self.incoming,
+                ImportConflictSolution::Incoming,
+                "conflict_incoming_id",
+            );
         });
     }
 }
@@ -331,7 +358,11 @@ impl View for ProfileInfo<'_> {
         });
 
         egui::ScrollArea::vertical().min_scrolled_width(ui.available_width()).show(ui, |ui| {
-            let mut vec = std::mem::take(&mut self.profile.write().mods.mods);
+            let (mut vec, profile_id) = {
+                let profile = &mut self.profile.write();
+                (std::mem::take(&mut profile.mods.mods), profile.profile.id)
+            };
+            let mut mods_to_remove = Vec::new();
             egui::Grid::new("mods_list").show(ui, |ui| {
                 for m in &mut vec {
                     mod_info_ui(ui, m);
@@ -341,6 +372,25 @@ impl View for ProfileInfo<'_> {
                         ui.label("Downloading...");
                     } else if m.is_downloaded && !self.profile_info_state.currently_downloading_mods.contains(&m.project_id) {
                         ui.colored_label(Color32::GREEN, "Downloaded");
+                        ui.button_with_confirm_popup(Id::new(&m.version_id).with("delete"), "Delete", |ui| {
+                            ui.label("Are you sure you want to delete this mod?");
+                            ui.horizontal(|ui| {
+                                let yes = ui.button("Yes");
+                                let no = ui.button("No");
+
+                                if yes.clicked() {
+                                    mods_to_remove.push(m.project_id.clone());
+                                    let path = Path::new(DOT_NOMI_MODS_STASH_DIR).join(format!("{profile_id}"));
+                                    for file in &m.files {
+                                        std::fs::remove_file(path.join(&file.filename)).report_error();
+                                    }
+                                }
+
+                                if yes.clicked() || no.clicked() {
+                                    ui.memory_mut(|mem| mem.close_popup());
+                                }
+                            });
+                        });
                     } else {
                         let profile_id = self.profile.read().profile.id;
                         let files = m.files.clone();
@@ -362,6 +412,11 @@ impl View for ProfileInfo<'_> {
                     ui.end_row()
                 }
             });
+
+            vec.retain(|m| !mods_to_remove.contains(&m.project_id));
+            if !mods_to_remove.is_empty() {
+                self.profiles.update_config().report_error();
+            }
 
             let _ = std::mem::replace(&mut self.profile.write().mods.mods, vec);
         });

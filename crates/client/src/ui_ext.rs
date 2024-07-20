@@ -1,4 +1,4 @@
-use eframe::egui::{self, popup_below_widget, PopupCloseBehavior, Response, RichText, Ui, WidgetText};
+use eframe::egui::{self, popup_below_widget, Id, PopupCloseBehavior, Response, RichText, Ui, WidgetText};
 use egui_notify::{Toast, Toasts};
 
 pub const TOASTS_ID: &str = "global_egui_notify_toasts";
@@ -51,16 +51,21 @@ pub trait UiExt {
         response
     }
 
-    fn button_with_confirm_popup<R>(&mut self, button_text: impl Into<WidgetText>, add_content: impl FnOnce(&mut Ui) -> R) -> Response {
+    fn button_with_confirm_popup<R>(&mut self, id: Id, button_text: impl Into<WidgetText>, add_content: impl FnOnce(&mut Ui) -> R) -> Response {
         let ui = self.ui_mut();
-        let popup_id = ui.id().with("button_confirm_popup");
+
+        let popup_id = ui.id().with("button_confirm_popup").with(id);
+
         let button = ui.button(button_text);
 
         if button.clicked() {
             ui.memory_mut(|mem| mem.toggle_popup(popup_id));
         }
 
-        popup_below_widget(ui, popup_id, &button, PopupCloseBehavior::CloseOnClickOutside, add_content);
+        popup_below_widget(ui, popup_id, &button, PopupCloseBehavior::CloseOnClickOutside, |ui| {
+            ui.set_min_width(150.0);
+            add_content(ui)
+        });
 
         button
     }
