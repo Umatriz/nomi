@@ -28,6 +28,9 @@ pub struct ProfileInfoState {
     pub mods_to_import_string: String,
     pub mods_to_import: Vec<Mod>,
     pub conflicts: Vec<ImportConflict>,
+
+    pub is_export_window_open: bool,
+    pub included_mods: Vec<bool>,
 }
 
 pub struct ImportConflict {
@@ -93,6 +96,15 @@ pub enum ImportConflictSolution {
     Incoming,
 }
 
+fn proceed_conflicting_mods<'a>(conflicts: impl Iterator<Item = &'a ImportConflict>) -> impl Iterator<Item = &'a Mod> {
+    conflicts.filter_map(|c| {
+        c.resolved.as_ref().map(|resolved| match resolved {
+            ImportConflictSolution::Existing => &c.existing,
+            ImportConflictSolution::Incoming => &c.incoming,
+        })
+    })
+}
+
 impl ProfileInfoState {
     pub fn new() -> Self {
         Self { ..Default::default() }
@@ -112,6 +124,12 @@ impl ProfileInfoState {
             })
         }
     }
+}
+
+fn mod_info_ui(ui: &mut egui::Ui, modification: &Mod) {
+    ui.label(&modification.name);
+    ui.label(&modification.version_name);
+    ui.label(&modification.version_number);
 }
 
 impl View for ProfileInfo<'_> {
@@ -186,15 +204,26 @@ impl View for ProfileInfo<'_> {
                         });
                     }
 
+                    if is_safe_to_import {
+                        ui.collapsing("List of mods", |ui| {
+                            egui::Grid::new("list_of_importing_mods").show(ui, |ui| {
+                                for modification in self
+                                    .profile_info_state
+                                    .mods_to_import
+                                    .iter()
+                                    .chain(proceed_conflicting_mods(self.profile_info_state.conflicts.iter()))
+                                {
+                                    mod_info_ui(ui, modification);
+                                    ui.end_row();
+                                }
+                            });
+                        });
+                    }
+
                     if ui.add_enabled(is_safe_to_import, egui::Button::new("Finish importing")).clicked() {
                         self.profile_info_state
                             .mods_to_import
-                            .extend(self.profile_info_state.conflicts.iter().filter_map(|c| {
-                                c.resolved.as_ref().map(|resolved| match resolved {
-                                    ImportConflictSolution::Existing => c.existing.clone(),
-                                    ImportConflictSolution::Incoming => c.incoming.clone(),
-                                })
-                            }));
+                            .extend(proceed_conflicting_mods(self.profile_info_state.conflicts.iter()).cloned());
 
                         {
                             let mut lock = self.profile.write();
@@ -214,31 +243,66 @@ impl View for ProfileInfo<'_> {
                 });
             });
 
+        egui::Window::new("Export mods")
+            .open(&mut self.profile_info_state.is_export_window_open)
+            .show(ui.ctx(), |ui| {
+                let mods = &self.profile.read().mods.mods;
+
+                egui::Grid::new("export_mods_selection").show(ui, |ui| {
+                    if ui.button("Add all").clicked() {
+                        self.profile_info_state.included_mods.iter_mut().for_each(|s| *s = true);
+                    };
+
+                    if ui.button("Remove all").clicked() {
+                        self.profile_info_state.included_mods.iter_mut().for_each(|s| *s = false);
+                    };
+
+                    ui.end_row();
+
+                    for (modification, state) in mods.iter().zip(self.profile_info_state.included_mods.iter_mut()) {
+                        ui.checkbox(state, "");
+                        mod_info_ui(ui, modification);
+                        ui.end_row();
+                    }
+                });
+
+                if ui
+                    .add_enabled(
+                        !self.profile_info_state.included_mods.iter().all(|s| !s),
+                        egui::Button::new("Finish exporting"),
+                    )
+                    .on_hover_text("The export code will include all the mods that have the checkbox checked")
+                    .clicked()
+                {
+                    let mods = mods
+                        .iter()
+                        .zip(self.profile_info_state.included_mods.iter())
+                        .filter(|(_, s)| **s)
+                        .map(|(m, _)| m.clone())
+                        .map(|mut m| {
+                            m.is_downloaded = false;
+                            m
+                        })
+                        .collect::<Vec<_>>();
+
+                    if let Some(export_code) = serde_json::to_string(&mods).report_error() {
+                        ui.ctx().copy_text(export_code);
+                    }
+
+                    ui.toasts(|toasts| toasts.success("Copied the export code to the clipboard"));
+                }
+            });
+
         ui.heading("Mods");
 
         ui.add_enabled_ui(self.profile.read().profile.loader().is_fabric(), |ui| {
             ui.toggle_button(&mut self.profile_info_state.is_import_window_open, "Import mods");
-
-            if ui.button("Export mods").clicked() {
-                let mods = self
-                    .profile
-                    .read()
-                    .mods
-                    .mods
-                    .iter()
-                    .cloned()
-                    .map(|mut m| {
-                        m.is_downloaded = false;
-                        m
-                    })
-                    .collect::<Vec<_>>();
-
-                if let Some(export_code) = serde_json::to_string(&mods).report_error() {
-                    ui.output_mut(|o| o.copied_text = export_code);
-                }
-
-                ui.toasts(|toasts| toasts.success("Copied the export code to the clipboard"));
-            };
+            if ui
+                .toggle_button(&mut self.profile_info_state.is_export_window_open, "Export mods")
+                .clicked()
+            {
+                self.profile_info_state.included_mods = vec![true; self.profile.read().mods.mods.len()];
+            }
 
             if ui
                 .button("Open mods folder")
@@ -268,13 +332,14 @@ impl View for ProfileInfo<'_> {
 
         egui::ScrollArea::vertical().min_scrolled_width(ui.available_width()).show(ui, |ui| {
             let mut vec = std::mem::take(&mut self.profile.write().mods.mods);
-            for m in &mut vec {
-                ui.horizontal(|ui| {
-                    ui.label(&m.name);
+            egui::Grid::new("mods_list").show(ui, |ui| {
+                for m in &mut vec {
+                    mod_info_ui(ui, m);
+
                     if self.profile_info_state.currently_downloading_mods.contains(&m.project_id) {
                         ui.spinner();
                         ui.label("Downloading...");
-                    } else if m.is_downloaded {
+                    } else if m.is_downloaded && !self.profile_info_state.currently_downloading_mods.contains(&m.project_id) {
                         ui.colored_label(Color32::GREEN, "Downloaded");
                     } else {
                         let profile_id = self.profile.read().profile.id;
@@ -293,8 +358,10 @@ impl View for ProfileInfo<'_> {
                             m.is_downloaded = true
                         }
                     }
-                });
-            }
+
+                    ui.end_row()
+                }
+            });
 
             let _ = std::mem::replace(&mut self.profile.write().mods.mods, vec);
         });
