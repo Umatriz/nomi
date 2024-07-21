@@ -136,7 +136,7 @@ impl eframe::App for MyTabs {
             .add_collection::<collections::AssetsCollection>(())
             .add_collection::<collections::FabricDataCollection>(&mut self.context.states.add_profile_menu_state.fabric_versions)
             .add_collection::<collections::GameDeletionCollection>(())
-            .add_collection::<collections::GameDownloadingCollection>(())
+            .add_collection::<collections::GameDownloadingCollection>(&self.context.states.profiles.profiles)
             .add_collection::<collections::JavaCollection>(())
             .add_collection::<collections::ProjectCollection>(&mut self.context.states.mod_manager.current_project)
             .add_collection::<collections::ProjectVersionsCollection>(&mut self.context.states.mod_manager.current_versions)

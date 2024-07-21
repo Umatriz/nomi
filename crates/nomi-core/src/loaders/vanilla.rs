@@ -48,10 +48,13 @@ impl Vanilla {
         let queue = DownloadQueue::new()
             .with_downloader(LibrariesDownloader::new(&libraries_mapper, &manifest.libraries))
             .with_downloader(LibrariesDownloader::new(&native_libraries_mapper, &manifest.libraries))
-            .with_downloader(FileDownloader::new(
-                manifest.downloads.client.url.clone(),
-                game_paths.version.join(format!("{}.jar", manifest.id)),
-            ));
+            .with_downloader(
+                FileDownloader::new(
+                    manifest.downloads.client.url.clone(),
+                    game_paths.version.join(format!("{}.jar", manifest.id)),
+                )
+                .into_retry(),
+            );
 
         Ok(Self { manifest, game_paths, queue })
     }

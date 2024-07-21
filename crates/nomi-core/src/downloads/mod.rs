@@ -26,6 +26,9 @@ pub enum DownloadError {
 
     #[error("The task was cancelled or panicked")]
     JoinError,
+
+    #[error("All iterations failed")]
+    AllIterationsFailed,
 }
 
 pub(crate) async fn download_file(path: impl AsRef<Path>, url: impl Into<String>) -> Result<(), DownloadError> {

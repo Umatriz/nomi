@@ -6,6 +6,7 @@ use std::{collections::HashMap, path::PathBuf};
 use tracing::info;
 
 use crate::{
+    calculate_sha1,
     downloads::{
         downloaders::file::FileDownloader,
         progress::ProgressSender,
@@ -87,10 +88,19 @@ impl AssetsDownloader {
                 chunk
                     .filter_map(|asset| {
                         let path = objects.join(&asset.hash[0..2]).join(&asset.hash);
-                        (!path.exists()).then_some(FileDownloader::new(
-                            format!("https://resources.download.minecraft.net/{}/{}", &asset.hash[0..2], asset.hash),
-                            path,
-                        ))
+
+                        if path.exists() && std::fs::read(&path).ok().is_some_and(|buff| asset.hash == calculate_sha1(buff)) {
+                            None
+                        } else {
+                            let downloader = FileDownloader::new(
+                                format!("https://resources.download.minecraft.net/{}/{}", &asset.hash[0..2], asset.hash),
+                                path,
+                            )
+                            .with_sha1(asset.hash.clone())
+                            .into_retry();
+
+                            Some(downloader)
+                        }
                     })
                     .map::<Box<dyn Downloadable<Out = DownloadResult>>, _>(|downloader| Box::new(downloader))
                     .collect::<Vec<_>>()

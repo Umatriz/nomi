@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::{
     calculate_sha1,
@@ -11,7 +11,9 @@ use crate::{
     },
 };
 
-#[derive(Debug)]
+use super::ReTryDownloader;
+
+#[derive(Debug, Clone)]
 pub struct FileDownloader {
     url: String,
     path: PathBuf,
@@ -28,6 +30,11 @@ impl FileDownloader {
         self.hash_sha1 = Some(hash);
         self
     }
+
+    #[must_use]
+    pub fn into_retry(self) -> ReTryDownloader {
+        ReTryDownloader::new(self)
+    }
 }
 
 #[async_trait::async_trait]
@@ -43,7 +50,7 @@ impl Downloadable for FileDownloader {
         };
 
         if let Some(hash) = self.hash_sha1 {
-            let file = match tokio::fs::read_to_string(&self.path).await.map_err(|e| DownloadError::Error {
+            let file = match tokio::fs::read(&self.path).await.map_err(|e| DownloadError::Error {
                 url: self.url.clone(),
                 path: self.path.clone(),
                 error: format!("Unable to open downloaded file. Original error: {e}"),
@@ -54,9 +61,7 @@ impl Downloadable for FileDownloader {
 
             let calculated_hash = calculate_sha1(file);
 
-            if hash == calculated_hash {
-                debug!("Hashes matched successfully");
-            } else {
+            if hash != calculated_hash {
                 let s = format!("Hashes does not match. {hash} != {calculated_hash}");
                 error!("{s}");
                 return DownloadResult(Err(DownloadError::Error {

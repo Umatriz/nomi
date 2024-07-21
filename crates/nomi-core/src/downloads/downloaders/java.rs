@@ -80,7 +80,8 @@ impl Downloader for JavaDownloader {
         let downloader = FileDownloader::new(
             consts::PORTABLE_URL.to_string(),
             PathBuf::from(DOT_NOMI_TEMP_DIR).join(consts::ARCHIVE_FILENAME),
-        );
+        )
+        .into_retry();
 
         Box::new(downloader).download(sender).await;
     }
@@ -189,7 +190,7 @@ mod tests {
     }
 
     async fn java_downloader_test_helper(url: &str, file_name: &str, hash: &str) -> anyhow::Result<bool> {
-        let downloader = FileDownloader::new(url.to_owned(), PathBuf::from("./java_downloader_test").join(file_name));
+        let downloader = FileDownloader::new(url.to_owned(), PathBuf::from("./java_downloader_test").join(file_name)).into_retry();
 
         let (tx, mut rx) = tokio::sync::mpsc::channel(5);
 
@@ -236,7 +237,7 @@ mod tests {
             archive.unpack(target_path).map_err(Into::into)
         }
 
-        let downloader = FileDownloader::new(consts3::PORTABLE_URL.to_owned(), PathBuf::from("./").join(consts3::ARCHIVE_FILENAME));
+        let downloader = FileDownloader::new(consts3::PORTABLE_URL.to_owned(), PathBuf::from("./").join(consts3::ARCHIVE_FILENAME)).into_retry();
 
         let (tx, mut rx) = tokio::sync::mpsc::channel(5);
 

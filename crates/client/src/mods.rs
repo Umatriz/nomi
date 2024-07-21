@@ -64,7 +64,9 @@ pub async fn download_added_mod(progress: TaskProgressShared, profile_id: usize,
 
     let mods_stash = Path::new(DOT_NOMI_MODS_STASH_DIR).join(format!("{profile_id}"));
     for file in files {
-        let downloader = FileDownloader::new(file.url, mods_stash.join(file.filename)).with_sha1(file.sha1);
+        let downloader = FileDownloader::new(file.url, mods_stash.join(file.filename))
+            .with_sha1(file.sha1)
+            .into_retry();
         set.add(Box::new(downloader));
     }
 
@@ -144,7 +146,9 @@ pub async fn download_mod(sender: Sender<Box<dyn Progress>>, dir: PathBuf, name:
             filename: file.filename.clone(),
         });
 
-        let downloader = FileDownloader::new(file.url.clone(), dir.join(&file.filename)).with_sha1(file.hashes.sha1.clone());
+        let downloader = FileDownloader::new(file.url.clone(), dir.join(&file.filename))
+            .with_sha1(file.hashes.sha1.clone())
+            .into_retry();
         set.add(Box::new(downloader));
     }
 
