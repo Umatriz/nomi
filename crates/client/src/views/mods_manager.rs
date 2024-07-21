@@ -4,7 +4,7 @@ use std::{
     sync::Arc,
 };
 
-use eframe::egui::{self, Button, Color32, ComboBox, Id, Image, Key, Layout, RichText, ScrollArea, SelectableLabel, Vec2};
+use eframe::egui::{self, Button, Color32, ComboBox, Id, Image, Key, Layout, RichText, ScrollArea, Vec2};
 use egui_infinite_scroll::{InfiniteScroll, LoadingState};
 use egui_task_manager::{Caller, Task, TaskManager};
 use nomi_core::{DOT_NOMI_DATA_PACKS_DIR, MINECRAFT_DIR};
@@ -190,24 +190,26 @@ impl View for ModManager<'_> {
         egui::TopBottomPanel::top("mod_manager_top_panel").show_inside(ui, |ui| {
             ui.horizontal(|ui| {
                 for project_type in ProjectType::iter().filter(|t| !matches!(t, ProjectType::Plugin)) {
-                    if matches!(project_type, ProjectType::Modpack) {
-                        ui.add_enabled(
-                            false,
-                            SelectableLabel::new(false, capitalize_first_letters_whitespace_split(project_type.as_str())),
-                        )
-                        .on_disabled_hover_text("Support for modpacks coming soon!");
-                        continue;
-                    }
+                    let enabled = {
+                        (self.profile.read().profile.loader().is_fabric() || matches!(project_type, ProjectType::DataPack))
+                            && !matches!(project_type, ProjectType::Modpack)
+                    };
 
-                    let response = ui.selectable_value(
-                        &mut self.mod_manager_state.current_project_type,
-                        project_type,
-                        capitalize_first_letters_whitespace_split(project_type.as_str()),
-                    );
+                    ui.add_enabled_ui(enabled, |ui| {
+                        let mut response = ui.selectable_value(
+                            &mut self.mod_manager_state.current_project_type,
+                            project_type,
+                            capitalize_first_letters_whitespace_split(project_type.as_str()),
+                        );
 
-                    if response.clicked() {
-                        self.mod_manager_state.clear_filter()
-                    }
+                        if matches!(project_type, ProjectType::Modpack) {
+                            response = response.on_hover_text("Support for modpacks coming soon!");
+                        }
+
+                        if response.clicked() {
+                            self.mod_manager_state.clear_filter()
+                        }
+                    });
                 }
 
                 match self.mod_manager_state.current_project_type {
