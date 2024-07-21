@@ -29,13 +29,14 @@ use super::{
     add_profile_menu::{AddProfileMenu, AddProfileMenuState},
     load_mods,
     settings::SettingsState,
-    ModsConfig, TabsState, View,
+    ModsConfig, ProfileInfoState, TabsState, View,
 };
 
 pub struct ProfilesPage<'a> {
     pub is_allowed_to_take_action: bool,
     pub manager: &'a mut TaskManager,
     pub settings_state: &'a SettingsState,
+    pub profile_info_state: &'a mut ProfileInfoState,
 
     pub is_profile_window_open: &'a mut bool,
 
@@ -229,6 +230,8 @@ impl View for ProfilesPage<'_> {
 
                         row.col(|ui| {
                             if ui.button("Details").clicked() {
+                                self.profile_info_state.set_profile_to_edit(&profile_lock.read());
+
                                 let kind = TabKind::ProfileInfo {
                                     profile: profile_lock.clone(),
                                 };

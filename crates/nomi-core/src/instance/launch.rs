@@ -48,7 +48,7 @@ pub struct LaunchSettings {
 #[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq, Eq, Hash)]
 pub struct LaunchInstance {
     pub settings: LaunchSettings,
-    jvm_args: Option<Vec<String>>,
+    jvm_args: Vec<String>,
     loader_profile: Option<LoaderProfile>,
 }
 
@@ -100,6 +100,14 @@ impl LaunchInstance {
 
     pub fn loader_profile(&self) -> Option<&LoaderProfile> {
         self.loader_profile.as_ref()
+    }
+
+    pub fn jvm_arguments(&self) -> &[String] {
+        self.jvm_args.as_slice()
+    }
+
+    pub fn jvm_arguments_mut(&mut self) -> &mut Vec<String> {
+        &mut self.jvm_args
     }
 
     fn process_natives(&self, natives: &[PathBuf]) -> anyhow::Result<()> {
@@ -190,7 +198,7 @@ pub mod macros {
 #[allow(clippy::module_name_repetitions)]
 pub struct LaunchInstanceBuilder<S> {
     settings: S,
-    jvm_args: Option<Vec<String>>,
+    jvm_args: Vec<String>,
     profile: Option<LoaderProfile>,
 }
 
@@ -224,7 +232,7 @@ impl<S> LaunchInstanceBuilder<S> {
     pub fn jvm_args(self, jvm_args: Vec<String>) -> LaunchInstanceBuilder<S> {
         LaunchInstanceBuilder {
             settings: self.settings,
-            jvm_args: Some(jvm_args),
+            jvm_args,
             profile: self.profile,
         }
     }

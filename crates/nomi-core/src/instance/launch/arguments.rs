@@ -123,7 +123,7 @@ impl<'a, U> ArgumentsBuilder<'a, WithClasspath, U> {
     }
 
     pub fn custom_jvm_arguments(&self) -> &[String] {
-        self.instance.jvm_args.as_ref().map_or(&[], |args| args.as_slice())
+        self.instance.jvm_args.as_slice()
     }
 
     pub fn loader_arguments(&self) -> LoaderArguments<'a> {

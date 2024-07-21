@@ -1,4 +1,4 @@
-use std::{fmt::Display, sync::Arc};
+use std::fmt::Display;
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
@@ -39,7 +39,7 @@ impl Loader {
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ProfileState {
-    Downloaded(Arc<LaunchInstance>),
+    Downloaded(Box<LaunchInstance>),
 
     NotDownloaded {
         version: String,
@@ -50,7 +50,7 @@ pub enum ProfileState {
 
 impl ProfileState {
     pub fn downloaded(instance: LaunchInstance) -> Self {
-        Self::Downloaded(Arc::new(instance))
+        Self::Downloaded(Box::new(instance))
     }
 
     pub fn not_downloaded(version: String, version_type: VersionType, loader: Loader) -> Self {
