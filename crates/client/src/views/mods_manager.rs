@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
@@ -19,7 +19,7 @@ use nomi_modding::{
     Query,
 };
 use parking_lot::RwLock;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::{
     collections::{DependenciesCollection, ModsDownloadingCollection, ProjectCollection, ProjectVersionsCollection},
@@ -428,7 +428,9 @@ impl View for ModManager<'_> {
 
                             ui.style_mut().url_in_tooltip = true;
 
-                            egui::CollapsingHeader::new("Full description").default_open(true).show(ui, |ui| ui.markdown_ui(Id::new("mod_full_description_markdown"), project.body.as_str()));
+                            egui::CollapsingHeader::new("Full description")
+                                .default_open(true)
+                                .show(ui, |ui| ui.markdown_ui(Id::new("mod_full_description_markdown"), project.body.as_str()));
 
                             ui.separator();
 
@@ -442,7 +444,11 @@ impl View for ModManager<'_> {
                                 .show_ui(ui, |ui| {
                                     for version in &self.mod_manager_state.current_versions {
                                         let response = ui
-                                            .selectable_value(&mut self.mod_manager_state.selected_version, Some(version.clone()), version.name.clone())
+                                            .selectable_value(
+                                                &mut self.mod_manager_state.selected_version,
+                                                Some(version.clone()),
+                                                version.name.clone(),
+                                            )
                                             .on_hover_text(version.version_number.clone());
 
                                         if response.clicked() {
@@ -450,16 +456,6 @@ impl View for ModManager<'_> {
                                         }
                                     }
                                 });
-
-                            if self.mod_manager_state.is_datapack {
-                                ui.horizontal(|ui| {
-                                    ui.heading("ℹ").on_hover_text("While downloading data packs you need to select where it will be downloaded. Because usually data packs are presented as a mods and as a data packs.\nTo understand what are you downloading take a look at the version name in the select menu.\nAdditional information is shown if the variant is hovered.").on_hover_text("If the data pack requires dependencies it is recommended to install them manually.");
-                                    ComboBox::from_id_source("select_path").selected_text(format!("{:?}", self.mod_manager_state.data_pack_path)).show_ui(ui, |ui| {
-                                        ui.selectable_value(&mut self.mod_manager_state.data_pack_path, DataPackDownloadDirectory::Mods, "Mods directory");
-                                        ui.selectable_value(&mut self.mod_manager_state.data_pack_path, DataPackDownloadDirectory::DataPacks, "Data packs directory").on_hover_text("Can be accessed via Open -> Data Packs in the top menu.");
-                                    });
-                                });
-                            }
 
                             let is_dependencies_loaded = self.task_manager.get_collection::<DependenciesCollection>().tasks().is_empty();
 
@@ -520,12 +516,13 @@ impl View for ModManager<'_> {
                                                                     .on_hover_text("This version is featured by the author");
                                                             }
 
-                                                            let response = ui.selectable_value(&mut val.version, Some(version.clone()), version.name.clone())
+                                                            let response = ui
+                                                                .selectable_value(&mut val.version, Some(version.clone()), version.name.clone())
                                                                 .on_hover_text(version.version_number.clone());
 
-                                                                if response.clicked() {
-                                                                    get_dependencies(self.task_manager, &self.profile, version);
-                                                                }
+                                                            if response.clicked() {
+                                                                get_dependencies(self.task_manager, &self.profile, version);
+                                                            }
                                                         });
                                                     }
                                                 });
@@ -583,7 +580,10 @@ impl View for ModManager<'_> {
 
                                 let _ = self.profiles_config.update_config().report_error();
                                 let is_data_pack = self.mod_manager_state.is_datapack;
-                                let data_pack_dir = self.mod_manager_state.data_pack_path.as_path_buf(profile.read().profile.id);
+                                let profile_id = {
+                                    let lock = profile.read();
+                                    lock.profile.id
+                                };
                                 let download_mod = Task::new(
                                     "Download mods",
                                     Caller::progressing(move |progress| async move {
@@ -591,16 +591,26 @@ impl View for ModManager<'_> {
 
                                         for (name, version) in versions {
                                             let path = if is_data_pack {
-                                                data_pack_dir.clone()
+                                                version
+                                                    .files
+                                                    .first()
+                                                    .map(|f| &f.filename)
+                                                    .and_then(|f| Path::new(f).extension())
+                                                    .map(|ext| match ext {
+                                                        ext if ext.eq_ignore_ascii_case("jar") => DataPackDownloadDirectory::Mods,
+                                                        ext if ext.eq_ignore_ascii_case("zip") => DataPackDownloadDirectory::DataPacks,
+                                                        _ => {
+                                                            warn!("Unknown datapack file extension. Using DataPacks directory.");
+                                                            DataPackDownloadDirectory::DataPacks
+                                                        }
+                                                    })
+                                                    .unwrap_or(DataPackDownloadDirectory::DataPacks)
+                                                    .as_path_buf(profile_id)
                                             } else {
                                                 directory_from_project_type(project_type, profile.read().profile.id)
                                             };
 
-                                            let data = (
-                                                version,
-                                                path,
-                                                name,
-                                            );
+                                            let data = (version, path, name);
                                             versions_with_paths.push(data);
                                         }
 
