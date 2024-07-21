@@ -6,7 +6,7 @@ use crate::downloads::{
     DownloadSet,
 };
 
-use super::file::FileDownloader;
+use super::{file::FileDownloader, ReTryDownloader};
 
 pub trait LibrariesMapper<L> {
     fn proceed(&self, library: &L) -> Option<FileDownloader>;
@@ -14,7 +14,7 @@ pub trait LibrariesMapper<L> {
 
 #[derive(Debug)]
 pub struct LibrariesDownloader {
-    downloads: Vec<FileDownloader>,
+    downloads: Vec<ReTryDownloader>,
 }
 
 impl LibrariesDownloader {
@@ -22,7 +22,11 @@ impl LibrariesDownloader {
     where
         M: LibrariesMapper<L>,
     {
-        let downloads = libraries.iter().filter_map(|lib| mapper.proceed(lib)).collect_vec();
+        let downloads = libraries
+            .iter()
+            .filter_map(|lib| mapper.proceed(lib))
+            .map(FileDownloader::into_retry)
+            .collect_vec();
 
         Self { downloads }
     }

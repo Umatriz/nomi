@@ -63,21 +63,6 @@ where
     }
 }
 
-/// TODO finish this trait
-#[async_trait::async_trait]
-pub trait Retry {
-    type Out;
-    async fn retry_set(&self) -> &[Box<dyn Downloadable<Out = Self::Out>>];
-}
-
-const _: Option<Box<dyn Retry<Out = DownloadResult>>> = None;
-
-pub trait RetryDownloader: Downloader + Retry {}
-
-const _: Option<Box<dyn RetryDownloader<Out = DownloadResult, Data = DownloadResult>>> = None;
-
-impl<T> RetryDownloader for T where T: Downloader + Retry {}
-
 #[async_trait::async_trait]
 pub trait DownloaderIO {
     async fn io(&self) -> anyhow::Result<()>;

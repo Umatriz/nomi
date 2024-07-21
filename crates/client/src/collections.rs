@@ -73,7 +73,7 @@ impl<'c> TasksCollection<'c> for JavaCollection {
 pub struct GameDownloadingCollection;
 
 impl<'c> TasksCollection<'c> for GameDownloadingCollection {
-    type Context = ();
+    type Context = &'c ProfilesConfig;
 
     type Target = Option<()>;
 
@@ -83,8 +83,10 @@ impl<'c> TasksCollection<'c> for GameDownloadingCollection {
         "Game downloading collection"
     }
 
-    fn handle(_context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|_| ())
+    fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|_| {
+            context.update_config().report_error();
+        })
     }
 }
 
