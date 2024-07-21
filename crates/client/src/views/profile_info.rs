@@ -344,18 +344,14 @@ impl View for ProfileInfo<'_> {
                     open_directory_native(path).report_error();
                 }
             }
-
-            if ui
-                .button("Browse mods")
-                .on_disabled_hover_text("Profile must have a mod loader.")
-                .clicked()
-            {
-                let kind = TabKind::Mods {
-                    profile: self.profile.clone(),
-                };
-                self.tabs_state.0.insert(kind.id(), kind);
-            }
         });
+
+        if ui.button("Browse mods").clicked() {
+            let kind = TabKind::Mods {
+                profile: self.profile.clone(),
+            };
+            self.tabs_state.0.insert(kind.id(), kind);
+        }
 
         egui::ScrollArea::vertical().min_scrolled_width(ui.available_width()).show(ui, |ui| {
             let (mut vec, profile_id) = {
