@@ -1,7 +1,8 @@
 use std::{collections::HashSet, path::Path, sync::Arc};
 
-use eframe::egui::{self, Color32, Id, RichText};
+use eframe::egui::{self, Color32, Id, RichText, TextEdit};
 use egui_task_manager::{Caller, Task, TaskManager};
+use nomi_core::configs::profile::ProfileState;
 use nomi_modding::modrinth::project::ProjectId;
 use parking_lot::RwLock;
 
@@ -24,6 +25,10 @@ pub struct ProfileInfo<'a> {
 pub struct ProfileInfoState {
     pub currently_downloading_mods: HashSet<ProjectId>,
 
+    pub profile_name: String,
+    pub profile_jvm_args: Vec<String>,
+    pub jvm_arg_to_add: String,
+
     pub is_import_window_open: bool,
     pub mods_to_import_string: String,
     pub mods_to_import: Vec<Mod>,
@@ -31,6 +36,35 @@ pub struct ProfileInfoState {
 
     pub is_export_window_open: bool,
     pub included_mods: Vec<bool>,
+}
+
+impl ProfileInfoState {
+    pub fn new() -> Self {
+        Self { ..Default::default() }
+    }
+
+    pub fn proceed_mods_import(&mut self, profile: &ModdedProfile) {
+        for incoming in &self.mods_to_import {
+            let Some(existing) = profile.mods.mods.iter().find(|m| m.project_id == incoming.project_id) else {
+                continue;
+            };
+
+            self.conflicts.push(ImportConflict {
+                name: existing.name.clone(),
+                existing: existing.clone(),
+                incoming: incoming.clone(),
+                resolved: None,
+            })
+        }
+    }
+
+    pub fn set_profile_to_edit(&mut self, profile: &ModdedProfile) {
+        self.profile_name.clone_from(&profile.profile.name);
+
+        if let ProfileState::Downloaded(instance) = &profile.profile.state {
+            self.profile_jvm_args = instance.jvm_arguments().into();
+        }
+    }
 }
 
 pub struct ImportConflict {
@@ -130,27 +164,6 @@ fn proceed_conflicting_mods<'a>(conflicts: impl Iterator<Item = &'a ImportConfli
             ImportConflictSolution::Incoming => &c.incoming,
         })
     })
-}
-
-impl ProfileInfoState {
-    pub fn new() -> Self {
-        Self { ..Default::default() }
-    }
-
-    pub fn proceed_mods_import(&mut self, profile: &ModdedProfile) {
-        for incoming in &self.mods_to_import {
-            let Some(existing) = profile.mods.mods.iter().find(|m| m.project_id == incoming.project_id) else {
-                continue;
-            };
-
-            self.conflicts.push(ImportConflict {
-                name: existing.name.clone(),
-                existing: existing.clone(),
-                incoming: incoming.clone(),
-                resolved: None,
-            })
-        }
-    }
 }
 
 fn mod_info_ui(ui: &mut egui::Ui, modification: &Mod) {
@@ -319,6 +332,58 @@ impl View for ProfileInfo<'_> {
                     ui.toasts(|toasts| toasts.success("Copied the export code to the clipboard"));
                 }
             });
+
+        ui.heading("Profile");
+
+        ui.small("Don't forget to save the changes!");
+
+        ui.label("Profile name");
+        TextEdit::singleline(&mut self.profile_info_state.profile_name).show(ui);
+
+        ui.label("JVM arguments");
+
+        ui.small("Each element should represent only one argument.");
+
+        ui.vertical(|ui| {
+            egui::Grid::new("jvm_arguments_ui").show(ui, |ui| {
+                self.profile_info_state.profile_jvm_args.retain_mut(|i| {
+                    ui.scope(|ui| {
+                        ui.set_min_width(150.0);
+                        ui.text_edit_singleline(i);
+                    });
+                    let response = ui.button("❌");
+                    ui.end_row();
+                    *i = i.trim().to_string();
+                    !response.clicked()
+                });
+            });
+
+            ui.horizontal(|ui| {
+                ui.text_edit_singleline(&mut self.profile_info_state.jvm_arg_to_add);
+                if ui.button("Add").clicked() {
+                    let value = std::mem::take(&mut self.profile_info_state.jvm_arg_to_add).trim().to_string();
+                    self.profile_info_state.profile_jvm_args.push(value)
+                };
+            });
+        });
+
+        ui.horizontal(|ui| {
+            if ui.button("Save").clicked() {
+                {
+                    let mut profile = self.profile.write();
+                    profile.profile.name.clone_from(&self.profile_info_state.profile_name);
+                    if let ProfileState::Downloaded(instance) = &mut profile.profile.state {
+                        instance.jvm_arguments_mut().clone_from(&self.profile_info_state.profile_jvm_args);
+                    }
+                }
+
+                self.profiles.update_config().report_error();
+            }
+
+            if ui.button("Reset").clicked() {
+                self.profile_info_state.set_profile_to_edit(&self.profile.read());
+            }
+        });
 
         ui.heading("Mods");
 

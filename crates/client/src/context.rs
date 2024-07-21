@@ -76,6 +76,7 @@ impl TabViewer for MyContext {
         match &tab.kind {
             TabKind::Profiles => ProfilesPage {
                 is_allowed_to_take_action: self.is_allowed_to_take_action,
+                profile_info_state: &mut self.states.profile_info,
                 manager: &mut self.manager,
                 settings_state: &self.states.settings,
                 profiles_state: &mut self.states.profiles,
