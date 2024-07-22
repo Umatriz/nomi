@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use tracing::error;
+use tracing::warn;
 
 use crate::{
     calculate_sha1,
@@ -63,7 +63,7 @@ impl Downloadable for FileDownloader {
 
             if hash != calculated_hash {
                 let s = format!("Hashes does not match. {hash} != {calculated_hash}");
-                error!("{s}");
+                warn!("{s}");
                 return DownloadResult(Err(DownloadError::Error {
                     url: self.url.clone(),
                     path: self.path.clone(),

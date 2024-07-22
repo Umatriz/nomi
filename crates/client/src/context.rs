@@ -1,6 +1,7 @@
 use crate::{
     errors_pool::ErrorPoolExt,
     states::States,
+    subscriber::EguiLayer,
     views::{self, profiles::ProfilesPage, settings::SettingsPage, ModManager, ProfileInfo, View},
     Tab, TabKind,
 };
@@ -15,7 +16,7 @@ use nomi_core::{
 };
 
 pub struct MyContext {
-    pub collector: EventCollector,
+    pub egui_layer: EguiLayer,
     pub launcher_manifest: &'static LauncherManifest,
     pub file_dialog: FileDialog,
 
@@ -27,7 +28,7 @@ pub struct MyContext {
 }
 
 impl MyContext {
-    pub fn new(collector: EventCollector) -> Self {
+    pub fn new(egui_layer: EguiLayer) -> Self {
         const EMPTY_MANIFEST: &LauncherManifest = &LauncherManifest {
             latest: Latest {
                 release: String::new(),
@@ -39,7 +40,7 @@ impl MyContext {
         let launcher_manifest_ref = pollster::block_on(get_launcher_manifest()).report_error().unwrap_or(EMPTY_MANIFEST);
 
         Self {
-            collector,
+            egui_layer,
             launcher_manifest: launcher_manifest_ref,
             file_dialog: FileDialog::new(),
             is_profile_window_open: false,
@@ -97,7 +98,7 @@ impl TabViewer for MyContext {
             .ui(ui),
             TabKind::Logs => {
                 ScrollArea::horizontal().show(ui, |ui| {
-                    ui.add(egui_tracing::Logs::new(self.collector.clone()));
+                    self.egui_layer.ui(ui);
                 });
             }
             TabKind::DownloadProgress => {
