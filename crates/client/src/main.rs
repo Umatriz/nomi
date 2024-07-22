@@ -55,10 +55,10 @@ fn main() {
     let stdout_sub = Layer::new().with_writer(std::io::stdout.with_max_level(Level::DEBUG)).pretty();
     // stdout_sub.set_ansi(false);
 
-    let egui_layer = EguiLayer::new().with_level(Level::DEBUG);
+    let egui_layer = EguiLayer::new().with_level(Level::TRACE);
 
     let subscriber = tracing_subscriber::registry()
-        .with(EnvFilter::builder().parse("client=debug,nomi_core=debug").unwrap())
+        .with(EnvFilter::builder().parse("client=trace,nomi_core=debug").unwrap())
         .with(egui_layer.clone())
         .with(stdout_sub)
         .with(file_sub);
@@ -66,6 +66,12 @@ fn main() {
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     egui_task_manager::setup!();
+
+    tracing::trace!("Test trace!");
+    tracing::debug!("Test debug!");
+    tracing::warn!("Test warn!");
+    tracing::info!("Test info!");
+    tracing::error!("Test error!");
 
     add_with_span(2, 2);
 
