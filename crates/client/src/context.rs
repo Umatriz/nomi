@@ -9,7 +9,6 @@ use eframe::egui::{self, ScrollArea};
 use egui_dock::TabViewer;
 use egui_file_dialog::FileDialog;
 use egui_task_manager::TaskManager;
-use egui_tracing::EventCollector;
 use nomi_core::{
     repository::launcher_manifest::{Latest, LauncherManifest},
     state::get_launcher_manifest,

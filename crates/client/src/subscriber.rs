@@ -1,9 +1,6 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
-use eframe::{
-    egui::{self, text::LayoutJob, Color32, Pos2, Rect, Sense, Stroke, TextFormat, Vec2},
-    epaint::PathStroke,
-};
+use eframe::egui::{self, text::LayoutJob, Color32, Sense, TextFormat, Vec2};
 use parking_lot::Mutex;
 use time::{format_description, OffsetDateTime};
 use tracing::{

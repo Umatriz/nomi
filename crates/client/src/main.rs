@@ -6,7 +6,6 @@ use eframe::{
 };
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
 use egui_notify::Toasts;
-use egui_tracing::EventCollector;
 use open_directory::open_directory_native;
 use std::path::Path;
 use subscriber::EguiLayer;
@@ -44,8 +43,6 @@ pub mod states;
 pub use consts::*;
 
 fn main() {
-    // let collector = egui_tracing::EventCollector::default().with_level(Level::INFO);
-
     let appender = tracing_appender::rolling::hourly(DOT_NOMI_LOGS_DIR, "nomi.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(appender);
 
@@ -55,10 +52,10 @@ fn main() {
     let stdout_sub = Layer::new().with_writer(std::io::stdout.with_max_level(Level::DEBUG)).pretty();
     // stdout_sub.set_ansi(false);
 
-    let egui_layer = EguiLayer::new().with_level(Level::TRACE);
+    let egui_layer = EguiLayer::new().with_level(Level::DEBUG);
 
     let subscriber = tracing_subscriber::registry()
-        .with(EnvFilter::builder().parse("client=trace,nomi_core=debug").unwrap())
+        .with(EnvFilter::builder().parse("client=debug,nomi_core=debug").unwrap())
         .with(egui_layer.clone())
         .with(stdout_sub)
         .with(file_sub);
@@ -66,14 +63,6 @@ fn main() {
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     egui_task_manager::setup!();
-
-    tracing::trace!("Test trace!");
-    tracing::debug!("Test debug!");
-    tracing::warn!("Test warn!");
-    tracing::info!("Test info!");
-    tracing::error!("Test error!");
-
-    add_with_span(2, 2);
 
     let native_options = eframe::NativeOptions {
         viewport: ViewportBuilder::default().with_inner_size(Vec2::new(1280.0, 720.0)),
@@ -90,24 +79,6 @@ fn main() {
     );
 
     info!("Exiting")
-}
-
-fn add_with_span(a: usize, b: usize) -> usize {
-    let span = tracing::span!(Level::INFO, "test_span");
-    let _guard = span.enter();
-
-    add(a, b)
-}
-
-#[tracing::instrument(fields(result))]
-fn add(a: usize, b: usize) -> usize {
-    let result = a + b;
-
-    tracing::Span::current().record("result", result);
-
-    info!("Finished the calculations");
-
-    result
 }
 
 struct MyTabs {
