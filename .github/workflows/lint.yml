@@ -31,3 +31,19 @@ jobs:
 
       - name: Clippy
         run: cargo clippy -- -D warnings
+
+  typos:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Typos
+        run: cargo install typos-cli
+
+      - name: Typos
+        run: typos
