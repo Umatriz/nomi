@@ -1,3 +1,6 @@
+// Remove console window
+#![windows_subsystem = "windows"]
+
 use collections::{AssetsCollection, GameDownloadingCollection, GameRunnerCollection, JavaCollection};
 use context::MyContext;
 use eframe::{
