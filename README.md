@@ -46,4 +46,4 @@ NOT AN OFFICIAL MINECRAFT [PRODUCT/SERVICE/EVENT/etc.]. NOT APPROVED BY OR ASSOC
 
 ---
 
-Copyright (C) 2023  umatriz
+Copyright (C) 2024  umatriz
