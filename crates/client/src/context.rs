@@ -2,7 +2,7 @@ use crate::{
     errors_pool::ErrorPoolExt,
     states::States,
     subscriber::EguiLayer,
-    views::{self, profiles::ProfilesPage, settings::SettingsPage, Logs, ModManager, ProfileInfo, View},
+    views::{self, profiles::ProfilesPage, settings::SettingsPage, Logs, ModManager, ModManagerState, ProfileInfo, View},
     Tab, TabKind,
 };
 use eframe::egui::{self};
@@ -24,6 +24,8 @@ pub struct MyContext {
 
     pub is_allowed_to_take_action: bool,
     pub is_profile_window_open: bool,
+
+    pub images_clean_requested: bool,
 }
 
 impl MyContext {
@@ -47,7 +49,12 @@ impl MyContext {
             states: States::new(),
             manager: TaskManager::new(),
             is_allowed_to_take_action: true,
+            images_clean_requested: false,
         }
+    }
+
+    pub fn request_images_clean(&mut self) {
+        self.images_clean_requested = true
     }
 }
 
@@ -127,6 +134,11 @@ impl TabViewer for MyContext {
     }
 
     fn on_close(&mut self, tab: &mut Self::Tab) -> bool {
+        if let TabKind::Mods { profile: _ } = tab.kind {
+            self.states.mod_manager = ModManagerState::new();
+            self.request_images_clean()
+        }
+
         self.states.tabs.0.remove(&tab.id);
         true
     }
