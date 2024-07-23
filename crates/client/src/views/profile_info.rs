@@ -91,11 +91,11 @@ impl ImportConflict {
                     ui.end_row();
 
                     ui.label("Version number:");
-                    ui.label(&variant.version_number);
+                    ui.label(variant.version_number.as_deref().unwrap_or("None"));
                     ui.end_row();
 
                     ui.label("Version name:");
-                    ui.label(&variant.version_name);
+                    ui.label(variant.version_name.as_deref().unwrap_or("None"));
                     ui.end_row();
 
                     ui.label("Files:");
@@ -168,8 +168,8 @@ fn proceed_conflicting_mods<'a>(conflicts: impl Iterator<Item = &'a ImportConfli
 
 fn mod_info_ui(ui: &mut egui::Ui, modification: &Mod) {
     ui.label(&modification.name);
-    ui.label(&modification.version_name);
-    ui.label(&modification.version_number);
+    ui.label(modification.version_name.as_deref().unwrap_or("None"));
+    ui.label(modification.version_number.as_deref().unwrap_or("None"));
 }
 
 impl View for ProfileInfo<'_> {
