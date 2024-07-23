@@ -1,5 +1,5 @@
-// Remove console window
-#![windows_subsystem = "windows"]
+// Remove console window in release builds
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use collections::{AssetsCollection, GameDownloadingCollection, GameRunnerCollection, JavaCollection};
 use context::MyContext;
@@ -267,6 +267,11 @@ impl eframe::App for MyTabs {
                     })
                     .and_then(|tab_info| self.dock_state.remove_tab(tab_info));
             }
+        }
+
+        if self.context.images_clean_requested {
+            ctx.forget_all_images();
+            self.context.images_clean_requested = false
         }
 
         let manager = &self.context.manager;
