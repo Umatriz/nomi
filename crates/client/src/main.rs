@@ -1,3 +1,6 @@
+// Remove console window
+#![windows_subsystem = "windows"]
+
 use collections::{AssetsCollection, GameDownloadingCollection, GameRunnerCollection, JavaCollection};
 use context::MyContext;
 use eframe::{
@@ -6,9 +9,9 @@ use eframe::{
 };
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
 use egui_notify::Toasts;
-use egui_tracing::EventCollector;
 use open_directory::open_directory_native;
 use std::path::Path;
+use subscriber::EguiLayer;
 use ui_ext::TOASTS_ID;
 use views::{add_tab_menu::AddTab, View};
 
@@ -33,6 +36,7 @@ pub mod open_directory;
 
 pub mod collections;
 pub mod progress;
+pub mod subscriber;
 
 pub mod tab;
 pub use tab::*;
@@ -42,8 +46,6 @@ pub mod states;
 pub use consts::*;
 
 fn main() {
-    let collector = egui_tracing::EventCollector::default().with_level(Level::INFO);
-
     let appender = tracing_appender::rolling::hourly(DOT_NOMI_LOGS_DIR, "nomi.log");
     let (non_blocking, _guard) = tracing_appender::non_blocking(appender);
 
@@ -53,9 +55,11 @@ fn main() {
     let stdout_sub = Layer::new().with_writer(std::io::stdout.with_max_level(Level::DEBUG)).pretty();
     // stdout_sub.set_ansi(false);
 
+    let egui_layer = EguiLayer::new().with_level(Level::DEBUG);
+
     let subscriber = tracing_subscriber::registry()
         .with(EnvFilter::builder().parse("client=debug,nomi_core=debug").unwrap())
-        .with(collector.clone())
+        .with(egui_layer.clone())
         .with(stdout_sub)
         .with(file_sub);
 
@@ -73,7 +77,7 @@ fn main() {
         native_options,
         Box::new(|cc| {
             egui_extras::install_image_loaders(&cc.egui_ctx);
-            Ok(Box::new(MyTabs::new(collector)))
+            Ok(Box::new(MyTabs::new(egui_layer)))
         }),
     );
 
@@ -86,7 +90,7 @@ struct MyTabs {
 }
 
 impl MyTabs {
-    pub fn new(collector: EventCollector) -> Self {
+    pub fn new(egui_layer: EguiLayer) -> Self {
         let tabs = [TabKind::Profiles, TabKind::Logs, TabKind::Settings]
             .map(|kind| Tab { id: kind.id(), kind })
             .into();
@@ -104,7 +108,7 @@ impl MyTabs {
         );
 
         Self {
-            context: MyContext::new(collector),
+            context: MyContext::new(egui_layer),
             dock_state,
         }
     }

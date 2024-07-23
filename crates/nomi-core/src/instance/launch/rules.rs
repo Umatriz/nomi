@@ -18,7 +18,7 @@ pub fn is_rule_passes(rule: &Rule) -> bool {
 
                 !(custom_res || demo || quick_realms)
             }
-            Some(RuleKind::JvmRule(os)) => os.name.as_ref().map_or(true, |target_os| dbg!(env::consts::OS == target_os)),
+            Some(RuleKind::JvmRule(os)) => os.name.as_ref().map_or(true, |target_os| env::consts::OS == target_os),
 
             None => true,
         },
@@ -41,7 +41,7 @@ pub fn is_all_rules_passed(rules: &[Rule]) -> bool {
 
 pub fn is_library_passes(lib: &Library) -> bool {
     match lib.rules.as_ref() {
-        Some(rules) => dbg!(is_all_rules_passed(rules)),
+        Some(rules) => is_all_rules_passed(rules),
         None => true,
     }
 }

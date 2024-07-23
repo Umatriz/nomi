@@ -4,6 +4,7 @@ use nomi_core::{
     game_paths::GamePaths,
     instance::{
         launch::{arguments::UserData, LaunchSettings},
+        logs::PrintLogs,
         Instance,
     },
     loaders::fabric::Fabric,
@@ -61,5 +62,8 @@ async fn full_fabric_test() {
         .state(ProfileState::downloaded(launch))
         .build();
 
-    dbg!(profile).launch(UserData::default(), &JavaRunner::default()).await.unwrap();
+    dbg!(profile)
+        .launch(UserData::default(), &JavaRunner::default(), &PrintLogs)
+        .await
+        .unwrap();
 }

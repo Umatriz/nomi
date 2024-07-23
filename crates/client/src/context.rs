@@ -1,21 +1,21 @@
 use crate::{
     errors_pool::ErrorPoolExt,
     states::States,
-    views::{self, profiles::ProfilesPage, settings::SettingsPage, ModManager, ProfileInfo, View},
+    subscriber::EguiLayer,
+    views::{self, profiles::ProfilesPage, settings::SettingsPage, Logs, ModManager, ProfileInfo, View},
     Tab, TabKind,
 };
-use eframe::egui::{self, ScrollArea};
+use eframe::egui::{self};
 use egui_dock::TabViewer;
 use egui_file_dialog::FileDialog;
 use egui_task_manager::TaskManager;
-use egui_tracing::EventCollector;
 use nomi_core::{
     repository::launcher_manifest::{Latest, LauncherManifest},
     state::get_launcher_manifest,
 };
 
 pub struct MyContext {
-    pub collector: EventCollector,
+    pub egui_layer: EguiLayer,
     pub launcher_manifest: &'static LauncherManifest,
     pub file_dialog: FileDialog,
 
@@ -27,7 +27,7 @@ pub struct MyContext {
 }
 
 impl MyContext {
-    pub fn new(collector: EventCollector) -> Self {
+    pub fn new(egui_layer: EguiLayer) -> Self {
         const EMPTY_MANIFEST: &LauncherManifest = &LauncherManifest {
             latest: Latest {
                 release: String::new(),
@@ -39,7 +39,7 @@ impl MyContext {
         let launcher_manifest_ref = pollster::block_on(get_launcher_manifest()).report_error().unwrap_or(EMPTY_MANIFEST);
 
         Self {
-            collector,
+            egui_layer,
             launcher_manifest: launcher_manifest_ref,
             file_dialog: FileDialog::new(),
             is_profile_window_open: false,
@@ -82,6 +82,7 @@ impl TabViewer for MyContext {
                 profiles_state: &mut self.states.profiles,
                 menu_state: &mut self.states.add_profile_menu_state,
                 tabs_state: &mut self.states.tabs,
+                logs_state: &self.states.logs_state,
 
                 launcher_manifest: self.launcher_manifest,
                 is_profile_window_open: &mut self.is_profile_window_open,
@@ -95,11 +96,11 @@ impl TabViewer for MyContext {
                 file_dialog: &mut self.file_dialog,
             }
             .ui(ui),
-            TabKind::Logs => {
-                ScrollArea::horizontal().show(ui, |ui| {
-                    ui.add(egui_tracing::Logs::new(self.collector.clone()));
-                });
+            TabKind::Logs => Logs {
+                egui_layer: &self.egui_layer,
+                logs_state: &mut self.states.logs_state,
             }
+            .ui(ui),
             TabKind::DownloadProgress => {
                 views::DownloadingProgress {
                     manager: &self.manager,

@@ -19,7 +19,7 @@ use crate::{
         add_tab_menu::TabsState,
         profiles::ProfilesState,
         settings::{ClientSettingsState, SettingsState},
-        AddProfileMenuState, ModManagerState, ProfileInfoState, ProfilesConfig,
+        AddProfileMenuState, LogsState, ModManagerState, ProfileInfoState, ProfilesConfig,
     },
 };
 
@@ -27,6 +27,7 @@ pub struct States {
     pub tabs: TabsState,
     pub errors_pool: ErrorsPoolState,
 
+    pub logs_state: LogsState,
     pub java: JavaState,
     pub profiles: ProfilesState,
     pub settings: SettingsState,
@@ -42,8 +43,9 @@ impl Default for States {
 
         Self {
             tabs: TabsState::new(),
-            java: JavaState::new(),
             errors_pool: ErrorsPoolState::default(),
+            logs_state: LogsState::new(),
+            java: JavaState::new(),
             profiles: ProfilesState {
                 currently_downloading_profiles: HashSet::new(),
                 profiles: read_toml_config_sync::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG).unwrap_or_default(),

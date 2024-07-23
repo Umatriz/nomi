@@ -29,7 +29,7 @@ use super::{
     add_profile_menu::{AddProfileMenu, AddProfileMenuState},
     load_mods,
     settings::SettingsState,
-    ModsConfig, ProfileInfoState, TabsState, View,
+    LogsState, ModsConfig, ProfileInfoState, TabsState, View,
 };
 
 pub struct ProfilesPage<'a> {
@@ -40,6 +40,7 @@ pub struct ProfilesPage<'a> {
 
     pub is_profile_window_open: &'a mut bool,
 
+    pub logs_state: &'a LogsState,
     pub tabs_state: &'a mut TabsState,
     pub profiles_state: &'a mut ProfilesState,
     pub menu_state: &'a mut AddProfileMenuState,
@@ -185,6 +186,8 @@ impl View for ProfilesPage<'_> {
                                     let should_load_mods = profile.profile.loader().is_fabric();
                                     let profile_id = profile.profile.id;
 
+                                    let game_logs = self.logs_state.game_logs.clone();
+                                    game_logs.clear();
                                     let run_game = Task::new(
                                         "Running the game",
                                         Caller::standard(async move {
@@ -192,7 +195,7 @@ impl View for ProfilesPage<'_> {
                                                 load_mods(profile_id).await.report_error();
                                             }
 
-                                            instance.launch(user_data, &java_runner).await.report_error()
+                                            instance.launch(user_data, &java_runner, &*game_logs).await.report_error()
                                         }),
                                     );
 

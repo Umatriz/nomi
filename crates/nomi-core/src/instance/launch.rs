@@ -2,12 +2,15 @@ use std::{
     fs::{File, OpenOptions},
     io,
     path::{Path, PathBuf},
+    process::Stdio,
 };
 
 use arguments::UserData;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
-use tracing::{debug, info, trace, warn};
+use tokio_stream::StreamExt;
+use tokio_util::codec::{FramedRead, LinesCodec};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::{
     downloads::Assets,
@@ -20,7 +23,11 @@ use crate::{
 
 use self::arguments::ArgumentsBuilder;
 
-use super::{profile::LoaderProfile, Undefined};
+use super::{
+    logs::{GameLogsEvent, GameLogsWriter},
+    profile::LoaderProfile,
+    Undefined,
+};
 
 pub mod arguments;
 pub mod rules;
@@ -141,8 +148,8 @@ impl LaunchInstance {
         Ok(())
     }
 
-    #[tracing::instrument(skip(self), err)]
-    pub async fn launch(&self, user_data: UserData, java_runner: &JavaRunner) -> anyhow::Result<()> {
+    #[tracing::instrument(skip(self, logs_writer), err)]
+    pub async fn launch(&self, user_data: UserData, java_runner: &JavaRunner, logs_writer: &dyn GameLogsWriter) -> anyhow::Result<()> {
         let manifest = read_json_config::<Manifest>(&self.settings.manifest_file).await?;
 
         let arguments_builder = ArgumentsBuilder::new(self, &manifest).with_classpath().with_userdata(user_data);
@@ -163,16 +170,40 @@ impl LaunchInstance {
         let mut child = Command::new(java_runner.get())
             .args(custom_jvm_arguments)
             .args(loader_jvm_arguments)
-            .args(dbg!(manifest_jvm_arguments))
+            .args(manifest_jvm_arguments)
             .arg(main_class)
-            .args(dbg!(manifest_game_arguments))
+            .args(manifest_game_arguments)
             .args(loader_game_arguments)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
             // Works incorrectly so let's ignore it for now.
             // It will work when the instances are implemented.
             // .current_dir(std::fs::canonicalize(MINECRAFT_DIR)?)
             .spawn()?;
 
-        child.wait().await?.code().inspect(|code| info!("Minecraft exit code: {}", code));
+        let stdout = child.stdout.take().expect("child did not have a handle to stdout");
+        let stderr = child.stderr.take().expect("child did not have a handle to stdout");
+
+        // let mut stdout_reader = BufReader::new(stdout).lines();
+        // let mut stderr_reader = BufReader::new(stderr).lines();
+
+        let stdout = FramedRead::new(stdout, LinesCodec::new());
+        let stderr = FramedRead::new(stderr, LinesCodec::new());
+
+        tokio::spawn(async move {
+            if let Ok(out) = child.wait().await.inspect_err(|e| error!(error = ?e, "Unable to get the exit code")) {
+                out.code().inspect(|code| info!("Minecraft exit code: {}", code));
+            };
+        });
+
+        let mut read = stdout.merge(stderr);
+
+        while let Some(line) = read.next().await {
+            match line {
+                Ok(line) => logs_writer.write(GameLogsEvent::new(line)),
+                Err(e) => error!(error = ?e, "Error occurred while decoding game's output"),
+            }
+        }
 
         Ok(())
     }
