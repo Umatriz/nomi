@@ -24,8 +24,6 @@ eframe = { version = "0.28.0" }
 egui_dock = "0.13.0"
 egui_form = { version = "0.2.0", features = ["validator_garde"] }
 egui-file-dialog = "0.6.0"
-# egui version was incompatible so I forked it and bumped it.
-egui_tracing = { git = "https://github.com/Umatriz/egui_tracing" }
 egui_task_manager = { git = "https://github.com/Umatriz/egui-task-manager" }
 egui_extras = { version = "0.28.0", features = ["all_loaders", "svg"] }
 egui_infinite_scroll = { version = "0.4.0", features = ["tokio"] }
