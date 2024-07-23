@@ -2,6 +2,7 @@ use typed_builder::TypedBuilder;
 
 pub mod builder_ext;
 pub mod launch;
+pub mod logs;
 pub mod profile;
 pub mod version_marker;
 

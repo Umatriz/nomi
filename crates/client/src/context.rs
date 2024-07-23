@@ -2,10 +2,10 @@ use crate::{
     errors_pool::ErrorPoolExt,
     states::States,
     subscriber::EguiLayer,
-    views::{self, profiles::ProfilesPage, settings::SettingsPage, ModManager, ProfileInfo, View},
+    views::{self, profiles::ProfilesPage, settings::SettingsPage, Logs, ModManager, ProfileInfo, View},
     Tab, TabKind,
 };
-use eframe::egui::{self, ScrollArea};
+use eframe::egui::{self};
 use egui_dock::TabViewer;
 use egui_file_dialog::FileDialog;
 use egui_task_manager::TaskManager;
@@ -82,6 +82,7 @@ impl TabViewer for MyContext {
                 profiles_state: &mut self.states.profiles,
                 menu_state: &mut self.states.add_profile_menu_state,
                 tabs_state: &mut self.states.tabs,
+                logs_state: &self.states.logs_state,
 
                 launcher_manifest: self.launcher_manifest,
                 is_profile_window_open: &mut self.is_profile_window_open,
@@ -95,11 +96,11 @@ impl TabViewer for MyContext {
                 file_dialog: &mut self.file_dialog,
             }
             .ui(ui),
-            TabKind::Logs => {
-                ScrollArea::horizontal().show(ui, |ui| {
-                    self.egui_layer.ui(ui);
-                });
+            TabKind::Logs => Logs {
+                egui_layer: &self.egui_layer,
+                logs_state: &mut self.states.logs_state,
             }
+            .ui(ui),
             TabKind::DownloadProgress => {
                 views::DownloadingProgress {
                     manager: &self.manager,

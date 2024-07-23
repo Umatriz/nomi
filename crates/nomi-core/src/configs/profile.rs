@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
 use crate::{
-    instance::launch::{arguments::UserData, LaunchInstance},
+    instance::{
+        launch::{arguments::UserData, LaunchInstance},
+        logs::GameLogsWriter,
+    },
     repository::{java_runner::JavaRunner, manifest::VersionType},
 };
 
@@ -71,9 +74,9 @@ pub struct VersionProfile {
 }
 
 impl VersionProfile {
-    pub async fn launch(&self, user_data: UserData, java_runner: &JavaRunner) -> anyhow::Result<()> {
+    pub async fn launch(&self, user_data: UserData, java_runner: &JavaRunner, logs_writer: &dyn GameLogsWriter) -> anyhow::Result<()> {
         match &self.state {
-            ProfileState::Downloaded(instance) => instance.launch(user_data, java_runner).await,
+            ProfileState::Downloaded(instance) => instance.launch(user_data, java_runner, logs_writer).await,
             ProfileState::NotDownloaded { .. } => Err(anyhow!("This profile is not downloaded!")),
         }
     }

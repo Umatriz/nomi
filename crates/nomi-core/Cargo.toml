@@ -8,6 +8,8 @@ repository = "https://github.com/Umatriz/nomi"
 
 [dependencies]
 tokio.workspace = true
+tokio-stream.workspace = true
+tokio-util.workspace = true
 anyhow.workspace = true
 serde.workspace = true
 serde_json.workspace = true
