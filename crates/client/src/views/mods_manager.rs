@@ -398,7 +398,13 @@ impl View for ModManager<'_> {
             }
 
             if self.mod_manager_state.scroll.bottom_loading_state().loading() {
-                ui.spinner();
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label("If loading takes too long try to");
+                    if ui.button("Reset").clicked() {
+                        self.mod_manager_state.scroll.reset()
+                    };
+                });
             }
         });
 
