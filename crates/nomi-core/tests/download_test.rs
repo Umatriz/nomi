@@ -25,10 +25,9 @@ async fn download_test() {
     Box::new(instance.assets().await.unwrap()).download(&tx).await;
 
     let version = instance.instance();
-    {
-        let io = version.get_io_dyn();
-        io.io().await.unwrap();
-    }
 
+    let fut = version.io();
     version.download(&tx).await;
+
+    fut.await.unwrap();
 }

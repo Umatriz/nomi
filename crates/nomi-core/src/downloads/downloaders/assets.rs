@@ -11,14 +11,15 @@ use crate::{
         downloaders::file::FileDownloader,
         progress::ProgressSender,
         set::DownloadSet,
-        traits::{DownloadResult, Downloadable, Downloader, DownloaderIO, DownloaderIOExt},
+        traits::{DownloadResult, Downloadable, Downloader},
     },
     fs::write_json_config,
+    PinnedFutureWithBounds,
 };
 
 use super::DownloadQueue;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Assets {
     pub objects: HashMap<String, AssetInformation>,
 }
@@ -113,32 +114,6 @@ impl AssetsDownloader {
     }
 }
 
-impl<'a> DownloaderIOExt<'a> for AssetsDownloader {
-    type IO = AssetsDownloaderIo<'a>;
-
-    fn get_io(&'a self) -> AssetsDownloaderIo<'a> {
-        AssetsDownloaderIo {
-            assets: &self.assets,
-            indexes: self.indexes.clone(),
-            id: self.id.clone(),
-        }
-    }
-}
-
-pub struct AssetsDownloaderIo<'a> {
-    assets: &'a Assets,
-    indexes: PathBuf,
-    id: String,
-}
-
-#[async_trait::async_trait]
-impl DownloaderIO for AssetsDownloaderIo<'_> {
-    async fn io(&self) -> anyhow::Result<()> {
-        let path = self.indexes.join(format!("{}.json", self.id));
-        write_json_config(&self.assets, path).await
-    }
-}
-
 #[async_trait::async_trait]
 impl Downloader for AssetsDownloader {
     type Data = DownloadResult;
@@ -150,5 +125,18 @@ impl Downloader for AssetsDownloader {
     #[tracing::instrument(skip_all)]
     async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
         Box::new(self.queue).download(sender).await;
+    }
+
+    fn io(&self) -> PinnedFutureWithBounds<anyhow::Result<()>> {
+        let id = self.id.clone();
+        let indexes = self.indexes.clone();
+        let assets = self.assets.clone();
+
+        let fut = async move {
+            let path = indexes.join(format!("{id}.json"));
+            write_json_config(&assets, path).await
+        };
+
+        Box::pin(fut)
     }
 }

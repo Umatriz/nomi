@@ -1,6 +1,8 @@
 use egui_task_manager::Progress;
 
-use super::{downloaders::assets::AssetsDownloaderIo, progress::ProgressSender, DownloadError};
+use crate::PinnedFutureWithBounds;
+
+use super::{progress::ProgressSender, DownloadError};
 
 #[derive(Debug, Clone)]
 pub struct DownloadResult(pub Result<DownloadStatus, DownloadError>);
@@ -41,7 +43,13 @@ pub trait Downloader: Send + Sync {
 
     /// Returns the number of items to download
     fn total(&self) -> u32;
+
     async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>);
+
+    /// This method must return a pinned future that does not borrow any values from `Self`
+    fn io(&self) -> PinnedFutureWithBounds<anyhow::Result<()>> {
+        Box::pin(async { Ok(()) })
+    }
 }
 
 const _: Option<Box<dyn Downloader<Data = DownloadResult>>> = None;
@@ -60,33 +68,5 @@ where
     async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
         let result = self.download().await;
         sender.update(result).await;
-    }
-}
-
-#[async_trait::async_trait]
-pub trait DownloaderIO {
-    async fn io(&self) -> anyhow::Result<()>;
-}
-
-const _: Option<Box<dyn DownloaderIO>> = None;
-
-pub trait DownloaderIOExt<'a> {
-    type IO: DownloaderIO;
-
-    fn get_io(&'a self) -> Self::IO;
-}
-
-const _: Option<Box<dyn DownloaderIOExt<'_, IO = AssetsDownloaderIo<'_>>>> = None;
-
-pub trait ObjectSafeDownloaderIOExt<'a> {
-    fn get_io_dyn(&'a self) -> Box<dyn DownloaderIO + Send + 'a>;
-}
-
-impl<'a, T: DownloaderIOExt<'a>> ObjectSafeDownloaderIOExt<'a> for T
-where
-    T::IO: Send,
-{
-    fn get_io_dyn(&'a self) -> Box<dyn DownloaderIO + Send + 'a> {
-        Box::new(self.get_io())
     }
 }

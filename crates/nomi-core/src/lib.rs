@@ -19,11 +19,15 @@ pub mod state;
 
 pub mod consts;
 
+use std::{future::Future, pin::Pin};
+
 pub use consts::*;
 
 pub use regex;
 use sha1::Digest;
 pub use uuid::Uuid;
+
+type PinnedFutureWithBounds<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 
 pub fn calculate_sha1(data: impl AsRef<[u8]>) -> String {
     let value = sha1::Sha1::digest(data);

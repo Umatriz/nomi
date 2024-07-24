@@ -5,10 +5,10 @@ use std::{
 use thiserror::Error;
 use tracing::error;
 
-use crate::{downloads::progress::ProgressSender, DOT_NOMI_TEMP_DIR};
+use crate::{downloads::progress::ProgressSender, PinnedFutureWithBounds, DOT_NOMI_TEMP_DIR};
 
 use super::{
-    super::traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
+    super::traits::{DownloadResult, Downloader},
     FileDownloader,
 };
 
@@ -85,20 +85,27 @@ impl Downloader for JavaDownloader {
 
         Box::new(downloader).download(sender).await;
     }
-}
 
-impl<'a> DownloaderIOExt<'a> for JavaDownloader {
-    type IO = JavaDownloaderIO;
+    fn io(&self) -> PinnedFutureWithBounds<anyhow::Result<()>> {
+        let target_directory = self.target_directory.clone();
 
-    fn get_io(&'a self) -> Self::IO {
-        JavaDownloaderIO {
-            target_directory: self.target_directory.clone(),
-        }
+        let fut = async move {
+            let path = PathBuf::from(DOT_NOMI_TEMP_DIR).join(consts::ARCHIVE_FILENAME);
+            if !check_hash(path.clone(), consts::SHA256)? {
+                return Err(JavaDownloaderError::HashDoesNotMatch.into());
+            }
+
+            let file = File::open(&path)?;
+
+            extract(file, &target_directory)?;
+
+            tokio::fs::remove_file(&path).await?;
+
+            Ok(())
+        };
+
+        Box::pin(fut)
     }
-}
-
-pub struct JavaDownloaderIO {
-    target_directory: PathBuf,
 }
 
 #[cfg(target_os = "windows")]
@@ -115,24 +122,6 @@ fn extract(archive: std::fs::File, target_path: &Path) -> anyhow::Result<()> {
     let tar = GzDecoder::new(archive);
     let mut archive = Archive::new(tar);
     archive.unpack(target_path).map_err(Into::into)
-}
-
-#[async_trait::async_trait]
-impl DownloaderIO for JavaDownloaderIO {
-    async fn io(&self) -> anyhow::Result<()> {
-        let path = PathBuf::from(DOT_NOMI_TEMP_DIR).join(consts::ARCHIVE_FILENAME);
-        if !check_hash(path.clone(), consts::SHA256)? {
-            return Err(JavaDownloaderError::HashDoesNotMatch.into());
-        }
-
-        let file = File::open(&path)?;
-
-        extract(file, &self.target_directory)?;
-
-        tokio::fs::remove_file(&path).await?;
-
-        Ok(())
-    }
 }
 
 #[derive(Error, Debug)]

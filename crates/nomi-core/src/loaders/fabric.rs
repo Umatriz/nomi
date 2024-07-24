@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use itertools::Itertools;
 use reqwest::Client;
@@ -11,7 +11,7 @@ use crate::{
             libraries::{LibrariesDownloader, LibrariesMapper},
         },
         progress::ProgressSender,
-        traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
+        traits::{DownloadResult, Downloader},
     },
     fs::write_to_file,
     game_paths::GamePaths,
@@ -24,6 +24,7 @@ use crate::{
         simple_lib::SimpleLib,
     },
     state::get_launcher_manifest,
+    PinnedFutureWithBounds,
 };
 
 #[derive(Debug)]
@@ -105,23 +106,6 @@ impl Fabric {
     }
 }
 
-#[allow(clippy::module_name_repetitions)]
-pub struct FabricIO<'a> {
-    profile: &'a FabricProfile,
-    version_path: &'a Path,
-}
-
-#[async_trait::async_trait]
-impl<'a> DownloaderIO for FabricIO<'a> {
-    async fn io(&self) -> anyhow::Result<()> {
-        let path = self.version_path.join(format!("{}.json", self.profile.id));
-
-        let body = serde_json::to_string_pretty(&self.profile)?;
-
-        write_to_file(body.as_bytes(), &path).await
-    }
-}
-
 struct FabricLibrariesMapper {
     libraries: PathBuf,
 }
@@ -146,15 +130,20 @@ impl Downloader for Fabric {
     async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
         Box::new(self.libraries_downloader).download(sender).await;
     }
-}
 
-impl<'a> DownloaderIOExt<'a> for Fabric {
-    type IO = FabricIO<'a>;
+    fn io(&self) -> PinnedFutureWithBounds<anyhow::Result<()>> {
+        let version_path = self.game_paths.version.clone();
+        let profile = self.profile.clone();
+        let id = self.profile.id.clone();
 
-    fn get_io(&'a self) -> FabricIO<'a> {
-        FabricIO {
-            profile: &self.profile,
-            version_path: &self.game_paths.version,
-        }
+        let fut = async move {
+            let path = version_path.join(format!("{id}.json"));
+
+            let body = serde_json::to_string_pretty(&profile)?;
+
+            write_to_file(body.as_bytes(), &path).await
+        };
+
+        Box::pin(fut)
     }
 }
