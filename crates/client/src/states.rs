@@ -2,11 +2,7 @@ use std::{collections::HashSet, path::PathBuf};
 
 use egui_task_manager::{Caller, Task, TaskManager};
 use nomi_core::{
-    downloads::{
-        java::JavaDownloader,
-        progress::MappedSender,
-        traits::{Downloader, DownloaderIO, DownloaderIOExt},
-    },
+    downloads::{java::JavaDownloader, progress::MappedSender, traits::Downloader},
     fs::read_toml_config_sync,
     DOT_NOMI_JAVA_DIR, DOT_NOMI_JAVA_EXECUTABLE, DOT_NOMI_PROFILES_CONFIG, DOT_NOMI_SETTINGS_CONFIG,
 };
@@ -88,14 +84,15 @@ impl JavaState {
 
             let _ = progress.set_total(downloader.total());
 
-            let io = downloader.get_io();
+            let io = downloader.io();
 
             let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress.sender()));
 
             Box::new(downloader).download(&mapped_sender).await;
 
-            io.io().await.report_error();
+            io.await.report_error();
         });
+
         let task = Task::new("Java downloading", caller);
         manager.push_task::<JavaCollection>(task);
     }

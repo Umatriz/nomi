@@ -1,12 +1,12 @@
 use std::{path::PathBuf, sync::Arc};
 
-use anyhow::{anyhow, Context};
+use anyhow::anyhow;
 use egui_task_manager::TaskProgressShared;
 use nomi_core::{
     configs::profile::{Loader, ProfileState},
     downloads::{
         progress::MappedSender,
-        traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
+        traits::{DownloadResult, Downloader},
         AssetsDownloader, DownloadQueue,
     },
     game_paths::GamePaths,
@@ -76,9 +76,12 @@ async fn try_download_version(profile: Arc<RwLock<ModdedProfile>>, progress_shar
         let launch_instance = instance.launch_instance(settings, Some(vec!["-Xms2G".to_string(), "-Xmx4G".to_string()]));
 
         let instance = instance.instance();
-        instance.get_io_dyn().io().await?;
+
+        let io = instance.io();
 
         let downloader: Box<dyn Downloader<Data = DownloadResult>> = instance.into_downloader();
+
+        io.await?;
 
         let downloader = DownloadQueue::new().with_downloader_dyn(downloader);
 
@@ -112,13 +115,15 @@ async fn try_assets(version: String, assets_dir: PathBuf, progress_shared: TaskP
     )
     .await?;
 
-    downloader.get_io().io().await.context("`io` error")?;
+    let io = downloader.io();
 
     let _ = progress_shared.set_total(downloader.total());
 
     let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress_shared.sender()));
 
     Box::new(downloader).download(&mapped_sender).await;
+
+    io.await?;
 
     Ok(())
 }

@@ -11,13 +11,14 @@ use crate::{
             libraries::{LibrariesDownloader, LibrariesMapper},
         },
         progress::ProgressSender,
-        traits::{DownloadResult, Downloader, DownloaderIO, DownloaderIOExt},
+        traits::{DownloadResult, Downloader},
         DownloadQueue,
     },
     fs::write_to_file,
     game_paths::GamePaths,
     repository::manifest::{Classifiers, DownloadFile, Library, Manifest},
     state::get_launcher_manifest,
+    PinnedFutureWithBounds,
 };
 
 #[derive(Debug)]
@@ -108,23 +109,6 @@ impl LibrariesMapper<Library> for VanillaNativeLibrariesMapper<'_> {
     }
 }
 
-#[allow(clippy::module_name_repetitions)]
-pub struct VanillaIO<'a> {
-    manifest: &'a Manifest,
-    version_path: &'a Path,
-}
-
-#[async_trait::async_trait]
-impl DownloaderIO for VanillaIO<'_> {
-    async fn io(&self) -> anyhow::Result<()> {
-        let path = self.version_path.join(format!("{}.json", self.manifest.id));
-
-        let body = serde_json::to_string_pretty(&self.manifest)?;
-
-        write_to_file(body.as_bytes(), &path).await
-    }
-}
-
 #[async_trait::async_trait]
 impl Downloader for Vanilla {
     type Data = DownloadResult;
@@ -136,15 +120,20 @@ impl Downloader for Vanilla {
     async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
         Box::new(self.queue).download(sender).await;
     }
-}
 
-impl<'a> DownloaderIOExt<'a> for Vanilla {
-    type IO = VanillaIO<'a>;
+    fn io(&self) -> PinnedFutureWithBounds<anyhow::Result<()>> {
+        let versions_path = self.game_paths.version.clone();
+        let manifest_id = self.manifest.id.clone();
+        let manifest_res = serde_json::to_string_pretty(&self.manifest);
 
-    fn get_io(&'a self) -> VanillaIO<'a> {
-        VanillaIO {
-            manifest: &self.manifest,
-            version_path: &self.game_paths.version,
-        }
+        let fut = async move {
+            let path = versions_path.join(format!("{manifest_id}.json"));
+
+            let body = manifest_res?;
+
+            write_to_file(body.as_bytes(), &path).await
+        };
+
+        Box::pin(fut)
     }
 }

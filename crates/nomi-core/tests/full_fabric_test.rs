@@ -52,9 +52,11 @@ async fn full_fabric_test() {
     Box::new(instance.assets().await.unwrap()).download(&tx).await;
 
     let instance = instance.instance();
-    instance.get_io_dyn().io().await.unwrap();
+    let ui_fut = instance.io();
 
     instance.download(&tx).await;
+
+    ui_fut.await.unwrap();
 
     let profile = VersionProfile::builder()
         .id(1)
