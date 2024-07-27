@@ -1,8 +1,16 @@
-use std::{collections::HashMap, fmt::Debug};
+use std::{collections::HashMap, fmt::Debug, slice::Iter};
 
 use anyhow::anyhow;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+
+use crate::{
+    downloads::{
+        progress::ProgressSender,
+        traits::{DownloadResult, Downloader},
+    },
+    PinnedFutureWithBounds,
+};
 
 const FORGE_REPO_URL: &str = "https://maven.minecraftforge.net";
 const FORGE_GROUP: &str = "net.minecraftforge";
@@ -12,8 +20,25 @@ const NEO_FORGE_REPO_URL: &str = "https://maven.neoforged.net/releases/";
 const NEO_FORGE_GROUP: &str = "net.neoforged";
 const NEO_FORGE_ARTIFACT: &str = "neoforge";
 
+/// Some versions require to have a suffix
+const FORGE_SUFFIXES: &[(&str, &[&str])] = &[
+    ("1.11", &["-1.11.x"]),
+    ("1.10.2", &["-1.10.0"]),
+    ("1.10", &["-1.10.0"]),
+    ("1.9.4", &["-1.9.4"]),
+    ("1.9", &["-1.9.0", "-1.9"]),
+    ("1.8.9", &["-1.8.9"]),
+    ("1.8.8", &["-1.8.8"]),
+    ("1.8", &["-1.8"]),
+    ("1.7.10", &["-1.7.10", "-1710ls", "-new"]),
+    ("1.7.2", &["-mc172"]),
+];
+
+#[derive(Debug)]
 pub struct Forge {
-    url: String,
+    urls: Vec<String>,
+    game_version: String,
+    forge_version: String,
 }
 
 impl Forge {
@@ -26,6 +51,7 @@ impl Forge {
             .text()
             .await?;
 
+        // Parsing the XML to get versions list
         let versions = raw
             .find("<version>")
             .and_then(|s| raw.find("</versions>").map(|e| (s, e)))
@@ -50,6 +76,7 @@ impl Forge {
         }
     }
 
+    /// Get forge versions that are recommended for specific game version
     pub async fn get_promo_versions() -> anyhow::Result<ForgeVersions> {
         reqwest::get("https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json")
             .await?
@@ -67,6 +94,7 @@ impl Forge {
         let promo_versions = Self::get_promo_versions().await?;
 
         let from_promo = |version| {
+            // Sometime one of those does not exist so we have a fallback.
             let next_version = match version {
                 ForgeVersion::Recommended => ForgeVersion::Latest,
                 ForgeVersion::Latest => ForgeVersion::Recommended,
@@ -86,13 +114,43 @@ impl Forge {
             version => from_promo(version),
         };
 
-        let Some(spesific_version) = opt else {
+        let Some(ForgeVersion::Specific(forge_version)) = opt else {
             return Err(anyhow!("Cannot match version"));
         };
 
-        dbg!(&spesific_version);
+        let mut suffixes = vec![""];
 
-        Err(anyhow!("not yet implemented"))
+        if let Some((_, s)) = FORGE_SUFFIXES.iter().find(|(k, _)| k == &game_version) {
+            suffixes.extend(s.iter());
+        }
+
+        // Make list of urls that we should try to get installer from
+        let urls = suffixes.into_iter().map(|suffix| {
+            format!(
+                "{FORGE_REPO_URL}/net/minecraftforge/forge/{game_version}-{forge_version}{suffix}/forge-{game_version}-{forge_version}{suffix}-installer.jar",
+            )
+        }).collect_vec();
+
+        Ok(Self {
+            urls,
+            game_version,
+            forge_version,
+        })
+    }
+}
+
+#[async_trait::async_trait]
+impl Downloader for Forge {
+    type Data = DownloadResult;
+
+    fn total(&self) -> u32 {
+        1
+    }
+
+    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {}
+
+    fn io(&self) -> PinnedFutureWithBounds<anyhow::Result<()>> {
+        todo!();
     }
 }
 
@@ -129,13 +187,16 @@ mod tests {
 
     #[tokio::test]
     async fn get_versions_test() {
-        let versions = Forge::get_versions("1.19.2").await.unwrap();
+        let versions = Forge::get_versions("1.7.10").await.unwrap();
         println!("{versions:#?}");
     }
 
     #[tokio::test]
     async fn create_forge_test() {
-        let _recommended = Forge::new("1.19.2", ForgeVersion::Recommended).await;
-        let _latest = Forge::new("1.19.2", ForgeVersion::Latest).await;
+        let recommended = Forge::new("1.7.10", ForgeVersion::Recommended).await.unwrap();
+        println!("{recommended:#?}");
+
+        let latest = Forge::new("1.19.2", ForgeVersion::Latest).await.unwrap();
+        println!("{latest:#?}");
     }
 }
