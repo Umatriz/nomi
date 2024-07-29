@@ -2,7 +2,6 @@ use egui_task_manager::Progress;
 
 #[async_trait::async_trait]
 pub trait ProgressSender<P: Send>: Sync + Send {
-    /// It can technically return error but we will ignore them.
     async fn update(&self, data: P);
 }
 

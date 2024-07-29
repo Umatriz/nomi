@@ -1,15 +1,23 @@
-use std::{collections::HashMap, fmt::Debug, slice::Iter};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    path::{Path, PathBuf},
+    slice::Iter,
+};
 
 use anyhow::anyhow;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 use crate::{
     downloads::{
+        download_file,
         progress::ProgressSender,
-        traits::{DownloadResult, Downloader},
+        traits::{DownloadResult, DownloadStatus, Downloader},
+        FileDownloader,
     },
-    PinnedFutureWithBounds,
+    PinnedFutureWithBounds, DOT_NOMI_TEMP_DIR,
 };
 
 const FORGE_REPO_URL: &str = "https://maven.minecraftforge.net";
@@ -137,6 +145,10 @@ impl Forge {
             forge_version,
         })
     }
+
+    pub fn installer_path(&self) -> PathBuf {
+        Path::new(DOT_NOMI_TEMP_DIR).join(format!("{}-{}.jar", &self.game_version, &self.forge_version))
+    }
 }
 
 #[async_trait::async_trait]
@@ -147,10 +159,32 @@ impl Downloader for Forge {
         1
     }
 
-    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {}
+    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
+        let installer_path = self.installer_path();
+
+        for url in &self.urls {
+            if let Err(err) = dbg!(download_file(&installer_path, url).await) {
+                warn!(
+                    url = url,
+                    error = ?err,
+                    "Error while downloading Forge {}. Trying next suffix.",
+                    &self.forge_version
+                );
+                continue;
+            }
+
+            // If the download is successful the break the loop
+            sender.update(DownloadResult(Ok(DownloadStatus::Success))).await;
+            break;
+        }
+    }
 
     fn io(&self) -> PinnedFutureWithBounds<anyhow::Result<()>> {
-        todo!();
+        async fn inner() -> anyhow::Result<()> {
+            todo!()
+        }
+
+        Box::pin(inner())
     }
 }
 
@@ -198,5 +232,23 @@ mod tests {
 
         let latest = Forge::new("1.19.2", ForgeVersion::Latest).await.unwrap();
         println!("{latest:#?}");
+    }
+
+    #[tokio::test]
+    async fn download_installer_test() {
+        let _guard = tracing::subscriber::set_default(tracing_subscriber::fmt().finish());
+
+        let recommended = Forge::new("1.7.10", ForgeVersion::Recommended).await.unwrap();
+        println!("{recommended:#?}");
+
+        dbg!(&recommended.urls[0]);
+
+        let (tx, mut rx) = tokio::sync::mpsc::channel(5);
+
+        Box::new(recommended).download(&tx).await;
+
+        dbg!(rx.recv().await);
+
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
 }

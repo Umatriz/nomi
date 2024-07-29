@@ -1,11 +1,16 @@
 pub use downloaders::*;
 
-use std::path::{Path, PathBuf};
+use std::{
+    future::IntoFuture,
+    path::{Path, PathBuf},
+};
 
 use futures_util::stream::StreamExt;
-use reqwest::Client;
+use reqwest::{Client, RequestBuilder, Response};
 use tokio::io::AsyncWriteExt;
 use tracing::{error, trace};
+
+use crate::PinnedFutureWithBounds;
 
 pub mod downloaders;
 pub mod progress;
@@ -31,57 +36,94 @@ pub enum DownloadError {
     AllIterationsFailed,
 }
 
-pub(crate) async fn download_file(path: impl AsRef<Path>, url: impl Into<String>) -> Result<(), DownloadError> {
+pub(crate) fn download_file(path: impl AsRef<Path>, url: impl Into<String>) -> Downloader {
     let url = url.into();
-    let path = path.as_ref();
+    let path = path.as_ref().to_path_buf();
 
-    if let Some(path) = path.parent() {
-        tokio::fs::create_dir_all(path).await.map_err(|err| DownloadError::Error {
-            url: url.clone(),
-            path: path.to_path_buf(),
-            error: err.to_string(),
-        })?;
+    Downloader {
+        url,
+        path,
+        client: None,
+        request_injection: Box::new(|r| r),
+    }
+}
+
+pub struct Downloader {
+    url: String,
+    path: PathBuf,
+    client: Option<Client>,
+    request_injection: Box<dyn FnOnce(RequestBuilder) -> RequestBuilder + Send>,
+}
+
+impl Downloader {
+    #[must_use]
+    pub fn with_client(mut self, client: Client) -> Self {
+        self.client = Some(client);
+        self
     }
 
-    let client = Client::new();
-    let res = client.get(&url).send().await.map_err(|err| DownloadError::Error {
-        url: url.clone(),
-        path: path.to_path_buf(),
-        error: err.to_string(),
-    })?;
+    #[must_use]
+    pub fn with_request_injection(mut self, injection: impl FnOnce(RequestBuilder) -> RequestBuilder + Send + 'static) -> Self {
+        self.request_injection = Box::new(injection);
+        self
+    }
 
-    let mut file = tokio::fs::File::create(path).await.map_err(|err| {
-        error!("Error occurred during file creating\nPath: {}\nError: {}", path.to_string_lossy(), err);
-        DownloadError::Error {
-            url: url.clone(),
-            path: path.to_path_buf(),
-            error: err.to_string(),
+    async fn download(self) -> Result<(), DownloadError> {
+        let download_error = |error| -> DownloadError {
+            DownloadError::Error {
+                url: self.url.clone(),
+                path: self.path.clone(),
+                error,
+            }
+        };
+
+        if let Some(path) = self.path.parent() {
+            tokio::fs::create_dir_all(path).await.map_err(|err| download_error(err.to_string()))?;
         }
-    })?;
 
-    let mut stream = res.bytes_stream();
+        let client = self.client.unwrap_or_default();
+        let request = (self.request_injection)(client.get(&self.url));
+        let res = request
+            .send()
+            .await
+            .and_then(Response::error_for_status)
+            .map_err(|err| download_error(err.to_string()))?;
 
-    while let Some(item) = stream.next().await {
-        let chunk = item.map_err(|err| {
-            error!("Error occurred during file downloading\nError: {}", err);
-            DownloadError::Error {
-                url: url.clone(),
-                path: path.to_path_buf(),
-                error: err.to_string(),
-            }
+        let mut file = tokio::fs::File::create(&self.path).await.map_err(|err| {
+            error!(
+                "Error occurred during file creating\nPath: {}\nError: {}",
+                self.path.to_string_lossy(),
+                err
+            );
+            download_error(err.to_string())
         })?;
 
-        file.write_all(&chunk).await.map_err(|err| {
-            error!("Error occurred during writing to file\nError: {}", err);
-            DownloadError::Error {
-                url: url.clone(),
-                path: path.to_path_buf(),
-                error: err.to_string(),
-            }
-        })?;
+        let mut stream = res.bytes_stream();
+
+        while let Some(item) = stream.next().await {
+            let chunk = item.map_err(|err| {
+                error!("Error occurred during file downloading\nError: {}", err);
+                download_error(err.to_string())
+            })?;
+
+            file.write_all(&chunk).await.map_err(|err| {
+                error!("Error occurred during writing to file\nError: {}", err);
+                download_error(err.to_string())
+            })?;
+        }
+
+        trace!("Downloaded successfully {}", self.path.to_string_lossy());
+
+        Ok(())
     }
+}
 
-    trace!("Downloaded successfully {}", path.to_string_lossy());
+impl IntoFuture for Downloader {
+    type Output = Result<(), DownloadError>;
 
-    Ok(())
+    type IntoFuture = PinnedFutureWithBounds<Self::Output>;
+
+    fn into_future(self) -> Self::IntoFuture {
+        Box::pin(self.download())
+    }
 }
