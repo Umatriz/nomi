@@ -1,11 +1,12 @@
 use std::{
     collections::HashMap,
     fmt::Debug,
+    io::Read,
     path::{Path, PathBuf},
     slice::Iter,
 };
 
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
@@ -17,6 +18,7 @@ use crate::{
         traits::{DownloadResult, DownloadStatus, Downloader},
         FileDownloader,
     },
+    repository::manifest::Library,
     PinnedFutureWithBounds, DOT_NOMI_TEMP_DIR,
 };
 
@@ -180,11 +182,31 @@ impl Downloader for Forge {
     }
 
     fn io(&self) -> PinnedFutureWithBounds<anyhow::Result<()>> {
-        async fn inner() -> anyhow::Result<()> {
-            todo!()
+        async fn inner(installer_path: PathBuf) -> anyhow::Result<()> {
+            let file = tokio::fs::File::open(&installer_path).await?;
+            let mut archive = zip::ZipArchive::new(file.into_std().await)?;
+
+            let index = archive
+                .index_for_name("version.json")
+                .or_else(|| archive.index_for_name("install_profile.json"));
+
+            let Some(idx) = index else {
+                bail!("Cannot find either `version.json` or `install_profile.json`")
+            };
+
+            let mut file = archive.by_index(idx)?;
+
+            let mut string = String::new();
+            file.read_to_string(&mut string)?;
+
+            let value: ForgeProfile = serde_json::from_str(&string)?;
+
+            dbg!(&value);
+
+            Ok(())
         }
 
-        Box::pin(inner())
+        Box::pin(inner(self.installer_path()))
     }
 }
 
@@ -215,6 +237,80 @@ impl ForgeVersion {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum ForgeProfile {
+    New(Box<ForgeProfileNew>),
+    Old(Box<ForgeProfileOld>),
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ForgeProfileNew {
+    #[serde(rename = "_comment_")]
+    pub comment: Vec<String>,
+    pub id: String,
+    pub time: String,
+    pub release_time: String,
+    #[serde(rename = "type")]
+    pub forge_profile_type: String,
+    pub main_class: String,
+    pub inherits_from: String,
+    pub logging: Logging,
+    pub arguments: crate::repository::manifest::Arguments,
+    pub libraries: Vec<Library>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Logging {}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct ForgeProfileOld {
+    // pub install: Install,
+    pub version_info: VersionInfo,
+}
+
+// #[derive(Serialize, Deserialize, Debug)]
+// #[serde(rename_all = "camelCase")]
+// pub struct Install {
+//     pub profile_name: String,
+//     pub target: String,
+//     pub path: String,
+//     pub version: String,
+//     pub file_path: String,
+//     pub welcome: String,
+//     pub minecraft: String,
+//     pub mirror_list: String,
+//     pub logo: String,
+// }
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct VersionInfo {
+    pub id: String,
+    pub time: String,
+    pub release_time: String,
+    #[serde(rename = "type")]
+    pub version_info_type: String,
+    pub minecraft_arguments: String,
+    pub main_class: String,
+    pub minimum_launcher_version: i64,
+    pub assets: String,
+    pub inherits_from: String,
+    pub jar: String,
+    pub libraries: Vec<ForgeOldLibrary>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ForgeOldLibrary {
+    pub name: String,
+    pub url: Option<String>,
+    pub serverreq: Option<bool>,
+    pub checksums: Option<Vec<String>>,
+    pub clientreq: Option<bool>,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -238,17 +334,17 @@ mod tests {
     async fn download_installer_test() {
         let _guard = tracing::subscriber::set_default(tracing_subscriber::fmt().finish());
 
-        let recommended = Forge::new("1.7.10", ForgeVersion::Recommended).await.unwrap();
+        let recommended = Forge::new("1.19.2", ForgeVersion::Recommended).await.unwrap();
         println!("{recommended:#?}");
 
-        dbg!(&recommended.urls[0]);
+        let io = recommended.io();
 
-        let (tx, mut rx) = tokio::sync::mpsc::channel(5);
+        if !recommended.installer_path().exists() {
+            let (tx, mut rx) = tokio::sync::mpsc::channel(5);
+            Box::new(recommended).download(&tx).await;
+            dbg!(rx.recv().await);
+        }
 
-        Box::new(recommended).download(&tx).await;
-
-        dbg!(rx.recv().await);
-
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        io.await.unwrap();
     }
 }
