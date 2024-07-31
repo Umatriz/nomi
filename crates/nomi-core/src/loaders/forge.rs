@@ -9,7 +9,7 @@ use std::{
 use anyhow::{anyhow, bail};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use tracing::warn;
+use tracing::{error, warn};
 
 use crate::{
     downloads::{
@@ -46,7 +46,7 @@ const FORGE_SUFFIXES: &[(&str, &[&str])] = &[
 
 #[derive(Debug)]
 pub struct Forge {
-    urls: Vec<String>,
+    profile: ForgeProfile,
     game_version: String,
     forge_version: String,
 }
@@ -87,6 +87,7 @@ impl Forge {
     }
 
     /// Get forge versions that are recommended for specific game version
+    #[tracing::instrument(err)]
     pub async fn get_promo_versions() -> anyhow::Result<ForgeVersions> {
         reqwest::get("https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json")
             .await?
@@ -95,13 +96,8 @@ impl Forge {
             .map_err(Into::into)
     }
 
-    #[tracing::instrument(skip(version), fields(game_version) err)]
-    pub async fn new(version: impl Into<String>, forge_version: ForgeVersion) -> anyhow::Result<Self> {
-        let game_version: String = version.into();
-
-        tracing::Span::current().record("game_version", &game_version);
-
-        let promo_versions = Self::get_promo_versions().await?;
+    async fn proceed_version(game_version: &str, forge_version: ForgeVersion) -> Option<String> {
+        let promo_versions = Self::get_promo_versions().await.ok()?;
 
         let from_promo = |version| {
             // Sometime one of those does not exist so we have a fallback.
@@ -113,44 +109,95 @@ impl Forge {
 
             promo_versions
                 .promos
-                .get(&version.format(&game_version))
-                .or_else(|| promo_versions.promos.get(&next_version.format(&game_version)))
+                .get(&version.format(game_version))
+                .or_else(|| promo_versions.promos.get(&next_version.format(game_version)))
                 .cloned()
-                .map(ForgeVersion::Specific)
         };
 
-        let opt = match forge_version {
-            ForgeVersion::Specific(v) => Some(ForgeVersion::Specific(v)),
+        match forge_version {
+            ForgeVersion::Specific(v) => Some(v),
             version => from_promo(version),
-        };
+        }
+    }
 
-        let Some(ForgeVersion::Specific(forge_version)) = opt else {
-            return Err(anyhow!("Cannot match version"));
-        };
-
+    /// Get list of urls that we should try to get installer from
+    fn get_urls(game_version: &str, forge_version: &str) -> Vec<String> {
         let mut suffixes = vec![""];
 
         if let Some((_, s)) = FORGE_SUFFIXES.iter().find(|(k, _)| k == &game_version) {
             suffixes.extend(s.iter());
         }
 
-        // Make list of urls that we should try to get installer from
-        let urls = suffixes.into_iter().map(|suffix| {
+        suffixes.into_iter().map(|suffix| {
             format!(
                 "{FORGE_REPO_URL}/net/minecraftforge/forge/{game_version}-{forge_version}{suffix}/forge-{game_version}-{forge_version}{suffix}-installer.jar",
             )
-        }).collect_vec();
+        }).collect_vec()
+    }
+
+    fn get_profile_from_installer(installer_path: &Path) -> anyhow::Result<ForgeProfile> {
+        let file = std::fs::File::open(installer_path)?;
+        let mut archive = zip::ZipArchive::new(file)?;
+
+        let index = archive
+            .index_for_name("version.json")
+            .or_else(|| archive.index_for_name("install_profile.json"));
+
+        let Some(idx) = index else {
+            bail!("Cannot find either `version.json` or `install_profile.json`")
+        };
+
+        let mut file = archive.by_index(idx)?;
+
+        let mut string = String::new();
+        file.read_to_string(&mut string)?;
+
+        serde_json::from_str(&string).map_err(Into::into)
+    }
+
+    #[tracing::instrument(skip(version), fields(game_version) err)]
+    pub async fn new(version: impl Into<String>, forge_version: ForgeVersion) -> anyhow::Result<Self> {
+        let game_version: String = version.into();
+
+        tracing::Span::current().record("game_version", &game_version);
+
+        let Some(forge_version) = Self::proceed_version(&game_version, forge_version).await else {
+            bail!("Cannot match version");
+        };
+
+        let installer_path = forge_installer_path(&game_version, &forge_version);
+
+        let urls = Self::get_urls(&game_version, &forge_version);
+        for url in &urls {
+            if let Err(err) = download_file(&installer_path, url).await {
+                warn!(
+                    url = url,
+                    error = ?err,
+                    "Error while downloading Forge {}. Trying next suffix.",
+                    &forge_version
+                );
+                continue;
+            }
+
+            break;
+        }
+
+        let profile = Self::get_profile_from_installer(&installer_path)?;
 
         Ok(Self {
-            urls,
+            profile,
             game_version,
             forge_version,
         })
     }
 
     pub fn installer_path(&self) -> PathBuf {
-        Path::new(DOT_NOMI_TEMP_DIR).join(format!("{}-{}.jar", &self.game_version, &self.forge_version))
+        forge_installer_path(&self.game_version, &self.forge_version)
     }
+}
+
+fn forge_installer_path(game_version: &str, forge_version: &str) -> PathBuf {
+    Path::new(DOT_NOMI_TEMP_DIR).join(format!("{game_version}-{forge_version}.jar"))
 }
 
 #[async_trait::async_trait]
@@ -161,52 +208,10 @@ impl Downloader for Forge {
         1
     }
 
-    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
-        let installer_path = self.installer_path();
-
-        for url in &self.urls {
-            if let Err(err) = dbg!(download_file(&installer_path, url).await) {
-                warn!(
-                    url = url,
-                    error = ?err,
-                    "Error while downloading Forge {}. Trying next suffix.",
-                    &self.forge_version
-                );
-                continue;
-            }
-
-            // If the download is successful the break the loop
-            sender.update(DownloadResult(Ok(DownloadStatus::Success))).await;
-            break;
-        }
-    }
+    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {}
 
     fn io(&self) -> PinnedFutureWithBounds<anyhow::Result<()>> {
-        async fn inner(installer_path: PathBuf) -> anyhow::Result<()> {
-            let file = tokio::fs::File::open(&installer_path).await?;
-            let mut archive = zip::ZipArchive::new(file.into_std().await)?;
-
-            let index = archive
-                .index_for_name("version.json")
-                .or_else(|| archive.index_for_name("install_profile.json"));
-
-            let Some(idx) = index else {
-                bail!("Cannot find either `version.json` or `install_profile.json`")
-            };
-
-            let mut file = archive.by_index(idx)?;
-
-            let mut string = String::new();
-            file.read_to_string(&mut string)?;
-
-            let value: ForgeProfile = serde_json::from_str(&string)?;
-
-            dbg!(&value);
-
-            Ok(())
-        }
-
-        Box::pin(inner(self.installer_path()))
+        Box::pin(async { Ok(()) })
     }
 }
 
@@ -263,6 +268,12 @@ pub struct ForgeProfileNew {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Logging {}
+
+impl ForgeProfileNew {
+    pub async fn download(&self) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
