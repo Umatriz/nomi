@@ -11,7 +11,11 @@ use nomi_core::{
     },
     game_paths::GamePaths,
     instance::{launch::LaunchSettings, Instance},
-    loaders::{fabric::Fabric, vanilla::Vanilla},
+    loaders::{
+        fabric::Fabric,
+        forge::{Forge, ForgeVersion},
+        vanilla::Vanilla,
+    },
     repository::java_runner::JavaRunner,
     state::get_launcher_manifest,
 };
@@ -57,6 +61,9 @@ async fn try_download_version(profile: Arc<RwLock<ModdedProfile>>, progress_shar
             Loader::Vanilla => builder.instance(Box::new(Vanilla::new(version_profile.version(), game_paths.clone()).await?)),
             Loader::Fabric { version } => builder.instance(Box::new(
                 Fabric::new(version_profile.version(), version.as_ref(), game_paths.clone()).await?,
+            )),
+            Loader::Forge => builder.instance(Box::new(
+                Forge::new(version_profile.version(), ForgeVersion::Recommended, &game_paths).await?,
             )),
         }
         .build();

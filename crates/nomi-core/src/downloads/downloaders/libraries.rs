@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use tracing::debug;
 
 use crate::downloads::{
     progress::ProgressSender,
@@ -48,5 +49,7 @@ impl Downloader for LibrariesDownloader {
         }
 
         Box::new(download_set).download(sender).await;
+
+        debug!("Finished downloading libraries");
     }
 }

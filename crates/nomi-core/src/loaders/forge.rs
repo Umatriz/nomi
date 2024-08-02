@@ -2,6 +2,7 @@ use std::{
     collections::HashMap,
     fmt::Debug,
     io::Read,
+    marker::PhantomData,
     path::{Path, PathBuf},
     slice::Iter,
 };
@@ -12,13 +13,23 @@ use serde::{Deserialize, Serialize};
 use tracing::{error, warn};
 
 use crate::{
+    configs::profile::Loader,
     downloads::{
         download_file,
         progress::ProgressSender,
         traits::{DownloadResult, DownloadStatus, Downloader},
-        FileDownloader,
+        FileDownloader, LibrariesDownloader, LibrariesMapper,
     },
-    repository::manifest::Library,
+    game_paths::GamePaths,
+    instance::profile::LoaderProfile,
+    loaders::vanilla::VanillaLibrariesMapper,
+    markers::Undefined,
+    maven_data::MavenData,
+    repository::{
+        manifest::{Argument, Arguments, Library},
+        simple_args::SimpleArgs,
+        simple_lib::SimpleLib,
+    },
     PinnedFutureWithBounds, DOT_NOMI_TEMP_DIR,
 };
 
@@ -47,11 +58,21 @@ const FORGE_SUFFIXES: &[(&str, &[&str])] = &[
 #[derive(Debug)]
 pub struct Forge {
     profile: ForgeProfile,
+    downloader: LibrariesDownloader,
     game_version: String,
     forge_version: String,
 }
 
 impl Forge {
+    pub fn to_profile(&self) -> LoaderProfile {
+        LoaderProfile {
+            loader: Loader::Forge,
+            main_class: self.profile.main_class().to_string(),
+            args: self.profile.simple_args(),
+            libraries: self.profile.simple_libraries(),
+        }
+    }
+
     #[tracing::instrument(skip_all, err)]
     pub async fn get_versions(game_version: impl Into<String>) -> anyhow::Result<Vec<String>> {
         let game_version = game_version.into();
@@ -155,8 +176,12 @@ impl Forge {
         serde_json::from_str(&string).map_err(Into::into)
     }
 
+    pub fn installer_path(&self) -> PathBuf {
+        forge_installer_path(&self.game_version, &self.forge_version)
+    }
+
     #[tracing::instrument(skip(version), fields(game_version) err)]
-    pub async fn new(version: impl Into<String>, forge_version: ForgeVersion) -> anyhow::Result<Self> {
+    pub async fn new(version: impl Into<String>, forge_version: ForgeVersion, game_paths: &GamePaths) -> anyhow::Result<Self> {
         let game_version: String = version.into();
 
         tracing::Span::current().record("game_version", &game_version);
@@ -184,15 +209,41 @@ impl Forge {
 
         let profile = Self::get_profile_from_installer(&installer_path)?;
 
-        Ok(Self {
+        let downloader = match &profile {
+            ForgeProfile::New(new) => {
+                let mapper = VanillaLibrariesMapper { path: &game_paths.libraries };
+                LibrariesDownloader::new(&mapper, &new.libraries)
+            }
+            ForgeProfile::Old(old) => {
+                struct ForgeOldLibrariesMapper<'a> {
+                    path: &'a Path,
+                }
+
+                impl LibrariesMapper<ForgeOldLibrary> for ForgeOldLibrariesMapper<'_> {
+                    fn proceed(&self, library: &ForgeOldLibrary) -> Option<FileDownloader> {
+                        let (name, url, is_required) = (library.name.as_str(), library.url.as_deref(), library.clientreq);
+
+                        is_required
+                            .filter(|x| *x)
+                            .map(|_| name)
+                            .map(MavenData::new)
+                            .map(|m| (m.url, m.path))
+                            .and_then(|(url_part, path)| url.map(|u| format!("{u}{url_part}")).map(|url| (url, path)))
+                            .map(|(url, path)| FileDownloader::new(url, self.path.join(path)))
+                    }
+                }
+
+                let mapper = ForgeOldLibrariesMapper { path: &game_paths.libraries };
+                LibrariesDownloader::new(&mapper, &old.version_info.libraries)
+            }
+        };
+
+        Ok(Forge {
             profile,
+            downloader,
             game_version,
             forge_version,
         })
-    }
-
-    pub fn installer_path(&self) -> PathBuf {
-        forge_installer_path(&self.game_version, &self.forge_version)
     }
 }
 
@@ -205,10 +256,12 @@ impl Downloader for Forge {
     type Data = DownloadResult;
 
     fn total(&self) -> u32 {
-        1
+        self.downloader.total()
     }
 
-    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {}
+    async fn download(self: Box<Self>, sender: &dyn ProgressSender<Self::Data>) {
+        Box::new(self.downloader).download(sender).await;
+    }
 
     fn io(&self) -> PinnedFutureWithBounds<anyhow::Result<()>> {
         Box::pin(async { Ok(()) })
@@ -249,6 +302,83 @@ pub enum ForgeProfile {
     Old(Box<ForgeProfileOld>),
 }
 
+impl ForgeProfile {
+    pub fn main_class(&self) -> &str {
+        match self {
+            ForgeProfile::New(new) => &new.main_class,
+            ForgeProfile::Old(old) => &old.version_info.main_class,
+        }
+    }
+
+    pub fn simple_args(&self) -> SimpleArgs {
+        match self {
+            ForgeProfile::New(new) => {
+                let Arguments::New { game, jvm } = &new.arguments else {
+                    return SimpleArgs {
+                        jvm: Vec::new(),
+                        game: Vec::new(),
+                    };
+                };
+
+                let filter_args = |args: &[Argument]| {
+                    args.iter()
+                        .filter_map(|a| match a {
+                            Argument::String(s) => Some(s),
+                            _ => None,
+                        })
+                        .cloned()
+                        .collect_vec()
+                };
+
+                SimpleArgs {
+                    game: filter_args(game),
+                    jvm: filter_args(jvm),
+                }
+            }
+            ForgeProfile::Old(old) => SimpleArgs {
+                game: old.version_info.minecraft_arguments.split_once("--tweakClass").map_or_else(
+                    || {
+                        warn!("Cannot find `--tweakClass` parameter in the Forge arguments list. Game might not launch.");
+                        Vec::new()
+                    },
+                    |(_, val)| vec!["--tweakClass", val].into_iter().map(String::from).collect_vec(),
+                ),
+                jvm: Vec::new(),
+            },
+        }
+    }
+
+    fn simple_libraries(&self) -> Vec<SimpleLib> {
+        match self {
+            ForgeProfile::New(new) => new
+                .libraries
+                .iter()
+                .map(|lib| SimpleLib {
+                    jar: lib
+                        .downloads
+                        .artifact
+                        .as_ref()
+                        .and_then(|a| a.path.as_ref())
+                        .map(PathBuf::from)
+                        .unwrap_or_else(|| {
+                            warn!("Forge library does not have path. Game might not launch.");
+                            PathBuf::new()
+                        }),
+                })
+                .collect_vec(),
+            ForgeProfile::Old(old) => old
+                .version_info
+                .libraries
+                .iter()
+                .filter(|lib| lib.clientreq.is_some_and(|required| required))
+                .map(|lib| lib.name.as_str())
+                .map(MavenData::new)
+                .map(SimpleLib::from)
+                .collect_vec(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ForgeProfileNew {
@@ -268,12 +398,6 @@ pub struct ForgeProfileNew {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Logging {}
-
-impl ForgeProfileNew {
-    pub async fn download(&self) -> anyhow::Result<()> {
-        Ok(())
-    }
-}
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -324,6 +448,8 @@ pub struct ForgeOldLibrary {
 
 #[cfg(test)]
 mod tests {
+    use tracing::{debug, Level};
+
     use super::*;
 
     #[tokio::test]
@@ -334,27 +460,27 @@ mod tests {
 
     #[tokio::test]
     async fn create_forge_test() {
-        let recommended = Forge::new("1.7.10", ForgeVersion::Recommended).await.unwrap();
+        let recommended = Forge::new("1.7.10", ForgeVersion::Recommended, &GamePaths::default()).await.unwrap();
         println!("{recommended:#?}");
 
-        let latest = Forge::new("1.19.2", ForgeVersion::Latest).await.unwrap();
+        let latest = Forge::new("1.19.2", ForgeVersion::Latest, &GamePaths::default()).await.unwrap();
         println!("{latest:#?}");
     }
 
     #[tokio::test]
     async fn download_installer_test() {
-        let _guard = tracing::subscriber::set_default(tracing_subscriber::fmt().finish());
+        let _guard = tracing::subscriber::set_default(tracing_subscriber::fmt().with_max_level(Level::DEBUG).finish());
 
-        let recommended = Forge::new("1.19.2", ForgeVersion::Recommended).await.unwrap();
+        debug!("Test");
+
+        let recommended = Forge::new("1.19.2", ForgeVersion::Recommended, &GamePaths::default()).await.unwrap();
         println!("{recommended:#?}");
 
         let io = recommended.io();
 
-        if !recommended.installer_path().exists() {
-            let (tx, mut rx) = tokio::sync::mpsc::channel(5);
-            Box::new(recommended).download(&tx).await;
-            dbg!(rx.recv().await);
-        }
+        let (tx, mut rx) = tokio::sync::mpsc::channel(5);
+        Box::new(recommended).download(&tx).await;
+        dbg!(rx.recv().await);
 
         io.await.unwrap();
     }

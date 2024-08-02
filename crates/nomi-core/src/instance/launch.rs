@@ -15,6 +15,7 @@ use tracing::{debug, error, info, trace, warn};
 use crate::{
     downloads::Assets,
     fs::read_json_config,
+    markers::Undefined,
     repository::{
         java_runner::JavaRunner,
         manifest::{Manifest, VersionType},
@@ -26,7 +27,6 @@ use self::arguments::ArgumentsBuilder;
 use super::{
     logs::{GameLogsEvent, GameLogsWriter},
     profile::LoaderProfile,
-    Undefined,
 };
 
 pub mod arguments;

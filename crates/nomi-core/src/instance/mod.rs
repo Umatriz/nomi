@@ -13,9 +13,6 @@ use self::{
     version_marker::Version,
 };
 
-#[derive(Default, Debug)]
-pub struct Undefined;
-
 #[derive(Debug, TypedBuilder)]
 pub struct Instance {
     instance: Box<dyn Version>,
