@@ -1,6 +1,7 @@
 use std::{marker::PhantomData, path::PathBuf};
 
 use itertools::Itertools;
+use tracing::info;
 
 use crate::{
     instance::{
@@ -8,6 +9,7 @@ use crate::{
         profile::LoaderProfile,
     },
     markers::Undefined,
+    maven_data::MavenArtifact,
     repository::{
         manifest::{Argument, Arguments, Classifiers, DownloadFile, Manifest, Value},
         username::Username,
@@ -245,10 +247,26 @@ impl<'a, S, U> ArgumentsBuilder<'a, S, U> {
             .iter()
             .filter(|lib| is_library_passes(lib))
             .map(|lib| {
+                let name = lib.name.as_str();
                 (
                     lib.downloads
                         .artifact
                         .as_ref()
+                        .filter(|_| {
+                            let Some(loader_profile) = self.instance.loader_profile() else {
+                                return true;
+                            };
+
+                            !loader_profile.libraries.iter().any(|lib| {
+                                let value = lib.artifact.group == MavenArtifact::new(name).group;
+
+                                if value {
+                                    info!(vanilla = name, loader = %lib.artifact, "Found overlapping library. Using the one loader provides.");
+                                }
+
+                                value
+                            })
+                        })
                         .and_then(|artifact| artifact.path.as_ref())
                         .map(|path| self.instance.settings.libraries_dir.join(path)),
                     lib.downloads

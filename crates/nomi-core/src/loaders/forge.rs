@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     fmt::Debug,
+    fs::File,
     io::Read,
     marker::PhantomData,
     path::{Path, PathBuf},
@@ -10,7 +11,8 @@ use std::{
 use anyhow::{anyhow, bail};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use tracing::{error, warn};
+use tokio::io::AsyncWriteExt;
+use tracing::{error, info, warn};
 
 use crate::{
     configs::profile::Loader,
@@ -24,7 +26,7 @@ use crate::{
     instance::profile::LoaderProfile,
     loaders::vanilla::VanillaLibrariesMapper,
     markers::Undefined,
-    maven_data::MavenData,
+    maven_data::{MavenArtifact, MavenData},
     repository::{
         manifest::{Argument, Arguments, Library},
         simple_args::SimpleArgs,
@@ -34,12 +36,8 @@ use crate::{
 };
 
 const FORGE_REPO_URL: &str = "https://maven.minecraftforge.net";
-const FORGE_GROUP: &str = "net.minecraftforge";
-const FORGE_ARTIFACT: &str = "forge";
 
 const NEO_FORGE_REPO_URL: &str = "https://maven.neoforged.net/releases/";
-const NEO_FORGE_GROUP: &str = "net.neoforged";
-const NEO_FORGE_ARTIFACT: &str = "neoforge";
 
 /// Some versions require to have a suffix
 const FORGE_SUFFIXES: &[(&str, &[&str])] = &[
@@ -61,6 +59,7 @@ pub struct Forge {
     downloader: LibrariesDownloader,
     game_version: String,
     forge_version: String,
+    libraries_dir: PathBuf,
 }
 
 impl Forge {
@@ -221,15 +220,14 @@ impl Forge {
 
                 impl LibrariesMapper<ForgeOldLibrary> for ForgeOldLibrariesMapper<'_> {
                     fn proceed(&self, library: &ForgeOldLibrary) -> Option<FileDownloader> {
-                        let (name, url, is_required) = (library.name.as_str(), library.url.as_deref(), library.clientreq);
+                        let (name, url) = (library.name.as_str(), library.url.as_deref());
 
-                        is_required
-                            .filter(|x| *x)
-                            .map(|_| name)
-                            .map(MavenData::new)
-                            .map(|m| (m.url, m.path))
-                            .and_then(|(url_part, path)| url.map(|u| format!("{u}{url_part}")).map(|url| (url, path)))
-                            .map(|(url, path)| FileDownloader::new(url, self.path.join(path)))
+                        let maven_data = MavenData::new(name);
+                        let url = url.map_or(format!("https://libraries.minecraft.net/{}", maven_data.url), |url| {
+                            format!("{url}{}", &maven_data.url)
+                        });
+
+                        Some(FileDownloader::new(url, self.path.join(&maven_data.path)))
                     }
                 }
 
@@ -243,6 +241,7 @@ impl Forge {
             downloader,
             game_version,
             forge_version,
+            libraries_dir: game_paths.libraries.clone(),
         })
     }
 }
@@ -264,7 +263,48 @@ impl Downloader for Forge {
     }
 
     fn io(&self) -> PinnedFutureWithBounds<anyhow::Result<()>> {
-        Box::pin(async { Ok(()) })
+        struct ForgeLibraryExtractionData {
+            library_path: String,
+            target_path: PathBuf,
+        }
+
+        async fn inner(installer_path: PathBuf, libraries_dir: PathBuf, lib_data: Option<ForgeLibraryExtractionData>) -> anyhow::Result<()> {
+            info!("Applying Forge IO");
+            if let Some(data) = lib_data {
+                info!("Extracting {}", &data.library_path);
+                let file = tokio::fs::File::open(installer_path).await?;
+                let mut archive = zip::ZipArchive::new(file.into_std().await)?;
+                let mut library_bytes = Vec::new();
+
+                // If it's not in it's own scope then the future cannot be send between thread safely
+                {
+                    let mut library = archive.by_name(&data.library_path)?;
+                    library.read_to_end(&mut library_bytes)?;
+                }
+
+                let target_path = libraries_dir.join(data.target_path);
+
+                if let Some(parent) = target_path.parent().filter(|p| !p.exists()) {
+                    tokio::fs::create_dir_all(parent).await?;
+                }
+
+                let mut target = tokio::fs::File::create(target_path).await?;
+                target.write_all(library_bytes.as_slice()).await?;
+            }
+
+            Ok(())
+        }
+
+        let extraction = match &self.profile {
+            ForgeProfile::Old(old) => Some(ForgeLibraryExtractionData {
+                library_path: old.install.file_path.clone(),
+                target_path: MavenData::new(&old.install.path).path,
+            }),
+            ForgeProfile::New(_) => None,
+        };
+
+        let (installer_path, libraries_dir) = (self.installer_path(), self.libraries_dir.clone());
+        Box::pin(inner(installer_path, libraries_dir, extraction))
     }
 }
 
@@ -324,7 +364,7 @@ impl ForgeProfile {
                     args.iter()
                         .filter_map(|a| match a {
                             Argument::String(s) => Some(s),
-                            _ => None,
+                            Argument::Struct { .. } => None,
                         })
                         .cloned()
                         .collect_vec()
@@ -341,7 +381,7 @@ impl ForgeProfile {
                         warn!("Cannot find `--tweakClass` parameter in the Forge arguments list. Game might not launch.");
                         Vec::new()
                     },
-                    |(_, val)| vec!["--tweakClass", val].into_iter().map(String::from).collect_vec(),
+                    |(_, val)| vec!["--tweakClass", val.trim()].into_iter().map(String::from).collect_vec(),
                 ),
                 jvm: Vec::new(),
             },
@@ -354,25 +394,23 @@ impl ForgeProfile {
                 .libraries
                 .iter()
                 .map(|lib| SimpleLib {
-                    jar: lib
-                        .downloads
-                        .artifact
-                        .as_ref()
-                        .and_then(|a| a.path.as_ref())
-                        .map(PathBuf::from)
-                        .unwrap_or_else(|| {
+                    jar: lib.downloads.artifact.as_ref().and_then(|a| a.path.as_ref()).map_or_else(
+                        || {
                             warn!("Forge library does not have path. Game might not launch.");
                             PathBuf::new()
-                        }),
+                        },
+                        PathBuf::from,
+                    ),
+                    artifact: MavenArtifact::new(&lib.name),
                 })
                 .collect_vec(),
             ForgeProfile::Old(old) => old
                 .version_info
                 .libraries
                 .iter()
-                .filter(|lib| lib.clientreq.is_some_and(|required| required))
+                // .filter(|lib| lib.clientreq.is_some_and(|required| required))
                 .map(|lib| lib.name.as_str())
-                .map(MavenData::new)
+                .map(MavenArtifact::new)
                 .map(SimpleLib::from)
                 .collect_vec(),
         }
@@ -402,23 +440,23 @@ pub struct Logging {}
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ForgeProfileOld {
-    // pub install: Install,
+    pub install: Install,
     pub version_info: VersionInfo,
 }
 
-// #[derive(Serialize, Deserialize, Debug)]
-// #[serde(rename_all = "camelCase")]
-// pub struct Install {
-//     pub profile_name: String,
-//     pub target: String,
-//     pub path: String,
-//     pub version: String,
-//     pub file_path: String,
-//     pub welcome: String,
-//     pub minecraft: String,
-//     pub mirror_list: String,
-//     pub logo: String,
-// }
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct Install {
+    // pub profile_name: String,
+    // pub target: String,
+    pub path: String,
+    // pub version: String,
+    pub file_path: String,
+    // pub welcome: String,
+    // pub minecraft: String,
+    // pub mirror_list: String,
+    // pub logo: String,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
