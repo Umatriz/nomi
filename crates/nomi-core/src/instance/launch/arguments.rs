@@ -1,12 +1,15 @@
 use std::{marker::PhantomData, path::PathBuf};
 
 use itertools::Itertools;
+use tracing::info;
 
 use crate::{
     instance::{
         launch::{macros::replace, rules::is_library_passes},
         profile::LoaderProfile,
     },
+    markers::Undefined,
+    maven_data::MavenArtifact,
     repository::{
         manifest::{Argument, Arguments, Classifiers, DownloadFile, Manifest, Value},
         username::Username,
@@ -17,7 +20,6 @@ use crate::{
 
 use super::{rules::is_rule_passes, LaunchInstance, CLASSPATH_SEPARATOR};
 
-pub enum Undefined {}
 pub enum WithUserData {}
 pub enum WithClasspath {}
 
@@ -43,15 +45,22 @@ pub struct UserData {
 struct JvmArguments(Vec<Argument>);
 struct GameArguments(Vec<Argument>);
 
-pub struct LoaderArguments<'a>(Option<&'a LoaderProfile>);
+pub struct LoaderArguments<'a, 'b> {
+    builder: &'b ArgumentsBuilder<'a, WithClasspath, WithUserData>,
+    profile: Option<&'a LoaderProfile>,
+}
 
-impl<'a> LoaderArguments<'a> {
-    pub fn jvm_arguments(&self) -> &[String] {
-        self.0.map_or(&[], |profile| profile.args.jvm.as_slice())
+impl<'a, 'b> LoaderArguments<'a, 'b> {
+    pub fn jvm_arguments(&self) -> Vec<String> {
+        self.profile.map_or(Vec::new(), |profile| {
+            profile.args.jvm.iter().map(|v| self.builder.parse_args_from_str(v)).collect_vec()
+        })
     }
 
-    pub fn game_arguments(&self) -> &[String] {
-        self.0.map_or(&[], |profile| profile.args.game.as_slice())
+    pub fn game_arguments(&self) -> Vec<String> {
+        self.profile.map_or(Vec::new(), |profile| {
+            profile.args.game.iter().map(|v| self.builder.parse_args_from_str(v)).collect_vec()
+        })
     }
 }
 
@@ -125,13 +134,15 @@ impl<'a, U> ArgumentsBuilder<'a, WithClasspath, U> {
     pub fn custom_jvm_arguments(&self) -> &[String] {
         self.instance.jvm_args.as_slice()
     }
-
-    pub fn loader_arguments(&self) -> LoaderArguments<'a> {
-        LoaderArguments(self.instance.loader_profile.as_ref())
-    }
 }
 
 impl<'a> ArgumentsBuilder<'a, WithClasspath, WithUserData> {
+    pub fn loader_arguments(&self) -> LoaderArguments<'a, '_> {
+        LoaderArguments {
+            builder: self,
+            profile: self.instance.loader_profile.as_ref(),
+        }
+    }
     pub fn manifest_jvm_arguments(&self) -> Vec<String> {
         self.arguments_parser(
             |JvmArguments(jvm), _| jvm.clone(),
@@ -161,6 +172,7 @@ impl<'a> ArgumentsBuilder<'a, WithClasspath, WithUserData> {
             "${game_assets}" => &path_to_string(&self.instance.settings.assets),
             "${game_directory}" => &path_to_string(&self.instance.settings.game_dir),
             "${natives_directory}" => &path_to_string(&self.instance.settings.natives_dir),
+            "${library_directory}" => &path_to_string(&self.instance.settings.libraries_dir),
             "${launcher_name}" => NOMI_NAME,
             "${launcher_version}" => NOMI_VERSION,
             "${auth_access_token}" => self.user_data
@@ -179,7 +191,8 @@ impl<'a> ArgumentsBuilder<'a, WithClasspath, WithUserData> {
             "${version_name}" => &self.instance.settings.version,
             "${assets_index_name}" => &self.manifest.asset_index.id,
             "${user_properties}" => "{}",
-            "${classpath}" => &self.classpath_as_str()
+            "${classpath}" => &self.classpath_as_str(),
+            "${classpath_separator}" => CLASSPATH_SEPARATOR
         )
     }
 
@@ -234,10 +247,26 @@ impl<'a, S, U> ArgumentsBuilder<'a, S, U> {
             .iter()
             .filter(|lib| is_library_passes(lib))
             .map(|lib| {
+                let name = lib.name.as_str();
                 (
                     lib.downloads
                         .artifact
                         .as_ref()
+                        .filter(|_| {
+                            let Some(loader_profile) = self.instance.loader_profile() else {
+                                return true;
+                            };
+
+                            !loader_profile.libraries.iter().any(|lib| {
+                                let value = lib.artifact.group == MavenArtifact::new(name).group;
+
+                                if value {
+                                    info!(vanilla = name, loader = %lib.artifact, "Found overlapping library. Using the one loader provides.");
+                                }
+
+                                value
+                            })
+                        })
                         .and_then(|artifact| artifact.path.as_ref())
                         .map(|path| self.instance.settings.libraries_dir.join(path)),
                     lib.downloads

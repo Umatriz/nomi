@@ -16,7 +16,7 @@ use crate::{
     fs::write_to_file,
     game_paths::GamePaths,
     instance::profile::LoaderProfile,
-    maven_data::MavenData,
+    maven_data::{MavenArtifact, MavenData},
     repository::{
         fabric_meta::FabricVersions,
         fabric_profile::{FabricLibrary, FabricProfile},
@@ -99,7 +99,7 @@ impl Fabric {
                 .profile
                 .libraries
                 .iter()
-                .map(|l| MavenData::new(&l.name))
+                .map(|l| MavenArtifact::new(&l.name))
                 .map(SimpleLib::from)
                 .collect_vec(),
         }

@@ -33,3 +33,8 @@ pub fn calculate_sha1(data: impl AsRef<[u8]>) -> String {
     let value = sha1::Sha1::digest(data);
     base16ct::lower::encode_string(&value)
 }
+
+mod markers {
+    #[derive(Default, Debug)]
+    pub struct Undefined;
+}

@@ -71,8 +71,8 @@ fn manifest_file_to_downloader(manifest_file: &DownloadFile, target_path: &Path)
         .map(|(url, path)| FileDownloader::new(url, path))
 }
 
-struct VanillaLibrariesMapper<'a> {
-    path: &'a Path,
+pub(crate) struct VanillaLibrariesMapper<'a> {
+    pub path: &'a Path,
 }
 
 impl LibrariesMapper<Library> for VanillaLibrariesMapper<'_> {

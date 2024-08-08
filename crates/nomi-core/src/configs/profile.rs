@@ -19,6 +19,7 @@ pub enum Loader {
     Fabric {
         version: Option<String>,
     },
+    Forge,
 }
 
 impl Display for Loader {
@@ -26,12 +27,17 @@ impl Display for Loader {
         match self {
             Loader::Vanilla => f.write_str("Vanilla"),
             Loader::Fabric { .. } => f.write_str("Fabric"),
+            Loader::Forge => f.write_str("Forge"),
         }
     }
 }
 
 impl Loader {
     pub fn is_fabric(&self) -> bool {
+        matches!(*self, Self::Fabric { .. })
+    }
+
+    pub fn is_forge(&self) -> bool {
         matches!(*self, Self::Fabric { .. })
     }
 

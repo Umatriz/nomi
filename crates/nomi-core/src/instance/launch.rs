@@ -15,9 +15,10 @@ use tracing::{debug, error, info, trace, warn};
 use crate::{
     downloads::Assets,
     fs::read_json_config,
+    markers::Undefined,
     repository::{
         java_runner::JavaRunner,
-        manifest::{Manifest, VersionType},
+        manifest::{Arguments, Manifest, VersionType},
     },
 };
 
@@ -26,17 +27,16 @@ use self::arguments::ArgumentsBuilder;
 use super::{
     logs::{GameLogsEvent, GameLogsWriter},
     profile::LoaderProfile,
-    Undefined,
 };
 
 pub mod arguments;
 pub mod rules;
 
 #[cfg(windows)]
-const CLASSPATH_SEPARATOR: &str = ";";
+pub const CLASSPATH_SEPARATOR: &str = ";";
 
 #[cfg(not(windows))]
-const CLASSPATH_SEPARATOR: &str = ":";
+pub const CLASSPATH_SEPARATOR: &str = ":";
 
 #[derive(Serialize, Deserialize, Default, PartialEq, Eq, Debug, Clone, Hash)]
 pub struct LaunchSettings {
@@ -160,6 +160,8 @@ impl LaunchInstance {
         let manifest_jvm_arguments = arguments_builder.manifest_jvm_arguments();
         let manifest_game_arguments = arguments_builder.manifest_game_arguments();
 
+        dbg!(arguments_builder.classpath_as_slice());
+
         let main_class = arguments_builder.get_main_class();
 
         let loader_arguments = arguments_builder.loader_arguments();
@@ -167,7 +169,8 @@ impl LaunchInstance {
         let loader_jvm_arguments = loader_arguments.jvm_arguments();
         let loader_game_arguments = loader_arguments.game_arguments();
 
-        let mut child = Command::new(java_runner.get())
+        let mut command = Command::new(java_runner.get());
+        let command = command
             .args(custom_jvm_arguments)
             .args(loader_jvm_arguments)
             .args(manifest_jvm_arguments)
@@ -175,11 +178,19 @@ impl LaunchInstance {
             .args(manifest_game_arguments)
             .args(loader_game_arguments)
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            // Works incorrectly so let's ignore it for now.
-            // It will work when the instances are implemented.
-            // .current_dir(std::fs::canonicalize(MINECRAFT_DIR)?)
-            .spawn()?;
+            .stderr(Stdio::piped());
+        // Works incorrectly so let's ignore it for now.
+        // It will work when the instances are implemented.
+        // .current_dir(std::fs::canonicalize(MINECRAFT_DIR)?)
+
+        // if matches!(manifest.arguments, Arguments::Old(_)) {
+        //     let mut cp = arguments_builder.classpath_as_str().to_string();
+        //     cp.push_str(CLASSPATH_SEPARATOR);
+        //     cp.push_str("./.nomi/launchwrapper-1.12.jar");
+        //     command.env("CLASSPATH", cp);
+        // }
+
+        let mut child = command.spawn()?;
 
         let stdout = child.stdout.take().expect("child did not have a handle to stdout");
         let stderr = child.stderr.take().expect("child did not have a handle to stdout");
