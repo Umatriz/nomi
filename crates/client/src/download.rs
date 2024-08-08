@@ -63,7 +63,7 @@ async fn try_download_version(profile: Arc<RwLock<ModdedProfile>>, progress_shar
                 Fabric::new(version_profile.version(), version.as_ref(), game_paths.clone()).await?,
             )),
             Loader::Forge => builder.instance(Box::new(
-                Forge::new(version_profile.version(), ForgeVersion::Recommended, &game_paths).await?,
+                Forge::new(version_profile.version(), ForgeVersion::Recommended, game_paths.clone()).await?,
             )),
         }
         .build();

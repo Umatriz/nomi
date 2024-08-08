@@ -1,8 +1,9 @@
 use std::{
+    borrow::Cow,
     collections::HashMap,
     fmt::Debug,
     fs::File,
-    io::Read,
+    io::{BufRead, Read},
     marker::PhantomData,
     path::{Path, PathBuf},
     slice::Iter,
@@ -10,9 +11,13 @@ use std::{
 
 use anyhow::{anyhow, bail};
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
-use tokio::io::AsyncWriteExt;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use tokio::{
+    io::{AsyncWriteExt, BufReader},
+    process::Command,
+};
 use tracing::{error, info, warn};
+use zip::read::ZipFile;
 
 use crate::{
     configs::profile::Loader,
@@ -20,18 +25,20 @@ use crate::{
         download_file,
         progress::ProgressSender,
         traits::{DownloadResult, DownloadStatus, Downloader},
-        FileDownloader, LibrariesDownloader, LibrariesMapper,
+        DownloadQueue, FileDownloader, LibrariesDownloader, LibrariesMapper,
     },
     game_paths::GamePaths,
-    instance::profile::LoaderProfile,
+    instance::{launch::CLASSPATH_SEPARATOR, profile::LoaderProfile},
     loaders::vanilla::VanillaLibrariesMapper,
     markers::Undefined,
     maven_data::{MavenArtifact, MavenData},
     repository::{
+        java_runner::JavaRunner,
         manifest::{Argument, Arguments, Library},
         simple_args::SimpleArgs,
         simple_lib::SimpleLib,
     },
+    utils::path_to_string,
     PinnedFutureWithBounds, DOT_NOMI_TEMP_DIR,
 };
 
@@ -56,10 +63,13 @@ const FORGE_SUFFIXES: &[(&str, &[&str])] = &[
 #[derive(Debug)]
 pub struct Forge {
     profile: ForgeProfile,
-    downloader: LibrariesDownloader,
+    downloader: DownloadQueue,
     game_version: String,
     forge_version: String,
-    libraries_dir: PathBuf,
+    game_paths: GamePaths,
+
+    library_data: Option<ForgeLibraryExtractionData>,
+    processors_data: Option<ProcessorsData>,
 }
 
 impl Forge {
@@ -155,10 +165,7 @@ impl Forge {
         }).collect_vec()
     }
 
-    fn get_profile_from_installer(installer_path: &Path) -> anyhow::Result<ForgeProfile> {
-        let file = std::fs::File::open(installer_path)?;
-        let mut archive = zip::ZipArchive::new(file)?;
-
+    fn get_profile_from_installer(archive: &mut zip::ZipArchive<File>) -> anyhow::Result<ForgeProfile> {
         let index = archive
             .index_for_name("version.json")
             .or_else(|| archive.index_for_name("install_profile.json"));
@@ -169,18 +176,25 @@ impl Forge {
 
         let mut file = archive.by_index(idx)?;
 
-        let mut string = String::new();
-        file.read_to_string(&mut string)?;
+        read_json_from_zip(&mut file)
+    }
 
-        serde_json::from_str(&string).map_err(Into::into)
+    fn get_install_profile(archive: &mut zip::ZipArchive<File>) -> anyhow::Result<ForgeInstallProfile> {
+        let mut file = archive.by_name("install_profile.json")?;
+
+        read_json_from_zip(&mut file)
     }
 
     pub fn installer_path(&self) -> PathBuf {
         forge_installer_path(&self.game_version, &self.forge_version)
     }
 
+    pub fn binpatch_path(&self) -> PathBuf {
+        forge_binpatch_path(&self.game_version, &self.forge_version)
+    }
+
     #[tracing::instrument(skip(version), fields(game_version) err)]
-    pub async fn new(version: impl Into<String>, forge_version: ForgeVersion, game_paths: &GamePaths) -> anyhow::Result<Self> {
+    pub async fn new(version: impl Into<String>, forge_version: ForgeVersion, game_paths: GamePaths) -> anyhow::Result<Self> {
         let game_version: String = version.into();
 
         tracing::Span::current().record("game_version", &game_version);
@@ -206,13 +220,15 @@ impl Forge {
             break;
         }
 
-        let profile = Self::get_profile_from_installer(&installer_path)?;
+        let file = std::fs::File::open(installer_path)?;
+        let mut archive = zip::ZipArchive::new(file)?;
+
+        let profile = Self::get_profile_from_installer(&mut archive)?;
+
+        let vanilla_mapper = VanillaLibrariesMapper { path: &game_paths.libraries };
 
         let downloader = match &profile {
-            ForgeProfile::New(new) => {
-                let mapper = VanillaLibrariesMapper { path: &game_paths.libraries };
-                LibrariesDownloader::new(&mapper, &new.libraries)
-            }
+            ForgeProfile::New(new) => LibrariesDownloader::new(&vanilla_mapper, &new.libraries),
             ForgeProfile::Old(old) => {
                 struct ForgeOldLibrariesMapper<'a> {
                     path: &'a Path,
@@ -236,18 +252,73 @@ impl Forge {
             }
         };
 
+        let mut downloader = DownloadQueue::new().with_downloader(downloader);
+        let mut processors_data = None;
+
+        if matches!(profile, ForgeProfile::New(_)) {
+            let profile = Self::get_install_profile(&mut archive)?;
+            downloader = downloader.with_downloader(LibrariesDownloader::new(&vanilla_mapper, &profile.libraries));
+
+            processors_data = Some(ProcessorsData {
+                data: profile.data,
+                processors: profile.processors,
+            });
+        }
+
+        let library_data = match &profile {
+            ForgeProfile::New(_) => {
+                let profile = Self::get_install_profile(&mut archive)?;
+                profile
+                    .data
+                    .get("BINPATCH")
+                    .map(|data| &data.client)
+                    .map(|client| ForgeLibraryExtractionData {
+                        library_path: client[1..].to_string(),
+                        target_path: forge_binpatch_path(&game_version, &forge_version),
+                    })
+            }
+            ForgeProfile::Old(old) => Some(ForgeLibraryExtractionData {
+                library_path: old.install.file_path.clone(),
+                target_path: game_paths.libraries.join(MavenData::new(&old.install.path).path),
+            }),
+        };
+
         Ok(Forge {
             profile,
             downloader,
             game_version,
             forge_version,
-            libraries_dir: game_paths.libraries.clone(),
+            game_paths,
+            library_data,
+            processors_data,
         })
     }
 }
 
 fn forge_installer_path(game_version: &str, forge_version: &str) -> PathBuf {
     Path::new(DOT_NOMI_TEMP_DIR).join(format!("{game_version}-{forge_version}.jar"))
+}
+
+fn forge_binpatch_path(game_version: &str, forge_version: &str) -> PathBuf {
+    PathBuf::from(DOT_NOMI_TEMP_DIR)
+        .join(format!("{game_version}-{forge_version}"))
+        .join("BINPATCH")
+}
+
+fn read_json_from_zip<T: DeserializeOwned>(file: &mut ZipFile<'_>) -> anyhow::Result<T> {
+    let mut string = String::new();
+    file.read_to_string(&mut string)?;
+
+    let mut deserializer = serde_json::Deserializer::from_str(&string);
+
+    serde_path_to_error::deserialize(&mut deserializer)
+        .map_err(|e| anyhow!("Path: {}. Error: {}", e.path().clone().to_string(), e.into_inner().to_string()))
+}
+
+#[derive(Debug, Clone)]
+struct ForgeLibraryExtractionData {
+    library_path: String,
+    target_path: PathBuf,
 }
 
 #[async_trait::async_trait]
@@ -263,48 +334,215 @@ impl Downloader for Forge {
     }
 
     fn io(&self) -> PinnedFutureWithBounds<anyhow::Result<()>> {
-        struct ForgeLibraryExtractionData {
-            library_path: String,
-            target_path: PathBuf,
-        }
-
-        async fn inner(installer_path: PathBuf, libraries_dir: PathBuf, lib_data: Option<ForgeLibraryExtractionData>) -> anyhow::Result<()> {
-            info!("Applying Forge IO");
-            if let Some(data) = lib_data {
-                info!("Extracting {}", &data.library_path);
+        #[tracing::instrument(name = "Forge IO", skip(lib_data, processors_data), err)]
+        async fn inner(
+            game_version: String,
+            forge_version: String,
+            installer_path: PathBuf,
+            java_runner: JavaRunner,
+            game_paths: GamePaths,
+            processors_data: Option<ProcessorsData>,
+            lib_data: Option<ForgeLibraryExtractionData>,
+        ) -> anyhow::Result<()> {
+            if let Some(lib_data) = lib_data {
+                info!("Extracting {}", &lib_data.library_path);
                 let file = tokio::fs::File::open(installer_path).await?;
                 let mut archive = zip::ZipArchive::new(file.into_std().await)?;
                 let mut library_bytes = Vec::new();
 
                 // If it's not in it's own scope then the future cannot be send between thread safely
                 {
-                    let mut library = archive.by_name(&data.library_path)?;
+                    let mut library = archive.by_name(&lib_data.library_path)?;
                     library.read_to_end(&mut library_bytes)?;
                 }
 
-                let target_path = libraries_dir.join(data.target_path);
-
-                if let Some(parent) = target_path.parent().filter(|p| !p.exists()) {
+                if let Some(parent) = lib_data.target_path.parent().filter(|p| !p.exists()) {
                     tokio::fs::create_dir_all(parent).await?;
                 }
 
-                let mut target = tokio::fs::File::create(target_path).await?;
+                let mut target = tokio::fs::File::create(lib_data.target_path).await?;
                 target.write_all(library_bytes.as_slice()).await?;
+            }
+
+            if let Some(processors_data) = processors_data {
+                processors_data
+                    .run_processors(&java_runner, &game_version, &forge_version, &game_paths)
+                    .await?;
             }
 
             Ok(())
         }
 
-        let extraction = match &self.profile {
-            ForgeProfile::Old(old) => Some(ForgeLibraryExtractionData {
-                library_path: old.install.file_path.clone(),
-                target_path: MavenData::new(&old.install.path).path,
-            }),
-            ForgeProfile::New(_) => None,
-        };
+        Box::pin(inner(
+            self.game_version.clone(),
+            self.forge_version.clone(),
+            self.installer_path(),
+            JavaRunner::nomi_default(),
+            self.game_paths.clone(),
+            self.processors_data.clone(),
+            self.library_data.clone(),
+        ))
+    }
+}
 
-        let (installer_path, libraries_dir) = (self.installer_path(), self.libraries_dir.clone());
-        Box::pin(inner(installer_path, libraries_dir, extraction))
+#[derive(Debug, Clone)]
+struct ProcessorsData {
+    processors: Vec<Processor>,
+    data: HashMap<String, Datum>,
+}
+
+impl ProcessorsData {
+    fn apply_data_rules(&mut self, game_version: &str, forge_version: &str, game_paths: &GamePaths) {
+        macro_rules! processor_rules {
+            ($dest:expr; $($name:literal : client = $client:expr, server = $server:expr)+) => {
+                $(std::collections::HashMap::insert(
+                    $dest,
+                    String::from($name),
+                    Datum {
+                        client: String::from($client),
+                        server: String::from($server),
+                    },
+                );)+
+            }
+        }
+
+        processor_rules! {
+            &mut self.data;
+            "SIDE":
+                client = "client",
+                server = ""
+            "MINECRAFT_JAR" :
+                client = game_paths.version.join(format!("{game_version}.jar")).to_string_lossy(),
+                server = ""
+            "MINECRAFT_VERSION":
+                client = game_version,
+                server = ""
+            "ROOT":
+                client = game_paths.game.to_string_lossy(),
+                server = ""
+            "LIBRARY_DIR":
+                client = game_paths.libraries.to_string_lossy(),
+                server = ""
+            "BINPATCH":
+                client = forge_binpatch_path(game_version, forge_version).to_string_lossy(),
+                server = ""
+        }
+    }
+
+    fn get_processor_classpath<'a>(libraries_dir: &Path, libraries: impl Iterator<Item = &'a str>) -> String {
+        libraries
+            .map(MavenData::new)
+            .map(|m| m.path)
+            .map(|p| libraries_dir.join(p))
+            .map(|p| p.to_string_lossy().into_owned())
+            .join(CLASSPATH_SEPARATOR)
+    }
+
+    #[tracing::instrument]
+    async fn get_processor_main_class(processor_jar: PathBuf) -> anyhow::Result<String> {
+        tokio::task::spawn_blocking(|| {
+            let file = std::fs::File::open(processor_jar)?;
+            let mut archive = zip::ZipArchive::new(file)?;
+
+            let file = archive.by_name("META-INF/MANIFEST.MF")?;
+            let reader = std::io::BufReader::new(file);
+
+            let opt = reader
+                .lines()
+                .filter_map(|l| l.inspect_err(|err| error!(error= %err,"Error while reading line")).ok())
+                .find(|line| line.starts_with("Main-Class:"))
+                .and_then(|line| line.split(':').nth(1).map(str::trim).map(ToString::to_string));
+
+            match opt {
+                Some(main_class) => Ok(main_class),
+                None => Err(anyhow!("Main class is not found")),
+            }
+        })
+        .await?
+    }
+
+    fn get_processor_arguments<'a>(libraries_dir: &Path, arguments: impl Iterator<Item = &'a str>, data: &HashMap<String, Datum>) -> Vec<String> {
+        let mut args = Vec::new();
+
+        for argument in arguments {
+            // Some arguments are enclosed in {} or [] so we need to get rid of them
+            let trimmed_arg = &argument[1..argument.len() - 1];
+
+            match argument {
+                arg if arg.starts_with('{') => {
+                    let Some(entry) = data.get(trimmed_arg) else {
+                        continue;
+                    };
+
+                    let arg = if entry.client.starts_with('[') {
+                        let data = MavenData::new(&entry.client[1..entry.client.len() - 1]);
+                        let path = libraries_dir.join(data.path);
+                        path.to_string_lossy().into_owned()
+                    } else {
+                        entry.client.clone()
+                    };
+
+                    args.push(arg);
+                }
+                arg if arg.starts_with('[') => {
+                    let data = MavenData::new(trimmed_arg);
+                    let path = libraries_dir.join(data.path);
+                    args.push(path.to_string_lossy().into_owned());
+                }
+                arg => args.push(arg.to_string()),
+            }
+        }
+
+        args
+    }
+
+    async fn run_processors(
+        mut self,
+        java_runner: &JavaRunner,
+        game_version: &str,
+        forge_version: &str,
+        game_paths: &GamePaths,
+    ) -> anyhow::Result<()> {
+        self.apply_data_rules(game_version, forge_version, game_paths);
+
+        let total = self
+            .processors
+            .iter()
+            .filter(|p| p.sides.as_ref().is_some_and(|sides| sides.iter().any(|s| s == "client")))
+            .count();
+        let mut ok = 0;
+        let mut err = 0;
+
+        for mut processor in self.processors {
+            if processor.sides.as_ref().is_some_and(|sides| !sides.iter().any(|s| s == "client")) {
+                continue;
+            }
+
+            processor.classpath.push(processor.jar.clone());
+
+            let processor_jar_path = MavenData::new(&processor.jar).path;
+
+            let classpath = Self::get_processor_classpath(&game_paths.libraries, processor.classpath.iter().map(String::as_str));
+            let main_class = Self::get_processor_main_class(game_paths.libraries.join(processor_jar_path)).await?;
+            let arguments = Self::get_processor_arguments(&game_paths.libraries, processor.args.iter().map(String::as_str), &self.data);
+
+            let output = dbg!(Command::new(java_runner.get()).arg("-cp").arg(classpath).arg(main_class).args(arguments))
+                .output()
+                .await?;
+
+            if output.status.success() {
+                ok += 1;
+                info!("Processor finished successfully");
+            } else {
+                err += 1;
+                let error = String::from_utf8_lossy(&output.stderr);
+                error!(error = %error, "Processor failed");
+            }
+        }
+
+        info!(total, ok, err, "Finished processors execution");
+
+        Ok(())
     }
 }
 
@@ -420,8 +658,8 @@ impl ForgeProfile {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ForgeProfileNew {
-    #[serde(rename = "_comment_")]
-    pub comment: Vec<String>,
+    // #[serde(rename = "_comment_")]
+    // pub comment: Vec<String>,
     pub id: String,
     pub time: String,
     pub release_time: String,
@@ -436,6 +674,50 @@ pub struct ForgeProfileNew {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Logging {}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ForgeInstallProfile {
+    // #[serde(rename = "_comment_")]
+    // comment: Vec<String>,
+    // spec: i64,
+    // profile: String,
+    // version: String,
+    // path: Option<serde_json::Value>,
+    // minecraft: String,
+    // server_jar_path: String,
+    data: HashMap<String, Datum>,
+    processors: Vec<Processor>,
+    libraries: Vec<Library>,
+    // icon: String,
+    // json: String,
+    // logo: String,
+    // mirror_list: String,
+    // welcome: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Datum {
+    client: String,
+    server: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Processor {
+    sides: Option<Vec<String>>,
+    jar: String,
+    classpath: Vec<String>,
+    args: Vec<String>,
+    outputs: Option<Outputs>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Outputs {
+    #[serde(rename = "{MC_SLIM}")]
+    mc_slim: String,
+    #[serde(rename = "{MC_EXTRA}")]
+    mc_extra: String,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -498,10 +780,10 @@ mod tests {
 
     #[tokio::test]
     async fn create_forge_test() {
-        let recommended = Forge::new("1.7.10", ForgeVersion::Recommended, &GamePaths::default()).await.unwrap();
+        let recommended = Forge::new("1.7.10", ForgeVersion::Recommended, GamePaths::default()).await.unwrap();
         println!("{recommended:#?}");
 
-        let latest = Forge::new("1.19.2", ForgeVersion::Latest, &GamePaths::default()).await.unwrap();
+        let latest = Forge::new("1.19.2", ForgeVersion::Latest, GamePaths::default()).await.unwrap();
         println!("{latest:#?}");
     }
 
@@ -511,7 +793,7 @@ mod tests {
 
         debug!("Test");
 
-        let recommended = Forge::new("1.19.2", ForgeVersion::Recommended, &GamePaths::default()).await.unwrap();
+        let recommended = Forge::new("1.7.10", ForgeVersion::Recommended, GamePaths::default()).await.unwrap();
         println!("{recommended:#?}");
 
         let io = recommended.io();

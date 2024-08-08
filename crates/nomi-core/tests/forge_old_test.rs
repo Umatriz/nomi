@@ -34,7 +34,7 @@ async fn forge_test() {
         .name("forge-test".into())
         .version("1.7.10".into())
         .game_paths(game_paths.clone())
-        .instance(Box::new(Forge::new("1.7.10", ForgeVersion::Recommended, &game_paths).await.unwrap()))
+        .instance(Box::new(Forge::new("1.7.10", ForgeVersion::Recommended, game_paths).await.unwrap()))
         // .instance(Box::new(Vanilla::new("1.7.10", game_paths.clone()).await.unwrap()))
         .build();
 

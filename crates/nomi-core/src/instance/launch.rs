@@ -33,10 +33,10 @@ pub mod arguments;
 pub mod rules;
 
 #[cfg(windows)]
-const CLASSPATH_SEPARATOR: &str = ";";
+pub const CLASSPATH_SEPARATOR: &str = ";";
 
 #[cfg(not(windows))]
-const CLASSPATH_SEPARATOR: &str = ":";
+pub const CLASSPATH_SEPARATOR: &str = ":";
 
 #[derive(Serialize, Deserialize, Default, PartialEq, Eq, Debug, Clone, Hash)]
 pub struct LaunchSettings {
