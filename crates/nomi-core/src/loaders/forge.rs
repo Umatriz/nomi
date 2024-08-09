@@ -22,7 +22,11 @@ use crate::{
         DownloadQueue, FileDownloader, LibrariesDownloader, LibrariesMapper,
     },
     game_paths::GamePaths,
-    instance::{launch::CLASSPATH_SEPARATOR, profile::LoaderProfile},
+    instance::{
+        builder_ext::LaunchInstanceBuilderExt,
+        launch::{LaunchInstanceBuilder, LaunchSettings, CLASSPATH_SEPARATOR},
+        profile::LoaderProfile,
+    },
     loaders::vanilla::VanillaLibrariesMapper,
     maven_data::{MavenArtifact, MavenData},
     repository::{
@@ -382,6 +386,12 @@ impl Downloader for Forge {
             self.processors_data.clone(),
             self.library_data.clone(),
         ))
+    }
+}
+
+impl LaunchInstanceBuilderExt for Forge {
+    fn insert(&self, builder: LaunchInstanceBuilder<LaunchSettings>) -> LaunchInstanceBuilder<LaunchSettings> {
+        builder.profile(self.to_profile())
     }
 }
 

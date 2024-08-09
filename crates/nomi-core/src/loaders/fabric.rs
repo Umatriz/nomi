@@ -15,7 +15,11 @@ use crate::{
     },
     fs::write_to_file,
     game_paths::GamePaths,
-    instance::profile::LoaderProfile,
+    instance::{
+        builder_ext::LaunchInstanceBuilderExt,
+        launch::{LaunchInstanceBuilder, LaunchSettings},
+        profile::LoaderProfile,
+    },
     maven_data::{MavenArtifact, MavenData},
     repository::{
         fabric_meta::FabricVersions,
@@ -145,5 +149,11 @@ impl Downloader for Fabric {
         };
 
         Box::pin(fut)
+    }
+}
+
+impl LaunchInstanceBuilderExt for Fabric {
+    fn insert(&self, builder: LaunchInstanceBuilder<LaunchSettings>) -> LaunchInstanceBuilder<LaunchSettings> {
+        builder.profile(self.to_profile())
     }
 }

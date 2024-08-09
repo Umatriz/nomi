@@ -16,6 +16,10 @@ use crate::{
     },
     fs::write_to_file,
     game_paths::GamePaths,
+    instance::{
+        builder_ext::LaunchInstanceBuilderExt,
+        launch::{LaunchInstanceBuilder, LaunchSettings},
+    },
     repository::manifest::{Classifiers, DownloadFile, Library, Manifest},
     state::get_launcher_manifest,
     PinnedFutureWithBounds,
@@ -135,5 +139,11 @@ impl Downloader for Vanilla {
         };
 
         Box::pin(fut)
+    }
+}
+
+impl LaunchInstanceBuilderExt for Vanilla {
+    fn insert(&self, builder: LaunchInstanceBuilder<LaunchSettings>) -> LaunchInstanceBuilder<LaunchSettings> {
+        builder
     }
 }
