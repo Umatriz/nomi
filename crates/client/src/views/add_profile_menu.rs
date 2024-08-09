@@ -70,6 +70,7 @@ impl View for AddProfileMenu<'_> {
                 && match selected_loader {
                     Loader::Fabric { version } => func(version.as_ref()),
                     Loader::Vanilla => unreachable!(),
+                    Loader::Forge => unreachable!(),
                 }
         }
 

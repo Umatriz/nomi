@@ -9,10 +9,7 @@ use nomi_core::{
         logs::PrintLogs,
         Instance,
     },
-    loaders::{
-        forge::{Forge, ForgeVersion},
-        vanilla::Vanilla,
-    },
+    loaders::forge::{Forge, ForgeVersion},
     repository::java_runner::JavaRunner,
     MINECRAFT_DIR,
 };

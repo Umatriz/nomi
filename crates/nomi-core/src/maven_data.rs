@@ -3,7 +3,7 @@ use std::{fmt::Display, path::PathBuf};
 use itertools::Itertools;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use tracing::{error, warn};
+use tracing::error;
 
 #[derive(Debug, Default)]
 pub struct MavenData {
@@ -111,7 +111,7 @@ mod tests {
     fn maven_artifact_parse_test() {
         let artifact = MavenArtifact::new("de.oceanlabs.mcp:mcp_config:1.20.1-20230612.114412@zip");
 
-        println!("{:#?}", artifact);
+        println!("{artifact:#?}");
     }
 
     #[test]

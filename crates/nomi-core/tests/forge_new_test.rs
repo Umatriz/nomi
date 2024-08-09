@@ -2,7 +2,6 @@ use std::path::PathBuf;
 
 use nomi_core::{
     configs::profile::{ProfileState, VersionProfile},
-    downloads::traits::Downloader,
     game_paths::GamePaths,
     instance::{
         launch::{arguments::UserData, LaunchSettings},

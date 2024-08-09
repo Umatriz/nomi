@@ -1,21 +1,15 @@
 use std::{
-    borrow::Cow,
     collections::HashMap,
     fmt::Debug,
     fs::File,
     io::{BufRead, Read},
-    marker::PhantomData,
     path::{Path, PathBuf},
-    slice::Iter,
 };
 
 use anyhow::{anyhow, bail};
 use itertools::Itertools;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use tokio::{
-    io::{AsyncWriteExt, BufReader},
-    process::Command,
-};
+use tokio::{io::AsyncWriteExt, process::Command};
 use tracing::{error, info, warn};
 use zip::read::ZipFile;
 
@@ -24,13 +18,12 @@ use crate::{
     downloads::{
         download_file,
         progress::ProgressSender,
-        traits::{DownloadResult, DownloadStatus, Downloader},
+        traits::{DownloadResult, Downloader},
         DownloadQueue, FileDownloader, LibrariesDownloader, LibrariesMapper,
     },
     game_paths::GamePaths,
     instance::{launch::CLASSPATH_SEPARATOR, profile::LoaderProfile},
     loaders::vanilla::VanillaLibrariesMapper,
-    markers::Undefined,
     maven_data::{MavenArtifact, MavenData},
     repository::{
         java_runner::JavaRunner,
@@ -38,13 +31,12 @@ use crate::{
         simple_args::SimpleArgs,
         simple_lib::SimpleLib,
     },
-    utils::path_to_string,
     PinnedFutureWithBounds, DOT_NOMI_TEMP_DIR,
 };
 
 const FORGE_REPO_URL: &str = "https://maven.minecraftforge.net";
 
-const NEO_FORGE_REPO_URL: &str = "https://maven.neoforged.net/releases/";
+const _NEO_FORGE_REPO_URL: &str = "https://maven.neoforged.net/releases/";
 
 /// Some versions require to have a suffix
 const FORGE_SUFFIXES: &[(&str, &[&str])] = &[
