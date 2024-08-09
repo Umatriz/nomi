@@ -18,7 +18,7 @@ use crate::{
     markers::Undefined,
     repository::{
         java_runner::JavaRunner,
-        manifest::{Arguments, Manifest, VersionType},
+        manifest::{Manifest, VersionType},
     },
 };
 
