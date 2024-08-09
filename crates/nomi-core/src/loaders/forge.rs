@@ -370,6 +370,14 @@ impl Downloader for Forge {
                     .await?;
             }
 
+            // Remove temporary files
+            if let Some(binpatch_dir) = forge_binpatch_path(&game_version, &forge_version).parent() {
+                tokio::fs::remove_dir_all(binpatch_dir).await?;
+            };
+
+            let forge_installer = forge_installer_path(&game_version, &forge_version);
+            tokio::fs::remove_file(forge_installer).await?;
+
             Ok(())
         }
 
