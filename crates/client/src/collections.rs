@@ -9,7 +9,7 @@ use nomi_modding::modrinth::{
 
 use crate::{
     errors_pool::ErrorPoolExt,
-    views::{ProfilesConfig, SimpleDependency},
+    views::{InstancesConfig, SimpleDependency},
 };
 
 pub struct FabricDataCollection;
@@ -73,7 +73,7 @@ impl<'c> TasksCollection<'c> for JavaCollection {
 pub struct GameDownloadingCollection;
 
 impl<'c> TasksCollection<'c> for GameDownloadingCollection {
-    type Context = &'c ProfilesConfig;
+    type Context = &'c InstancesConfig;
 
     type Target = Option<()>;
 
@@ -85,7 +85,7 @@ impl<'c> TasksCollection<'c> for GameDownloadingCollection {
 
     fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
         Handler::new(|_| {
-            context.update_config().report_error();
+            context.update_config_sync().report_error();
         })
     }
 }
@@ -182,7 +182,7 @@ impl<'c> TasksCollection<'c> for DependenciesCollection {
 pub struct ModsDownloadingCollection;
 
 impl<'c> TasksCollection<'c> for ModsDownloadingCollection {
-    type Context = &'c ProfilesConfig;
+    type Context = &'c InstancesConfig;
 
     type Target = Option<()>;
 
@@ -194,7 +194,7 @@ impl<'c> TasksCollection<'c> for ModsDownloadingCollection {
 
     fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
         Handler::new(|_| {
-            context.update_config().report_error();
+            context.update_config_sync().report_error();
         })
     }
 }
@@ -220,7 +220,7 @@ impl<'c> TasksCollection<'c> for GameRunnerCollection {
 pub struct DownloadAddedModsCollection;
 
 impl<'c> TasksCollection<'c> for DownloadAddedModsCollection {
-    type Context = (&'c mut HashSet<ProjectId>, &'c ProfilesConfig);
+    type Context = (&'c mut HashSet<ProjectId>, &'c InstancesConfig);
 
     type Target = ProjectId;
 
@@ -233,7 +233,7 @@ impl<'c> TasksCollection<'c> for DownloadAddedModsCollection {
     fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
         Handler::new(|id| {
             context.0.remove(&id);
-            context.1.update_config().report_error();
+            context.1.update_config_sync().report_error();
         })
     }
 }

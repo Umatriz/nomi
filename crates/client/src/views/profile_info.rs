@@ -7,14 +7,14 @@ use nomi_modding::modrinth::project::ProjectId;
 use parking_lot::RwLock;
 
 use crate::{
-    collections::DownloadAddedModsCollection, errors_pool::ErrorPoolExt, open_directory::open_directory_native, ui_ext::UiExt, views::ProfilesConfig,
-    TabKind, DOT_NOMI_MODS_STASH_DIR,
+    collections::DownloadAddedModsCollection, errors_pool::ErrorPoolExt, open_directory::open_directory_native, ui_ext::UiExt,
+    views::InstancesConfig, TabKind, DOT_NOMI_MODS_STASH_DIR,
 };
 
 use super::{download_added_mod, Mod, ModdedProfile, TabsState, View};
 
 pub struct ProfileInfo<'a> {
-    pub profiles: &'a ProfilesConfig,
+    pub profiles: &'a InstancesConfig,
     pub task_manager: &'a mut TaskManager,
     pub profile: Arc<RwLock<ModdedProfile>>,
     pub tabs_state: &'a mut TabsState,
@@ -273,7 +273,7 @@ impl View for ProfileInfo<'_> {
                         }
 
                         {
-                            self.profiles.update_config().report_error();
+                            self.profiles.update_config_sync().report_error();
                         }
 
                         self.profile_info_state.mods_to_import.clear();
@@ -377,7 +377,7 @@ impl View for ProfileInfo<'_> {
                     }
                 }
 
-                self.profiles.update_config().report_error();
+                self.profiles.update_config_sync().report_error();
             }
 
             if ui.button("Reset").clicked() {
@@ -476,7 +476,7 @@ impl View for ProfileInfo<'_> {
 
             vec.retain(|m| !mods_to_remove.contains(&m.project_id));
             if !mods_to_remove.is_empty() {
-                self.profiles.update_config().report_error();
+                self.profiles.update_config_sync().report_error();
             }
 
             let _ = std::mem::replace(&mut self.profile.write().mods.mods, vec);

@@ -69,11 +69,11 @@ impl TabViewer for MyContext {
         match &tab.kind {
             TabKind::Mods { profile } => {
                 let profile = profile.read();
-                self.states.profiles.profiles.find_profile(profile.profile.id).is_none()
+                self.states.profiles.instances.find_instance(profile.profile.id).is_none()
             }
             TabKind::ProfileInfo { profile } => {
                 let profile = profile.read();
-                self.states.profiles.profiles.find_profile(profile.profile.id).is_none()
+                self.states.profiles.instances.find_instance(profile.profile.id).is_none()
             }
             _ => false,
         }
@@ -117,13 +117,13 @@ impl TabViewer for MyContext {
             }
             TabKind::Mods { profile } => ModManager {
                 task_manager: &mut self.manager,
-                profiles_config: &mut self.states.profiles.profiles,
+                profiles_config: &mut self.states.profiles.instances,
                 mod_manager_state: &mut self.states.mod_manager,
                 profile: profile.clone(),
             }
             .ui(ui),
             TabKind::ProfileInfo { profile } => ProfileInfo {
-                profiles: &self.states.profiles.profiles,
+                profiles: &self.states.profiles.instances,
                 task_manager: &mut self.manager,
                 profile: profile.clone(),
                 tabs_state: &mut self.states.tabs,

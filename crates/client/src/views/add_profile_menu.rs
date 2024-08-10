@@ -202,8 +202,8 @@ impl View for AddProfileMenu<'_> {
             )
             .clicked()
         {
-            self.profiles_state.profiles.add_profile(ModdedProfile::new(VersionProfile {
-                id: self.profiles_state.profiles.create_id(),
+            self.profiles_state.instances.add_instance(ModdedProfile::new(VersionProfile {
+                id: self.profiles_state.instances.next_id(),
                 name: self.menu_state.profile_name_buf.trim_end().to_owned(),
                 state: ProfileState::NotDownloaded {
                     // PANICS: It will never panic because it's
@@ -213,7 +213,7 @@ impl View for AddProfileMenu<'_> {
                     version_type: self.menu_state.selected_version_type.clone(),
                 },
             }));
-            self.profiles_state.profiles.update_config().report_error();
+            self.profiles_state.instances.update_config_sync().report_error();
         }
     }
 }

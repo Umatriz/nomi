@@ -4,15 +4,16 @@ use std::{
     sync::Arc,
 };
 
+use anyhow::bail;
 use eframe::egui::{self, popup_below_widget, Align2, Button, Id, PopupCloseBehavior, TextWrapMode, Ui};
 use egui_extras::{Column, TableBuilder};
 use egui_task_manager::{Caller, Task, TaskManager};
+use itertools::Itertools;
 use nomi_core::{
     configs::profile::{Loader, ProfileState, VersionProfile},
     fs::{read_toml_config, read_toml_config_sync, write_toml_config, write_toml_config_sync},
-    instance::launch::arguments::UserData,
+    instance::{launch::arguments::UserData, load_instances, Instance, InstanceProfileId},
     repository::{launcher_manifest::LauncherManifest, username::Username},
-    DOT_NOMI_PROFILES_CONFIG,
 };
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -49,20 +50,13 @@ pub struct ProfilesPage<'a> {
 }
 
 pub struct ProfilesState {
-    pub currently_downloading_profiles: HashSet<usize>,
-    pub profiles: ProfilesConfig,
-}
-
-#[derive(Default, PartialEq, Eq, Hash, Clone)]
-pub struct SimpleProfile {
-    pub name: String,
-    pub version: String,
-    pub loader: Loader,
+    pub currently_downloading_profiles: HashSet<InstanceProfileId>,
+    pub instances: InstancesConfig,
 }
 
 #[derive(Serialize, Deserialize, Default)]
-pub struct ProfilesConfig {
-    pub profiles: Vec<Arc<RwLock<ModdedProfile>>>,
+pub struct InstancesConfig {
+    pub instances: Vec<Arc<RwLock<Instance>>>,
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -80,40 +74,57 @@ impl ModdedProfile {
     }
 }
 
-impl ProfilesConfig {
-    pub fn find_profile(&self, target_id: usize) -> Option<&Arc<RwLock<ModdedProfile>>> {
-        self.profiles.iter().find(|p| p.read().profile.id == target_id)
+impl InstancesConfig {
+    pub fn find_instance(&self, id: usize) -> Option<Arc<RwLock<Instance>>> {
+        self.instances.iter().find(|p| p.read().id() == id).cloned()
     }
 
-    pub fn read() -> Self {
-        read_toml_config_sync::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG).unwrap_or_default()
+    pub fn load() -> Self {
+        Self {
+            instances: load_instances()
+                .unwrap_or_default()
+                .into_iter()
+                .map(RwLock::new)
+                .map(Arc::new)
+                .collect_vec(),
+        }
     }
 
-    pub async fn read_async() -> Self {
-        read_toml_config::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG).await.unwrap_or_default()
+    pub async fn load_async() -> anyhow::Result<Self> {
+        tokio::task::spawn_blocking(Self::load).await.map_err(Into::into)
     }
 
-    pub fn try_read() -> anyhow::Result<Self> {
-        read_toml_config_sync::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG)
+    pub fn add_instance(&mut self, instance: Instance) {
+        self.instances.push(RwLock::new(instance).into())
     }
 
-    pub fn add_profile(&mut self, profile: ModdedProfile) {
-        self.profiles.push(RwLock::new(profile).into())
-    }
-
-    pub fn create_id(&self) -> usize {
-        match &self.profiles.iter().max_by_key(|profile| profile.read().profile.id) {
-            Some(v) => v.read().profile.id + 1,
+    pub fn next_id(&self) -> usize {
+        match &self.instances.iter().map(|instance| instance.read().id()).max() {
+            Some(id) => id + 1,
             None => 0,
         }
     }
 
-    pub fn update_config(&self) -> anyhow::Result<()> {
-        write_toml_config_sync(&self, DOT_NOMI_PROFILES_CONFIG)
+    pub async fn update_all_configs(&self) {
+        for instance in self.instances.iter() {
+            let instance = instance.read();
+            instance.write().await.report_error();
+        }
     }
 
-    pub async fn update_config_async(&self) -> anyhow::Result<()> {
-        write_toml_config(&self, DOT_NOMI_PROFILES_CONFIG).await
+    pub fn update_config_sync(&self, id: usize) -> anyhow::Result<()> {
+        let runtime = tokio::runtime::Builder::new_current_thread().build()?;
+        runtime.block_on(self.update_config(id))
+    }
+
+    pub async fn update_config(&self, id: usize) -> anyhow::Result<()> {
+        let Some(instance) = self.find_instance(id) else {
+            bail!("No such instance")
+        };
+
+        let instance = instance.read();
+
+        instance.write().await
     }
 }
 
@@ -159,7 +170,7 @@ impl View for ProfilesPage<'_> {
             .body(|mut body| {
                 let mut is_deleting = vec![];
 
-                for (index, profile_lock) in self.profiles_state.profiles.profiles.iter().enumerate() {
+                for (index, profile_lock) in self.profiles_state.instances.instances.iter().enumerate() {
                     body.row(30.0, |mut row| {
                         let profile = profile_lock.read();
                         row.col(|ui| {
@@ -319,8 +330,8 @@ impl View for ProfilesPage<'_> {
                 }
 
                 is_deleting.drain(..).for_each(|index| {
-                    self.profiles_state.profiles.profiles.remove(index);
-                    self.profiles_state.profiles.update_config().report_error();
+                    self.profiles_state.instances.instances.remove(index);
+                    self.profiles_state.instances.update_config_sync().report_error();
                 });
             });
     }

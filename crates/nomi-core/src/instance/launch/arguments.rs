@@ -4,9 +4,10 @@ use itertools::Itertools;
 use tracing::info;
 
 use crate::{
+    game_paths::GamePaths,
     instance::{
         launch::{macros::replace, rules::is_library_passes},
-        profile::LoaderProfile,
+        loader::LoaderProfile,
     },
     markers::Undefined,
     maven_data::MavenArtifact,
@@ -26,6 +27,7 @@ pub enum WithClasspath {}
 pub struct ArgumentsBuilder<'a, S = Undefined, U = Undefined> {
     instance: &'a LaunchInstance,
     manifest: &'a Manifest,
+    paths: &'a GamePaths,
     classpath: Vec<PathBuf>,
     classpath_string: String,
     native_libs: Vec<PathBuf>,
@@ -65,10 +67,11 @@ impl<'a, 'b> LoaderArguments<'a, 'b> {
 }
 
 impl<'a> ArgumentsBuilder<'a, Undefined, Undefined> {
-    pub fn new(instance: &'a LaunchInstance, manifest: &'a Manifest) -> ArgumentsBuilder<'a, Undefined, Undefined> {
+    pub fn new(paths: &'a GamePaths, instance: &'a LaunchInstance, manifest: &'a Manifest) -> ArgumentsBuilder<'a, Undefined, Undefined> {
         ArgumentsBuilder {
             instance,
             manifest,
+            paths,
             classpath: Vec::new(),
             classpath_string: String::new(),
             native_libs: Vec::new(),
@@ -80,11 +83,12 @@ impl<'a> ArgumentsBuilder<'a, Undefined, Undefined> {
 }
 
 impl<'a, U> ArgumentsBuilder<'a, Undefined, U> {
-    pub fn with_classpath(self) -> ArgumentsBuilder<'a, WithClasspath, U> {
+    pub fn build_classpath(self) -> ArgumentsBuilder<'a, WithClasspath, U> {
         let (classpath, native_libs) = self.classpath();
         ArgumentsBuilder {
             instance: self.instance,
             manifest: self.manifest,
+            paths: self.paths,
             user_data: self.user_data,
             classpath_string: itertools::intersperse(classpath.iter().map(|p| p.display().to_string()), CLASSPATH_SEPARATOR.to_string())
                 .collect::<String>(),
@@ -101,6 +105,7 @@ impl<'a, S> ArgumentsBuilder<'a, S, Undefined> {
         ArgumentsBuilder {
             instance: self.instance,
             manifest: self.manifest,
+            paths: self.paths,
             user_data,
             classpath_string: self.classpath_string,
             classpath: self.classpath,
@@ -148,10 +153,13 @@ impl<'a> ArgumentsBuilder<'a, WithClasspath, WithUserData> {
             |JvmArguments(jvm), _| jvm.clone(),
             |_| {
                 vec![
-                    format!("-Djava.library.path={}", &self.instance.settings.natives_dir.display()),
+                    format!("-Djava.library.path={}", self.paths.natives_dir().display()),
                     "-Dminecraft.launcher.brand=${launcher_name}".into(),
                     "-Dminecraft.launcher.version=${launcher_version}".into(),
-                    format!("-Dminecraft.client.jar={}", &self.instance.settings.version_jar_file.display()),
+                    format!(
+                        "-Dminecraft.client.jar={}",
+                        self.paths.version_jar_file(&self.instance.settings.version).display()
+                    ),
                     "-cp".to_string(),
                     self.classpath_as_str().to_owned(),
                 ]
@@ -168,11 +176,11 @@ impl<'a> ArgumentsBuilder<'a, WithClasspath, WithUserData> {
 
     fn parse_args_from_str(&self, source: &str) -> String {
         replace!(source,
-            "${assets_root}" => &path_to_string(&self.instance.settings.assets),
-            "${game_assets}" => &path_to_string(&self.instance.settings.assets),
-            "${game_directory}" => &path_to_string(&self.instance.settings.game_dir),
-            "${natives_directory}" => &path_to_string(&self.instance.settings.natives_dir),
-            "${library_directory}" => &path_to_string(&self.instance.settings.libraries_dir),
+            "${assets_root}" => &path_to_string(&self.paths.assets),
+            "${game_assets}" => &path_to_string(&self.paths.assets),
+            "${game_directory}" => &path_to_string(&self.paths.game),
+            "${natives_directory}" => &path_to_string(self.paths.natives_dir()),
+            "${library_directory}" => &path_to_string(&self.paths.libraries),
             "${launcher_name}" => NOMI_NAME,
             "${launcher_version}" => NOMI_VERSION,
             "${auth_access_token}" => self.user_data
@@ -239,7 +247,7 @@ impl<'a, S, U> ArgumentsBuilder<'a, S, U> {
             }
         }
 
-        let mut classpath = vec![Some(self.instance.settings.version_jar_file.clone())];
+        let mut classpath = vec![Some(self.paths.version_jar_file(&self.instance.settings.version))];
         let mut native_libs = vec![];
 
         self.manifest
@@ -268,13 +276,13 @@ impl<'a, S, U> ArgumentsBuilder<'a, S, U> {
                             })
                         })
                         .and_then(|artifact| artifact.path.as_ref())
-                        .map(|path| self.instance.settings.libraries_dir.join(path)),
+                        .map(|path| self.paths.libraries.join(path)),
                     lib.downloads
                         .classifiers
                         .as_ref()
                         .and_then(|natives| match_natives(natives))
                         .and_then(|native_lib| native_lib.path.as_ref())
-                        .map(|path| self.instance.settings.libraries_dir.join(path)),
+                        .map(|path| self.paths.libraries.join(path)),
                 )
             })
             .for_each(|(lib, native)| {
@@ -291,7 +299,7 @@ impl<'a, S, U> ArgumentsBuilder<'a, S, U> {
             .loader_profile
             .as_ref()
             .map(|p| &p.libraries)
-            .map(|libs| libs.iter().map(|lib| self.instance.settings.libraries_dir.join(&lib.jar)))
+            .map(|libs| libs.iter().map(|lib| self.paths.libraries.join(&lib.jar)))
         {
             classpath.extend(libs);
         }

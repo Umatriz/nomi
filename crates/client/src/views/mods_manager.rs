@@ -28,13 +28,13 @@ use crate::{
     DOT_NOMI_MODS_STASH_DIR,
 };
 
-use super::{ModdedProfile, ProfilesConfig, View};
+use super::{InstancesConfig, ModdedProfile, View};
 
 pub use crate::mods::*;
 
 pub struct ModManager<'a> {
     pub task_manager: &'a mut TaskManager,
-    pub profiles_config: &'a mut ProfilesConfig,
+    pub profiles_config: &'a mut InstancesConfig,
     pub profile: Arc<RwLock<ModdedProfile>>,
     pub mod_manager_state: &'a mut ModManagerState,
 }
@@ -586,7 +586,7 @@ impl View for ModManager<'_> {
 
                                 let project_type = project.project_type;
 
-                                let _ = self.profiles_config.update_config().report_error();
+                                let _ = self.profiles_config.update_config_sync().report_error();
                                 let is_data_pack = self.mod_manager_state.is_datapack;
                                 let profile_id = {
                                     let lock = profile.read();

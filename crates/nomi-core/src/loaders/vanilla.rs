@@ -56,7 +56,7 @@ impl Vanilla {
             .with_downloader(
                 FileDownloader::new(
                     manifest.downloads.client.url.clone(),
-                    game_paths.version.join(format!("{}.jar", manifest.id)),
+                    game_paths.profile.join(format!("{}.jar", manifest.id)),
                 )
                 .into_retry(),
             );
@@ -126,7 +126,7 @@ impl Downloader for Vanilla {
     }
 
     fn io(&self) -> PinnedFutureWithBounds<anyhow::Result<()>> {
-        let versions_path = self.game_paths.version.clone();
+        let versions_path = self.game_paths.profile.clone();
         let manifest_id = self.manifest.id.clone();
         let manifest_res = serde_json::to_string_pretty(&self.manifest);
 

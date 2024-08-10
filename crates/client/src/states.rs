@@ -4,7 +4,7 @@ use egui_task_manager::{Caller, Task, TaskManager};
 use nomi_core::{
     downloads::{java::JavaDownloader, progress::MappedSender, traits::Downloader},
     fs::read_toml_config_sync,
-    DOT_NOMI_JAVA_DIR, DOT_NOMI_JAVA_EXECUTABLE, DOT_NOMI_PROFILES_CONFIG, DOT_NOMI_SETTINGS_CONFIG,
+    DOT_NOMI_JAVA_DIR, DOT_NOMI_JAVA_EXECUTABLE, DOT_NOMI_SETTINGS_CONFIG,
 };
 use tracing::info;
 
@@ -15,7 +15,7 @@ use crate::{
         add_tab_menu::TabsState,
         profiles::ProfilesState,
         settings::{ClientSettingsState, SettingsState},
-        AddProfileMenuState, LogsState, ModManagerState, ProfileInfoState, ProfilesConfig,
+        AddProfileMenuState, InstancesConfig, LogsState, ModManagerState, ProfileInfoState,
     },
 };
 
@@ -44,7 +44,7 @@ impl Default for States {
             java: JavaState::new(),
             profiles: ProfilesState {
                 currently_downloading_profiles: HashSet::new(),
-                profiles: read_toml_config_sync::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG).unwrap_or_default(),
+                instances: read_toml_config_sync::<InstancesConfig>(DOT_NOMI_PROFILES_CONFIG).unwrap_or_default(),
             },
             client_settings: settings.client_settings.clone(),
             settings,

@@ -18,7 +18,7 @@ use crate::{
     instance::{
         builder_ext::LaunchInstanceBuilderExt,
         launch::{LaunchInstanceBuilder, LaunchSettings},
-        profile::LoaderProfile,
+        loader::LoaderProfile,
     },
     maven_data::{MavenArtifact, MavenData},
     repository::{
@@ -136,7 +136,7 @@ impl Downloader for Fabric {
     }
 
     fn io(&self) -> PinnedFutureWithBounds<anyhow::Result<()>> {
-        let version_path = self.game_paths.version.clone();
+        let version_path = self.game_paths.profile.clone();
         let profile = self.profile.clone();
         let id = self.profile.id.clone();
 

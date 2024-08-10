@@ -1,52 +1,126 @@
-use typed_builder::TypedBuilder;
-
 pub mod builder_ext;
 pub mod launch;
+pub mod loader;
 pub mod logs;
-pub mod profile;
-pub mod version_marker;
+pub mod marker;
+mod profile;
 
-use crate::{downloads::downloaders::assets::AssetsDownloader, game_paths::GamePaths, state::get_launcher_manifest};
+use std::path::{Path, PathBuf};
 
-use self::{
-    launch::{LaunchInstance, LaunchInstanceBuilder, LaunchSettings},
-    version_marker::Version,
+pub use profile::*;
+use serde::{Deserialize, Serialize};
+use tracing::error;
+
+use crate::{
+    configs::profile::{Loader, VersionProfile},
+    fs::{read_toml_config_sync, write_toml_config},
+    INSTANCES_DIR, INSTANCE_CONFIG,
 };
 
-#[derive(Debug, TypedBuilder)]
+/// Loads all instances in the [`INSTANCES_DIR`](crate::consts::INSTANCES_DIR)
+pub fn load_instances() -> anyhow::Result<Vec<Instance>> {
+    let dir = std::fs::read_dir(INSTANCES_DIR)?;
+
+    let mut instances = Vec::new();
+
+    for entry in dir {
+        let Ok(entry) = entry.inspect_err(|error| error!(%error, "Cannot read instance directory")) else {
+            continue;
+        };
+
+        if !entry.path().is_dir() {
+            continue;
+        }
+
+        let path = entry.path().join(INSTANCE_CONFIG);
+
+        let instance = read_toml_config_sync::<Instance>(path)?;
+
+        instances.push(instance);
+    }
+
+    Ok(instances)
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Instance {
-    instance: Box<dyn Version>,
-    pub game_paths: GamePaths,
-    pub version: String,
-    pub name: String,
+    name: String,
+    id: usize,
+    main_profile: Option<InstanceProfileId>,
+    profiles: Vec<ProfilePayload>,
 }
 
 impl Instance {
-    pub fn instance(self) -> Box<dyn Version> {
-        self.instance
+    pub fn new(name: impl Into<String>, id: usize) -> Self {
+        Self {
+            name: name.into(),
+            id,
+            main_profile: None,
+            profiles: Vec::new(),
+        }
     }
 
-    pub async fn assets(&self) -> anyhow::Result<AssetsDownloader> {
-        let manifest = get_launcher_manifest().await?;
-        let version_manifest = manifest.get_version_manifest(&self.version).await?;
-
-        AssetsDownloader::new(
-            version_manifest.asset_index.url,
-            version_manifest.asset_index.id,
-            self.game_paths.assets.join("objects"),
-            self.game_paths.assets.join("indexes"),
-        )
-        .await
+    pub fn set_main_profile(&mut self, main_profile_id: InstanceProfileId) {
+        self.main_profile = Some(main_profile_id);
     }
 
-    #[must_use]
-    pub fn launch_instance(&self, settings: LaunchSettings, jvm_args: Option<Vec<String>>) -> LaunchInstance {
-        let builder = LaunchInstanceBuilder::new().settings(settings);
-        let builder = match jvm_args {
-            Some(jvm) => builder.jvm_args(jvm),
-            None => builder,
-        };
+    pub fn add_profile(&mut self, payload: ProfilePayload) {
+        self.profiles.push(payload);
+    }
 
-        self.instance.insert(builder).build()
+    /// Generate id for the next profile in this instance
+    pub fn next_id(&self) -> InstanceProfileId {
+        match &self.profiles.iter().max_by_key(|profile| profile.id.1) {
+            Some(profile) => InstanceProfileId::new(profile.id.0, profile.id.1 + 1),
+            None => InstanceProfileId::new(self.id, 0),
+        }
+    }
+
+    pub fn id(&self) -> usize {
+        self.id
+    }
+
+    pub async fn write(&self) -> anyhow::Result<()> {
+        write_toml_config(&self, PathBuf::from(INSTANCES_DIR).join(&self.name).join(".nomi/Instance.toml")).await
+    }
+
+    pub fn path(&self) -> PathBuf {
+        PathBuf::from(INSTANCES_DIR).join(&self.name)
+    }
+}
+
+/// Represent a unique identifier of a profile.
+///
+/// First number is the instance id and the second number is the profile id.
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+pub struct InstanceProfileId(usize, usize);
+
+impl InstanceProfileId {
+    pub const ZERO: Self = Self(0, 0);
+
+    pub fn new(instance: usize, profile: usize) -> Self {
+        Self(instance, profile)
+    }
+}
+
+/// Information about profile.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ProfilePayload {
+    pub id: InstanceProfileId,
+    pub name: String,
+    pub loader: Loader,
+    pub version: String,
+    pub path: PathBuf,
+}
+
+impl ProfilePayload {
+    pub fn from_version_profile(profile: &VersionProfile, path: &Path) -> Self {
+        Self {
+            id: profile.id.clone(),
+            name: profile.name.clone(),
+            loader: profile.loader().clone(),
+            version: profile.version().to_owned(),
+            path: path.to_path_buf(),
+        }
     }
 }

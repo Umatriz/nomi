@@ -1,4 +1,4 @@
-use std::{fmt::Display, path::PathBuf};
+use std::{fmt::Display, path::PathBuf, sync::LazyLock};
 
 use itertools::Itertools;
 use regex::Regex;
@@ -57,11 +57,13 @@ pub struct MavenArtifact {
 
 impl MavenArtifact {
     #[must_use]
-    #[allow(clippy::missing_panics_doc)]
     pub fn new(artifact: &str) -> Self {
-        // PANICS: This will never panic because the pattern is valid.
-        let regex = Regex::new(r"(?P<group>[^:]*):(?P<artifact>[^:]*):(?P<version>[^@:]*)(?::(?P<classifier>.*))?(?:@(?P<extension>.*))?").unwrap();
-        regex.captures(artifact).map_or_else(
+        static REGEX: LazyLock<Regex> = LazyLock::new(|| {
+            // PANICS: This will never panic because the pattern is valid.
+            Regex::new(r"(?P<group>[^:]*):(?P<artifact>[^:]*):(?P<version>[^@:]*)(?::(?P<classifier>.*))?(?:@(?P<extension>.*))?").unwrap()
+        });
+
+        REGEX.captures(artifact).map_or_else(
             || {
                 error!(artifact, "No values captured. Using provided artifact as a group");
                 MavenArtifact {

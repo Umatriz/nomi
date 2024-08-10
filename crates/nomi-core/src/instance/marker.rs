@@ -4,11 +4,11 @@ use crate::downloads::traits::{DownloadResult, Downloader};
 
 use super::builder_ext::LaunchInstanceBuilderExt;
 
-pub trait Version: LaunchInstanceBuilderExt + Downloader<Data = DownloadResult> + Debug + Send + Sync {
+pub trait ProfileDownloader: LaunchInstanceBuilderExt + Downloader<Data = DownloadResult> + Debug + Send + Sync {
     fn into_downloader(self: Box<Self>) -> Box<dyn Downloader<Data = DownloadResult>>;
 }
 
-impl<T> Version for T
+impl<T> ProfileDownloader for T
 where
     T: LaunchInstanceBuilderExt + Downloader<Data = DownloadResult> + Debug + Send + Sync + 'static,
 {

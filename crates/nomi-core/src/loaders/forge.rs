@@ -25,7 +25,7 @@ use crate::{
     instance::{
         builder_ext::LaunchInstanceBuilderExt,
         launch::{LaunchInstanceBuilder, LaunchSettings, CLASSPATH_SEPARATOR},
-        profile::LoaderProfile,
+        loader::LoaderProfile,
     },
     loaders::vanilla::VanillaLibrariesMapper,
     maven_data::{MavenArtifact, MavenData},
@@ -422,7 +422,7 @@ impl ProcessorsData {
                 client = "client",
                 server = ""
             "MINECRAFT_JAR" :
-                client = game_paths.version.join(format!("{game_version}.jar")).to_string_lossy(),
+                client = game_paths.profile.join(format!("{game_version}.jar")).to_string_lossy(),
                 server = ""
             "MINECRAFT_VERSION":
                 client = game_version,

@@ -10,7 +10,7 @@ use nomi_core::{
         AssetsDownloader, DownloadQueue,
     },
     game_paths::GamePaths,
-    instance::{launch::LaunchSettings, Instance},
+    instance::{launch::LaunchSettings, Profile},
     loaders::{
         fabric::Fabric,
         forge::{Forge, ForgeVersion},
@@ -48,46 +48,37 @@ async fn try_download_version(profile: Arc<RwLock<ModdedProfile>>, progress_shar
         let game_paths = GamePaths {
             game: mc_dir.clone(),
             assets: mc_dir.join("assets"),
-            version: mc_dir.join("versions").join(version),
+            profile: mc_dir.join("versions").join(version),
             libraries: mc_dir.join("libraries"),
         };
 
-        let builder = Instance::builder()
+        let builder = Profile::builder()
             .name(version_profile.name.clone())
             .version(version_profile.version().to_string())
             .game_paths(game_paths.clone());
 
         let instance = match loader {
-            Loader::Vanilla => builder.instance(Box::new(Vanilla::new(version_profile.version(), game_paths.clone()).await?)),
-            Loader::Fabric { version } => builder.instance(Box::new(
+            Loader::Vanilla => builder.downloader(Box::new(Vanilla::new(version_profile.version(), game_paths.clone()).await?)),
+            Loader::Fabric { version } => builder.downloader(Box::new(
                 Fabric::new(version_profile.version(), version.as_ref(), game_paths.clone()).await?,
             )),
-            Loader::Forge => builder.instance(Box::new(
+            Loader::Forge => builder.downloader(Box::new(
                 Forge::new(version_profile.version(), ForgeVersion::Recommended, game_paths.clone()).await?,
             )),
         }
         .build();
 
         let settings = LaunchSettings {
-            assets: instance.game_paths.assets.clone(),
-            game_dir: instance.game_paths.game.clone(),
-            java_bin: JavaRunner::default(),
-            libraries_dir: instance.game_paths.libraries.clone(),
-            manifest_file: instance.game_paths.version.join(format!("{}.json", &version)),
-            natives_dir: instance.game_paths.version.join("natives"),
-            version_jar_file: instance.game_paths.version.join(format!("{}.jar", &version)),
+            java_runner: None,
             version: version.to_string(),
             version_type: version_type.clone(),
         };
 
         let launch_instance = instance.launch_instance(settings, Some(vec!["-Xms2G".to_string(), "-Xmx4G".to_string()]));
 
-        let instance = instance.instance();
-
+        let instance = instance.downloader();
         let io = instance.io();
-
         let downloader: Box<dyn Downloader<Data = DownloadResult>> = instance.into_downloader();
-
         io.await?;
 
         let downloader = DownloadQueue::new().with_downloader_dyn(downloader);
