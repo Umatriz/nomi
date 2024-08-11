@@ -67,7 +67,6 @@ where
         match self {
             Ok(value) => Some(value),
             Err(error) => {
-                error!("{:#?}", error);
                 if let Ok(mut pool) = ERRORS_POOL
                     .clone()
                     .write()
@@ -87,7 +86,6 @@ where
         match self {
             Ok(value) => Some(value),
             Err(error) => {
-                error!("{:#?}", error);
                 if let Ok(mut pool) = ERRORS_POOL
                     .clone()
                     .write()

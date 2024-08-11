@@ -7,7 +7,10 @@ use std::{
 use eframe::egui::{self, Button, Color32, ComboBox, Id, Image, Key, Layout, RichText, ScrollArea, Vec2};
 use egui_infinite_scroll::{InfiniteScroll, LoadingState};
 use egui_task_manager::{Caller, Task, TaskManager};
-use nomi_core::{DOT_NOMI_DATA_PACKS_DIR, MINECRAFT_DIR};
+use nomi_core::{
+    instance::{Instance, InstanceProfileId},
+    DOT_NOMI_DATA_PACKS_DIR, MINECRAFT_DIR,
+};
 use nomi_modding::{
     capitalize_first_letters_whitespace_split,
     modrinth::{
@@ -69,9 +72,10 @@ pub enum DataPackDownloadDirectory {
 }
 
 impl DataPackDownloadDirectory {
-    pub fn as_path_buf(&self, profile_id: usize) -> PathBuf {
+    pub fn as_path_buf(&self, profile_id: InstanceProfileId) -> PathBuf {
         match self {
-            DataPackDownloadDirectory::Mods => PathBuf::from(DOT_NOMI_MODS_STASH_DIR).join(format!("{profile_id}")),
+            DataPackDownloadDirectory::Mods => mods_stash_path_for_profile(profile_id),
+            // TODO: Maybe make this local for each instance
             DataPackDownloadDirectory::DataPacks => PathBuf::from(DOT_NOMI_DATA_PACKS_DIR),
         }
     }
@@ -91,11 +95,11 @@ fn fix_svg(text: &str, color: Color32) -> Option<String> {
     Some(format!("<svg xmlns=\"http://www.w3.org/2000/svg\" {s}"))
 }
 
-fn directory_from_project_type(project_type: ProjectType, profile_id: usize) -> PathBuf {
+fn directory_from_project_type(project_type: ProjectType, profile_id: InstanceProfileId) -> PathBuf {
     match project_type {
-        ProjectType::Mod | ProjectType::Modpack => PathBuf::from(DOT_NOMI_MODS_STASH_DIR).join(format!("{}", profile_id)),
-        ProjectType::ResourcePack => PathBuf::from(MINECRAFT_DIR).join("resourcepacks"),
-        ProjectType::Shader => PathBuf::from(MINECRAFT_DIR).join("shaderpacks"),
+        ProjectType::Mod | ProjectType::Modpack => mods_stash_path_for_profile(profile_id),
+        ProjectType::ResourcePack => Instance::path_from_id(profile_id.instance()).join("resourcepacks"),
+        ProjectType::Shader => Instance::path_from_id(profile_id.instance()).join("shaderpacks"),
         ProjectType::DataPack => PathBuf::from(DOT_NOMI_DATA_PACKS_DIR),
         _ => unreachable!("You cannot download plugins"),
     }
@@ -586,7 +590,7 @@ impl View for ModManager<'_> {
 
                                 let project_type = project.project_type;
 
-                                let _ = self.profiles_config.update_config_sync().report_error();
+                                let _ = self.profiles_config.update_profile_config(self.profile.read().profile.id).report_error();
                                 let is_data_pack = self.mod_manager_state.is_datapack;
                                 let profile_id = {
                                     let lock = profile.read();
@@ -629,11 +633,11 @@ impl View for ModManager<'_> {
                                                 profile.mods.mods.extend(mods);
                                                 profile.mods.mods.sort();
                                                 profile.mods.mods.dedup();
-                                                debug!("Added mods to profile {} successfully", profile.profile.id);
+                                                debug!(id = ?profile.profile.id, "Added mods to profile successfully");
                                             }
                                         }
 
-                                        Some(())
+                                        Some(profile_id)
                                     }),
                                 );
 

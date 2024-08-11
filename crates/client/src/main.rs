@@ -31,6 +31,8 @@ pub mod ui_ext;
 pub mod utils;
 pub mod views;
 
+pub mod cache;
+
 pub mod mods;
 pub mod open_directory;
 

@@ -13,7 +13,7 @@ use tracing::error;
 
 use crate::{
     configs::profile::{Loader, VersionProfile},
-    fs::{read_toml_config_sync, write_toml_config},
+    fs::{read_toml_config_sync, write_toml_config, write_toml_config_sync},
     INSTANCES_DIR, INSTANCE_CONFIG,
 };
 
@@ -42,7 +42,7 @@ pub fn load_instances() -> anyhow::Result<Vec<Instance>> {
     Ok(instances)
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct Instance {
     name: String,
     id: usize,
@@ -76,23 +76,47 @@ impl Instance {
         }
     }
 
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
     pub fn id(&self) -> usize {
         self.id
     }
 
+    pub fn main_profile(&self) -> Option<InstanceProfileId> {
+        self.main_profile
+    }
+
+    pub fn profiles(&self) -> &[ProfilePayload] {
+        &self.profiles
+    }
+
+    pub fn profiles_mut(&mut self) -> &mut Vec<ProfilePayload> {
+        &mut self.profiles
+    }
+
     pub async fn write(&self) -> anyhow::Result<()> {
-        write_toml_config(&self, PathBuf::from(INSTANCES_DIR).join(&self.name).join(".nomi/Instance.toml")).await
+        write_toml_config(&self, self.path().join(".nomi/Instance.toml")).await
+    }
+
+    pub fn write_blocking(&self) -> anyhow::Result<()> {
+        write_toml_config_sync(&self, self.path().join(".nomi/Instance.toml"))
     }
 
     pub fn path(&self) -> PathBuf {
-        PathBuf::from(INSTANCES_DIR).join(&self.name)
+        Self::path_from_id(self.id)
+    }
+
+    pub fn path_from_id(id: usize) -> PathBuf {
+        PathBuf::from(INSTANCES_DIR).join(format!("{id}"))
     }
 }
 
 /// Represent a unique identifier of a profile.
 ///
 /// First number is the instance id and the second number is the profile id.
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct InstanceProfileId(usize, usize);
 
 impl InstanceProfileId {
@@ -101,25 +125,35 @@ impl InstanceProfileId {
     pub fn new(instance: usize, profile: usize) -> Self {
         Self(instance, profile)
     }
+
+    pub fn instance(&self) -> usize {
+        self.0
+    }
+
+    pub fn profile(&self) -> usize {
+        self.1
+    }
 }
 
 /// Information about profile.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct ProfilePayload {
     pub id: InstanceProfileId,
     pub name: String,
     pub loader: Loader,
     pub version: String,
+    pub is_downloaded: bool,
     pub path: PathBuf,
 }
 
 impl ProfilePayload {
     pub fn from_version_profile(profile: &VersionProfile, path: &Path) -> Self {
         Self {
-            id: profile.id.clone(),
+            id: profile.id,
             name: profile.name.clone(),
             loader: profile.loader().clone(),
             version: profile.version().to_owned(),
+            is_downloaded: profile.is_downloaded(),
             path: path.to_path_buf(),
         }
     }

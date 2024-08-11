@@ -53,9 +53,9 @@ async fn instance_test() {
         state: ProfileState::downloaded(launch_instance),
     };
 
-    instance.add_profile(ProfilePayload::from_version_profile(&version_profile, &paths.profile()));
+    instance.add_profile(ProfilePayload::from_version_profile(&version_profile, &paths.profile_config()));
 
-    write_toml_config(&version_profile, paths.profile()).await.unwrap();
+    write_toml_config(&version_profile, paths.profile_config()).await.unwrap();
 
     instance.write().await.unwrap();
 

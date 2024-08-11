@@ -1,7 +1,7 @@
 use std::{collections::HashSet, sync::Arc};
 
 use egui_task_manager::*;
-use nomi_core::repository::fabric_meta::FabricVersions;
+use nomi_core::{instance::InstanceProfileId, repository::fabric_meta::FabricVersions};
 use nomi_modding::modrinth::{
     project::{Project, ProjectId},
     version::Version,
@@ -75,7 +75,7 @@ pub struct GameDownloadingCollection;
 impl<'c> TasksCollection<'c> for GameDownloadingCollection {
     type Context = &'c InstancesConfig;
 
-    type Target = Option<()>;
+    type Target = Option<InstanceProfileId>;
 
     type Executor = executors::Linear;
 
@@ -84,8 +84,10 @@ impl<'c> TasksCollection<'c> for GameDownloadingCollection {
     }
 
     fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|_| {
-            context.update_config_sync().report_error();
+        Handler::new(|id| {
+            if let Some(id) = id {
+                context.update_profile_config(id).report_error();
+            }
         })
     }
 }
@@ -184,7 +186,7 @@ pub struct ModsDownloadingCollection;
 impl<'c> TasksCollection<'c> for ModsDownloadingCollection {
     type Context = &'c InstancesConfig;
 
-    type Target = Option<()>;
+    type Target = Option<InstanceProfileId>;
 
     type Executor = executors::Linear;
 
@@ -193,8 +195,10 @@ impl<'c> TasksCollection<'c> for ModsDownloadingCollection {
     }
 
     fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|_| {
-            context.update_config_sync().report_error();
+        Handler::new(|id| {
+            if let Some(id) = id {
+                context.update_profile_config(id).report_error();
+            }
         })
     }
 }
@@ -222,7 +226,7 @@ pub struct DownloadAddedModsCollection;
 impl<'c> TasksCollection<'c> for DownloadAddedModsCollection {
     type Context = (&'c mut HashSet<ProjectId>, &'c InstancesConfig);
 
-    type Target = ProjectId;
+    type Target = (InstanceProfileId, ProjectId);
 
     type Executor = executors::Parallel;
 
@@ -231,9 +235,9 @@ impl<'c> TasksCollection<'c> for DownloadAddedModsCollection {
     }
 
     fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|id| {
-            context.0.remove(&id);
-            context.1.update_config_sync().report_error();
+        Handler::new(|(profile_id, project_id)| {
+            context.0.remove(&project_id);
+            context.1.update_profile_config(profile_id).report_error();
         })
     }
 }

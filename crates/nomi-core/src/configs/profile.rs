@@ -46,6 +46,10 @@ impl Loader {
     pub fn is_vanilla(&self) -> bool {
         matches!(*self, Self::Vanilla)
     }
+
+    pub fn name(&self) -> String {
+        format!("{self}")
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
@@ -116,5 +120,9 @@ impl VersionProfile {
             ProfileState::Downloaded(instance) => &instance.settings.version,
             ProfileState::NotDownloaded { version, .. } => version,
         }
+    }
+
+    pub fn is_downloaded(&self) -> bool {
+        matches!(self.state, ProfileState::Downloaded(_))
     }
 }

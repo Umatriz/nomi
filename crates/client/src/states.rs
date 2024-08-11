@@ -42,13 +42,10 @@ impl Default for States {
             errors_pool: ErrorsPoolState::default(),
             logs_state: LogsState::new(),
             java: JavaState::new(),
-            profiles: ProfilesState {
-                currently_downloading_profiles: HashSet::new(),
-                instances: read_toml_config_sync::<InstancesConfig>(DOT_NOMI_PROFILES_CONFIG).unwrap_or_default(),
-            },
+            profiles: ProfilesState::new(),
             client_settings: settings.client_settings.clone(),
             settings,
-            add_profile_menu_state: AddProfileMenuState::default(),
+            add_profile_menu_state: AddProfileMenuState::new(),
             mod_manager: ModManagerState::new(),
             profile_info: ProfileInfoState::new(),
         }

@@ -36,7 +36,7 @@ impl GamePaths {
         })
     }
 
-    pub fn profile(&self) -> PathBuf {
+    pub fn profile_config(&self) -> PathBuf {
         self.profile.join("Profile.toml")
     }
 

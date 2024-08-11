@@ -1,8 +1,15 @@
-use std::{collections::HashSet, path::Path, sync::Arc};
+use std::{
+    collections::HashSet,
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 
 use eframe::egui::{self, Color32, Id, RichText, TextEdit};
 use egui_task_manager::{Caller, Task, TaskManager};
-use nomi_core::configs::profile::ProfileState;
+use nomi_core::{
+    configs::profile::ProfileState,
+    instance::{Instance, InstanceProfileId},
+};
 use nomi_modding::modrinth::project::ProjectId;
 use parking_lot::RwLock;
 
@@ -11,7 +18,7 @@ use crate::{
     views::InstancesConfig, TabKind, DOT_NOMI_MODS_STASH_DIR,
 };
 
-use super::{download_added_mod, Mod, ModdedProfile, TabsState, View};
+use super::{download_added_mod, mods_stash_path_for_profile, Mod, ModdedProfile, TabsState, View};
 
 pub struct ProfileInfo<'a> {
     pub profiles: &'a InstancesConfig,
@@ -273,7 +280,8 @@ impl View for ProfileInfo<'_> {
                         }
 
                         {
-                            self.profiles.update_config_sync().report_error();
+                            let id = self.profile.read().profile.id;
+                            self.profiles.update_profile_config(id).report_error();
                         }
 
                         self.profile_info_state.mods_to_import.clear();
@@ -377,7 +385,7 @@ impl View for ProfileInfo<'_> {
                     }
                 }
 
-                self.profiles.update_config_sync().report_error();
+                self.profiles.update_profile_config(self.profile.read().profile.id).report_error();
             }
 
             if ui.button("Reset").clicked() {
@@ -401,7 +409,9 @@ impl View for ProfileInfo<'_> {
                 .on_hover_text("Open a folder where mods for this profile are located.")
                 .clicked()
             {
-                let path = Path::new(DOT_NOMI_MODS_STASH_DIR).join(format!("{}", self.profile.read().profile.id));
+                let profile_id = self.profile.read().profile.id;
+                let path = mods_stash_path_for_profile(profile_id);
+
                 if !path.exists() {
                     std::fs::create_dir_all(&path).report_error();
                 }
@@ -441,7 +451,7 @@ impl View for ProfileInfo<'_> {
 
                                 if yes.clicked() {
                                     mods_to_remove.push(m.project_id.clone());
-                                    let path = Path::new(DOT_NOMI_MODS_STASH_DIR).join(format!("{profile_id}"));
+                                    let path = mods_stash_path_for_profile(profile_id);
                                     for file in &m.files {
                                         std::fs::remove_file(path.join(&file.filename)).report_error();
                                     }
@@ -459,8 +469,8 @@ impl View for ProfileInfo<'_> {
                         let download_task = Task::new(
                             "Download mod",
                             Caller::progressing(move |progress| async move {
-                                download_added_mod(progress, profile_id, files).await;
-                                project_id
+                                download_added_mod(progress, mods_stash_path_for_profile(profile_id), files).await;
+                                (profile_id, project_id)
                             }),
                         );
 
@@ -476,7 +486,7 @@ impl View for ProfileInfo<'_> {
 
             vec.retain(|m| !mods_to_remove.contains(&m.project_id));
             if !mods_to_remove.is_empty() {
-                self.profiles.update_config_sync().report_error();
+                self.profiles.update_profile_config(self.profile.read().profile.id).report_error();
             }
 
             let _ = std::mem::replace(&mut self.profile.write().mods.mods, vec);

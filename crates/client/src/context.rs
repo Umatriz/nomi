@@ -2,7 +2,7 @@ use crate::{
     errors_pool::ErrorPoolExt,
     states::States,
     subscriber::EguiLayer,
-    views::{self, profiles::ProfilesPage, settings::SettingsPage, Logs, ModManager, ModManagerState, ProfileInfo, View},
+    views::{self, profiles::Instances, settings::SettingsPage, Logs, ModManager, ModManagerState, ProfileInfo, View},
     Tab, TabKind,
 };
 use eframe::egui::{self};
@@ -69,11 +69,11 @@ impl TabViewer for MyContext {
         match &tab.kind {
             TabKind::Mods { profile } => {
                 let profile = profile.read();
-                self.states.profiles.instances.find_instance(profile.profile.id).is_none()
+                self.states.profiles.instances.find_profile(profile.profile.id).is_none()
             }
             TabKind::ProfileInfo { profile } => {
                 let profile = profile.read();
-                self.states.profiles.instances.find_instance(profile.profile.id).is_none()
+                self.states.profiles.instances.find_profile(profile.profile.id).is_none()
             }
             _ => false,
         }
@@ -81,7 +81,7 @@ impl TabViewer for MyContext {
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         match &tab.kind {
-            TabKind::Profiles => ProfilesPage {
+            TabKind::Profiles => Instances {
                 is_allowed_to_take_action: self.is_allowed_to_take_action,
                 profile_info_state: &mut self.states.profile_info,
                 manager: &mut self.manager,

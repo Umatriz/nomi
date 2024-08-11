@@ -10,6 +10,7 @@ use nomi_core::{
     calculate_sha1,
     downloads::{progress::MappedSender, traits::Downloader, DownloadSet, FileDownloader},
     fs::read_toml_config,
+    instance::{Instance, InstanceProfileId},
 };
 use nomi_modding::{
     modrinth::{
@@ -27,6 +28,7 @@ use crate::{
 };
 
 #[derive(Serialize, Deserialize, Default, PartialEq, Eq, Hash, Debug)]
+#[serde(transparent)]
 pub struct ModsConfig {
     pub mods: Vec<Mod>,
 }
@@ -57,14 +59,13 @@ pub struct SimpleDependency {
     pub is_required: bool,
 }
 
-pub async fn download_added_mod(progress: TaskProgressShared, profile_id: usize, files: Vec<ModFile>) {
+pub async fn download_added_mod(progress: TaskProgressShared, target_path: PathBuf, files: Vec<ModFile>) {
     let _ = progress.set_total(files.len() as u32);
 
     let mut set = DownloadSet::new();
 
-    let mods_stash = Path::new(DOT_NOMI_MODS_STASH_DIR).join(format!("{profile_id}"));
     for file in files {
-        let downloader = FileDownloader::new(file.url, mods_stash.join(file.filename))
+        let downloader = FileDownloader::new(file.url, target_path.join(file.filename))
             .with_sha1(file.sha1)
             .into_retry();
         set.add(Box::new(downloader));
@@ -268,4 +269,10 @@ pub async fn load_mods(profile_id: usize) -> anyhow::Result<()> {
     loaded.write_with_comment(NOMI_LOADED_LOCK_FILE).await?;
 
     Ok(())
+}
+
+pub fn mods_stash_path_for_profile(profile_id: InstanceProfileId) -> PathBuf {
+    Instance::path_from_id(profile_id.instance())
+        .join(DOT_NOMI_MODS_STASH_DIR)
+        .join(format!("{}", profile_id.profile()))
 }
