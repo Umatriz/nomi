@@ -780,6 +780,8 @@ pub struct ForgeOldLibrary {
 mod tests {
     use tracing::{debug, Level};
 
+    use crate::instance::InstanceProfileId;
+
     use super::*;
 
     #[tokio::test]
@@ -790,10 +792,14 @@ mod tests {
 
     #[tokio::test]
     async fn create_forge_test() {
-        let recommended = Forge::new("1.7.10", ForgeVersion::Recommended, GamePaths::default()).await.unwrap();
+        let recommended = Forge::new("1.7.10", ForgeVersion::Recommended, GamePaths::from_id(InstanceProfileId::ZERO))
+            .await
+            .unwrap();
         println!("{recommended:#?}");
 
-        let latest = Forge::new("1.19.2", ForgeVersion::Latest, GamePaths::default()).await.unwrap();
+        let latest = Forge::new("1.19.2", ForgeVersion::Latest, GamePaths::from_id(InstanceProfileId::ZERO))
+            .await
+            .unwrap();
         println!("{latest:#?}");
     }
 
@@ -803,7 +809,9 @@ mod tests {
 
         debug!("Test");
 
-        let recommended = Forge::new("1.7.10", ForgeVersion::Recommended, GamePaths::default()).await.unwrap();
+        let recommended = Forge::new("1.7.10", ForgeVersion::Recommended, GamePaths::from_id(InstanceProfileId::ZERO))
+            .await
+            .unwrap();
         println!("{recommended:#?}");
 
         let io = recommended.io();

@@ -9,7 +9,7 @@ use egui_infinite_scroll::{InfiniteScroll, LoadingState};
 use egui_task_manager::{Caller, Task, TaskManager};
 use nomi_core::{
     instance::{Instance, InstanceProfileId},
-    DOT_NOMI_DATA_PACKS_DIR, MINECRAFT_DIR,
+    DOT_NOMI_DATA_PACKS_DIR,
 };
 use nomi_modding::{
     capitalize_first_letters_whitespace_split,
@@ -28,7 +28,6 @@ use crate::{
     collections::{DependenciesCollection, ModsDownloadingCollection, ProjectCollection, ProjectVersionsCollection},
     errors_pool::ErrorPoolExt,
     ui_ext::UiExt,
-    DOT_NOMI_MODS_STASH_DIR,
 };
 
 use super::{InstancesConfig, ModdedProfile, View};

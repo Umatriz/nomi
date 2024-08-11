@@ -16,7 +16,6 @@ use nomi_core::{
         forge::{Forge, ForgeVersion},
         vanilla::Vanilla,
     },
-    repository::java_runner::JavaRunner,
     state::get_launcher_manifest,
 };
 use parking_lot::RwLock;
@@ -29,8 +28,6 @@ pub async fn task_download_version(profile: Arc<RwLock<ModdedProfile>>, progress
 
 async fn try_download_version(profile: Arc<RwLock<ModdedProfile>>, progress_shared: TaskProgressShared) -> anyhow::Result<()> {
     let launch_instance = {
-        let mc_dir = PathBuf::from("./minecraft");
-
         let version_profile = {
             let version_profile = &profile.read().profile;
             version_profile.clone()
@@ -45,12 +42,7 @@ async fn try_download_version(profile: Arc<RwLock<ModdedProfile>>, progress_shar
             return Err(anyhow!("This profile is already downloaded"));
         };
 
-        let game_paths = GamePaths {
-            game: mc_dir.clone(),
-            assets: mc_dir.join("assets"),
-            profile: mc_dir.join("versions").join(version),
-            libraries: mc_dir.join("libraries"),
-        };
+        let game_paths = GamePaths::from_id(version_profile.id);
 
         let builder = Profile::builder()
             .name(version_profile.name.clone())

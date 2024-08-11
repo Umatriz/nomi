@@ -1,6 +1,9 @@
 use std::path::{Path, PathBuf};
 
-use crate::{ASSETS_DIR, LIBRARIES_DIR, MINECRAFT_DIR};
+use crate::{
+    instance::{Instance, InstanceProfileId},
+    ASSETS_DIR, LIBRARIES_DIR,
+};
 
 #[derive(Debug, Clone)]
 pub struct GamePaths {
@@ -11,14 +14,18 @@ pub struct GamePaths {
 }
 
 impl GamePaths {
-    pub fn from_instance_path(instance: impl AsRef<Path>, game_version: &str) -> Self {
+    pub fn from_id(id: InstanceProfileId) -> Self {
+        Self::from_instance_path(Instance::path_from_id(id.instance()), id.profile())
+    }
+
+    pub fn from_instance_path(instance: impl AsRef<Path>, profile_id: usize) -> Self {
         let path = instance.as_ref();
 
         Self {
             game: path.to_path_buf(),
             assets: ASSETS_DIR.into(),
             // Is this a good approach?
-            profile: path.join("profiles").join(game_version),
+            profile: path.join("profiles").join(format!("{profile_id}")),
             libraries: LIBRARIES_DIR.into(),
         }
     }
@@ -50,16 +57,5 @@ impl GamePaths {
 
     pub fn version_jar_file(&self, game_version: &str) -> PathBuf {
         self.profile.join(format!("{game_version}.jar"))
-    }
-}
-
-impl Default for GamePaths {
-    fn default() -> Self {
-        Self {
-            game: MINECRAFT_DIR.into(),
-            assets: PathBuf::from(MINECRAFT_DIR).join("assets"),
-            profile: PathBuf::from(MINECRAFT_DIR).join("versions").join("NOMI_DEFAULT"),
-            libraries: PathBuf::from(MINECRAFT_DIR).join("libraries"),
-        }
     }
 }

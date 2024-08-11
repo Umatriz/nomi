@@ -1,17 +1,14 @@
-use std::{
-    collections::HashSet,
-    path::{Path, PathBuf},
-    sync::Arc,
-};
+use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use anyhow::bail;
-use eframe::egui::{self, popup_below_widget, Align2, Button, Id, PopupCloseBehavior, TextWrapMode, Ui};
+use eframe::egui::{self, Align2, RichText, TextWrapMode, Ui};
 use egui_extras::{Column, TableBuilder};
 use egui_task_manager::{Caller, Task, TaskManager};
 use itertools::Itertools;
 use nomi_core::{
-    configs::profile::{Loader, ProfileState, VersionProfile},
-    fs::{read_toml_config, read_toml_config_sync, write_toml_config, write_toml_config_sync},
+    configs::profile::{ProfileState, VersionProfile},
+    fs::write_toml_config_sync,
+    game_paths::GamePaths,
     instance::{launch::arguments::UserData, load_instances, Instance, InstanceProfileId, ProfilePayload},
     repository::{launcher_manifest::LauncherManifest, username::Username},
 };
@@ -21,11 +18,10 @@ use tracing::error;
 
 use crate::{
     cache::GLOBAL_CACHE,
-    collections::{AssetsCollection, GameDeletionCollection, GameDownloadingCollection, GameRunnerCollection},
+    collections::{AssetsCollection, GameDownloadingCollection, GameRunnerCollection},
     download::{task_assets, task_download_version},
     errors_pool::ErrorPoolExt,
     ui_ext::UiExt,
-    TabKind, DOT_NOMI_MODS_STASH_DIR,
 };
 
 use super::{
@@ -158,8 +154,139 @@ impl InstancesConfig {
     }
 }
 
+impl Instances<'_> {
+    fn profile_action_ui(&mut self, ui: &mut Ui, profile_lock: Arc<RwLock<ModdedProfile>>) {
+        let profile = profile_lock.read();
+        match &profile.profile.state {
+            ProfileState::Downloaded(instance) => {
+                if ui.add_enabled(self.is_allowed_to_take_action, egui::Button::new("Launch")).clicked() {
+                    let user_data = UserData {
+                        username: Username::new(self.settings_state.username.clone()).unwrap(),
+                        uuid: Some(self.settings_state.uuid.clone()),
+                        access_token: None,
+                    };
+
+                    let instance = instance.clone();
+                    let java_runner = self.settings_state.java.clone();
+
+                    let should_load_mods = profile.profile.loader().support_mods();
+                    let profile_id = profile.profile.id;
+
+                    let game_logs = self.logs_state.game_logs.clone();
+                    game_logs.clear();
+                    let run_game = Task::new(
+                        "Running the game",
+                        Caller::standard(async move {
+                            if should_load_mods {
+                                load_mods(profile_id).await.report_error();
+                            }
+
+                            instance
+                                .launch(GamePaths::from_id(profile_id), user_data, &java_runner, &*game_logs)
+                                .await
+                                .report_error()
+                        }),
+                    );
+
+                    self.manager.push_task::<GameRunnerCollection>(run_game)
+                }
+            }
+            ProfileState::NotDownloaded { .. } => {
+                if ui
+                    .add_enabled(
+                        !self.profiles_state.currently_downloading_profiles.contains(&profile.profile.id),
+                        egui::Button::new("Download"),
+                    )
+                    .clicked()
+                {
+                    self.profiles_state.currently_downloading_profiles.insert(profile.profile.id);
+
+                    let game_version = profile.profile.version().to_owned();
+
+                    let game_paths = GamePaths::from_id(profile.profile.id);
+                    let assets_task = Task::new(
+                        format!("Assets ({})", profile.profile.version()),
+                        Caller::progressing(|progress| task_assets(game_version, game_paths.assets, progress)),
+                    );
+                    self.manager.push_task::<AssetsCollection>(assets_task);
+
+                    let profile_clone = profile_lock.clone();
+
+                    let id = profile.profile.id;
+                    let game_task = Task::new(
+                        format!("Downloading version {}", profile.profile.version()),
+                        Caller::progressing(move |progress| async move { task_download_version(profile_clone, progress).await.map(|()| id) }),
+                    );
+                    self.manager.push_task::<GameDownloadingCollection>(game_task);
+                }
+            }
+        }
+    }
+
+    fn show_profiles_for_instance(&mut self, ui: &mut Ui, profiles: &[ProfilePayload], is_allowed_to_take_action: bool) {
+        TableBuilder::new(ui)
+            .column(Column::auto().at_least(120.0).at_most(240.0))
+            .columns(Column::auto(), 5)
+            .header(20.0, |mut header| {
+                header.col(|ui| {
+                    ui.label("Name");
+                });
+                header.col(|ui| {
+                    ui.label("Version");
+                });
+                header.col(|ui| {
+                    ui.label("Loader");
+                });
+            })
+            .body(|mut body| {
+                // let mut is_deleting = vec![];
+
+                for (_index, profile) in profiles.iter().enumerate() {
+                    body.row(30.0, |mut row| {
+                        row.col(|ui| {
+                            ui.add(egui::Label::new(&profile.name).truncate());
+                        });
+                        row.col(|ui| {
+                            ui.label(&profile.version);
+                        });
+                        row.col(|ui| {
+                            ui.label(profile.loader.name());
+                        });
+                        row.col(|ui| {
+                            if let Some(profile) = self.profiles_state.instances.find_profile(profile.id) {
+                                self.profile_action_ui(ui, profile)
+                            } else {
+                                ui.error_label("Cannot find the profile");
+                            }
+                        });
+
+                        row.col(|ui| {
+                            if ui.button("TODO: Details").clicked() {
+                                // self.profile_info_state.set_profile_to_edit(&profile_lock.read());
+
+                                // let kind = TabKind::ProfileInfo {
+                                //     profile: profile_lock.clone(),
+                                // };
+                                // self.tabs_state.0.insert(kind.id(), kind);
+                            }
+                        });
+
+                        row.col(|ui| {
+                            ui.button("TODO: Delete");
+                        });
+                    });
+                }
+
+                // is_deleting.drain(..).for_each(|index| {
+                //     self.profiles_state.instances.instances.remove(index);
+                //     self.profiles_state.instances.update_config_sync().report_error();
+                // });
+            });
+    }
+}
+
 impl View for Instances<'_> {
-    fn ui(self, ui: &mut Ui) {
+    fn ui(mut self, ui: &mut Ui) {
         {
             ui.toggle_value(self.is_profile_window_open, "Add new profile");
 
@@ -182,128 +309,20 @@ impl View for Instances<'_> {
         }
 
         ui.style_mut().wrap_mode = Some(TextWrapMode::Extend);
+
+        let iter = self.profiles_state.instances.instances.iter().cloned().collect_vec().into_iter();
+        for instance in iter {
+            let instance = instance.read();
+            ui.group(|ui| {
+                ui.label(RichText::new(instance.name()).strong());
+                egui::CollapsingHeader::new("Profiles")
+                    .id_source(egui::Id::new(instance.id()).with("__profiles_list"))
+                    .show(ui, |ui| {
+                        self.show_profiles_for_instance(ui, instance.profiles(), self.is_allowed_to_take_action)
+                    });
+            });
+        }
     }
-}
-
-fn show_profiles_for_instance(ui: &mut Ui, profiles: &mut Vec<ProfilePayload>, is_allowed_to_take_action: bool) {
-    TableBuilder::new(ui)
-        .column(Column::auto().at_least(120.0).at_most(240.0))
-        .columns(Column::auto(), 5)
-        .header(20.0, |mut header| {
-            header.col(|ui| {
-                ui.label("Name");
-            });
-            header.col(|ui| {
-                ui.label("Version");
-            });
-            header.col(|ui| {
-                ui.label("Loader");
-            });
-        })
-        .body(|mut body| {
-            // let mut is_deleting = vec![];
-
-            for (_index, profile) in profiles.iter().enumerate() {
-                body.row(30.0, |mut row| {
-                    row.col(|ui| {
-                        ui.add(egui::Label::new(&profile.name).truncate());
-                    });
-                    row.col(|ui| {
-                        ui.label(&profile.version);
-                    });
-                    row.col(|ui| {
-                        ui.label(profile.loader.name());
-                    });
-                    row.col(|ui| {
-                        if profile.is_downloaded {
-                            ui.button("TODO: Launch");
-                        } else {
-                            ui.button("TODO: Download");
-                        }
-                    });
-
-                    row.col(|ui| {
-                        if ui.button("TODO: Details").clicked() {
-                            // self.profile_info_state.set_profile_to_edit(&profile_lock.read());
-
-                            // let kind = TabKind::ProfileInfo {
-                            //     profile: profile_lock.clone(),
-                            // };
-                            // self.tabs_state.0.insert(kind.id(), kind);
-                        }
-                    });
-
-                    row.col(|ui| {
-                        ui.button("TODO: Delete");
-                    });
-                });
-            }
-
-            // is_deleting.drain(..).for_each(|index| {
-            //     self.profiles_state.instances.instances.remove(index);
-            //     self.profiles_state.instances.update_config_sync().report_error();
-            // });
-        });
-}
-
-fn profile_action_ui() {
-    // match &profile.is_downloaded {
-    // ProfileState::Downloaded(instance) => {
-    //     if ui.add_enabled(self.is_allowed_to_take_action, egui::Button::new("Launch")).clicked() {
-    //         let user_data = UserData {
-    //             username: Username::new(self.settings_state.username.clone()).unwrap(),
-    //             uuid: Some(self.settings_state.uuid.clone()),
-    //             access_token: None,
-    //         };
-
-    //         let instance = instance.clone();
-    //         let java_runner = self.settings_state.java.clone();
-
-    //         let should_load_mods = profile.profile.loader().is_fabric();
-    //         let profile_id = profile.profile.id;
-
-    //         let game_logs = self.logs_state.game_logs.clone();
-    //         game_logs.clear();
-    //         let run_game = Task::new(
-    //             "Running the game",
-    //             Caller::standard(async move {
-    //                 if should_load_mods {
-    //                     load_mods(profile_id).await.report_error();
-    //                 }
-
-    //                 instance.launch(user_data, &java_runner, &*game_logs).await.report_error()
-    //             }),
-    //         );
-
-    //         self.manager.push_task::<GameRunnerCollection>(run_game)
-    //     }
-    // }
-    // ProfileState::NotDownloaded { .. } => {
-    //     if ui
-    //         .add_enabled(
-    //             !self.profiles_state.currently_downloading_profiles.contains(&profile.profile.id),
-    //             egui::Button::new("Download"),
-    //         )
-    //         .clicked()
-    //     {
-    //         self.profiles_state.currently_downloading_profiles.insert(profile.profile.id);
-
-    //         let game_version = profile.profile.version().to_owned();
-
-    //         let assets_task = Task::new(
-    //             format!("Assets ({})", profile.profile.version()),
-    //             Caller::progressing(|progress| task_assets(game_version, PathBuf::from("./minecraft/assets"), progress)),
-    //         );
-    //         self.manager.push_task::<AssetsCollection>(assets_task);
-
-    //         let profile_clone = profile_lock.clone();
-
-    //         let game_task = Task::new(
-    //             format!("Downloading version {}", profile.profile.version()),
-    //             Caller::progressing(|progress| task_download_version(profile_clone, progress)),
-    //         );
-    //         self.manager.push_task::<GameDownloadingCollection>(game_task);
-    //     }
 }
 
 fn delete_profile_ui() {

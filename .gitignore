@@ -10,6 +10,10 @@ logs/
 log/
 nomi_logs/
 
+/assets/
+/instances/
+/libraries/
+
 debug/
 
 node_modules

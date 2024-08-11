@@ -18,7 +18,7 @@ async fn instance_test() {
 
     let mut instance = Instance::new("cool-instance", 0);
 
-    let paths = GamePaths::from_instance_path(instance.path(), "1.19.2");
+    let paths = GamePaths::from_instance_path(instance.path(), 0);
     let profile = Profile::builder()
         .game_paths(paths.clone())
         .downloader(Box::new(Vanilla::new("1.19.2", paths.clone()).await.unwrap()))

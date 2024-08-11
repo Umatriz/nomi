@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::path::PathBuf;
 
 use egui_task_manager::{Caller, Task, TaskManager};
 use nomi_core::{
@@ -15,7 +15,7 @@ use crate::{
         add_tab_menu::TabsState,
         profiles::ProfilesState,
         settings::{ClientSettingsState, SettingsState},
-        AddProfileMenuState, InstancesConfig, LogsState, ModManagerState, ProfileInfoState,
+        AddProfileMenuState, LogsState, ModManagerState, ProfileInfoState,
     },
 };
 

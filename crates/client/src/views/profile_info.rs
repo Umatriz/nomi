@@ -1,21 +1,17 @@
 use std::{
     collections::HashSet,
-    path::{Path, PathBuf},
     sync::Arc,
 };
 
 use eframe::egui::{self, Color32, Id, RichText, TextEdit};
 use egui_task_manager::{Caller, Task, TaskManager};
-use nomi_core::{
-    configs::profile::ProfileState,
-    instance::{Instance, InstanceProfileId},
-};
+use nomi_core::configs::profile::ProfileState;
 use nomi_modding::modrinth::project::ProjectId;
 use parking_lot::RwLock;
 
 use crate::{
     collections::DownloadAddedModsCollection, errors_pool::ErrorPoolExt, open_directory::open_directory_native, ui_ext::UiExt,
-    views::InstancesConfig, TabKind, DOT_NOMI_MODS_STASH_DIR,
+    views::InstancesConfig, TabKind,
 };
 
 use super::{download_added_mod, mods_stash_path_for_profile, Mod, ModdedProfile, TabsState, View};

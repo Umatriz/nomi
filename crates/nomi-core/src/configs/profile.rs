@@ -35,6 +35,10 @@ impl Display for Loader {
 }
 
 impl Loader {
+    pub fn support_mods(&self) -> bool {
+        !self.is_vanilla()
+    }
+
     pub fn is_fabric(&self) -> bool {
         matches!(*self, Self::Fabric { .. })
     }

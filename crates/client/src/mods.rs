@@ -22,10 +22,7 @@ use nomi_modding::{
 use serde::{Deserialize, Serialize};
 use tokio::{fs::File, io::AsyncWriteExt};
 
-use crate::{
-    errors_pool::ErrorPoolExt, progress::UnitProgress, DOT_NOMI_MODS_STASH_DIR, MINECRAFT_MODS_DIRECTORY, NOMI_LOADED_LOCK_FILE,
-    NOMI_LOADED_LOCK_FILE_NAME,
-};
+use crate::{errors_pool::ErrorPoolExt, progress::UnitProgress, DOT_NOMI_MODS_STASH_DIR, NOMI_LOADED_LOCK_FILE, NOMI_LOADED_LOCK_FILE_NAME};
 
 #[derive(Serialize, Deserialize, Default, PartialEq, Eq, Hash, Debug)]
 #[serde(transparent)]
@@ -188,27 +185,31 @@ impl CurrentlyLoaded {
 }
 
 /// Load profile's mods by creating hard links.
-pub async fn load_mods(profile_id: usize) -> anyhow::Result<()> {
-    async fn make_link(source: &Path, file_name: &OsStr) -> anyhow::Result<()> {
-        let dst = PathBuf::from(MINECRAFT_MODS_DIRECTORY).join(file_name);
+pub async fn load_mods(id: InstanceProfileId) -> anyhow::Result<()> {
+    async fn make_link(source: &Path, mods_dir: &Path, file_name: &OsStr) -> anyhow::Result<()> {
+        let dst = mods_dir.join(file_name);
         tokio::fs::hard_link(source, dst).await.map_err(|e| e.into())
     }
 
-    if !Path::new(NOMI_LOADED_LOCK_FILE).exists() {
-        CurrentlyLoaded { id: profile_id }.write_with_comment(NOMI_LOADED_LOCK_FILE).await?
+    let instance_path = Instance::path_from_id(id.instance());
+    let mods_stash = mods_stash_path_for_profile(id);
+    let mods_dir = instance_path.join("mods");
+    let loaded_lock_path = mods_dir.join(NOMI_LOADED_LOCK_FILE);
+
+    if !loaded_lock_path.exists() {
+        CurrentlyLoaded { id: id.profile() }.write_with_comment(&loaded_lock_path).await?
     }
 
-    let mut loaded = read_toml_config::<CurrentlyLoaded>(NOMI_LOADED_LOCK_FILE).await?;
+    let mut loaded = read_toml_config::<CurrentlyLoaded>(&loaded_lock_path).await?;
 
-    let target_dir = PathBuf::from(MINECRAFT_MODS_DIRECTORY)
+    let target_dir = mods_dir
         .read_dir()?
         .filter_map(|r| r.ok())
         .map(|e| (e.file_name(), e.path()))
         .collect::<Vec<_>>();
 
-    if loaded.id == profile_id {
-        let path = PathBuf::from(DOT_NOMI_MODS_STASH_DIR).join(format!("{profile_id}"));
-        let mut dir = tokio::fs::read_dir(path).await?;
+    if loaded.id == id.profile() {
+        let mut dir = tokio::fs::read_dir(mods_stash).await?;
 
         let mut mods_in_the_stash = Vec::new();
 
@@ -219,13 +220,13 @@ pub async fn load_mods(profile_id: usize) -> anyhow::Result<()> {
                 continue;
             }
 
-            let path = entry.path();
+            let source = entry.path();
 
-            let Some(file_name) = path.file_name() else {
+            let Some(file_name) = source.file_name() else {
                 continue;
             };
 
-            make_link(&path, file_name).await?;
+            make_link(&source, &mods_dir, file_name).await?;
         }
 
         for (file_name, path) in target_dir {
@@ -243,7 +244,7 @@ pub async fn load_mods(profile_id: usize) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let mut dir = tokio::fs::read_dir(MINECRAFT_MODS_DIRECTORY).await?;
+    let mut dir = tokio::fs::read_dir(&mods_dir).await?;
     while let Ok(Some(entry)) = dir.next_entry().await {
         if entry.file_name() == NOMI_LOADED_LOCK_FILE_NAME {
             continue;
@@ -252,21 +253,21 @@ pub async fn load_mods(profile_id: usize) -> anyhow::Result<()> {
         tokio::fs::remove_file(entry.path()).await?;
     }
 
-    let mut dir = tokio::fs::read_dir(PathBuf::from(DOT_NOMI_MODS_STASH_DIR).join(format!("{profile_id}"))).await?;
+    let mut dir = tokio::fs::read_dir(mods_stash).await?;
 
     while let Ok(Some(entry)) = dir.next_entry().await {
-        let path = entry.path();
+        let source = entry.path();
 
-        let Some(file_name) = path.file_name() else {
+        let Some(file_name) = source.file_name() else {
             continue;
         };
 
-        make_link(&path, file_name).await?;
+        make_link(&source, &mods_dir, file_name).await?;
     }
 
-    loaded.id = profile_id;
+    loaded.id = id.profile();
 
-    loaded.write_with_comment(NOMI_LOADED_LOCK_FILE).await?;
+    loaded.write_with_comment(loaded_lock_path).await?;
 
     Ok(())
 }

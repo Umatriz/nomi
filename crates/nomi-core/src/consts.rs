@@ -7,7 +7,6 @@ pub const DOT_NOMI_JAVA_DIR: &str = "./.nomi/java";
 pub const DOT_NOMI_JAVA_EXECUTABLE: &str = "./.nomi/java/jdk-22.0.1/bin/java";
 pub const DOT_NOMI_DATA_PACKS_DIR: &str = "./.nomi/datapacks";
 
-pub const MINECRAFT_DIR: &str = "./minecraft";
 pub const LIBRARIES_DIR: &str = "./libraries";
 pub const ASSETS_DIR: &str = "./assets";
 

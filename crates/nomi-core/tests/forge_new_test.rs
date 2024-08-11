@@ -10,7 +10,7 @@ use nomi_core::{
     },
     loaders::forge::{Forge, ForgeVersion},
     repository::java_runner::JavaRunner,
-    DOT_NOMI_JAVA_EXECUTABLE, MINECRAFT_DIR,
+    DOT_NOMI_JAVA_EXECUTABLE,
 };
 
 #[tokio::test]
@@ -19,10 +19,7 @@ async fn forge_test() {
 
     let (tx, _) = tokio::sync::mpsc::channel(100);
 
-    let game_paths = GamePaths {
-        profile: PathBuf::from(MINECRAFT_DIR).join("versions").join("forge-test"),
-        ..Default::default()
-    };
+    let game_paths = GamePaths::from_id(InstanceProfileId::ZERO);
 
     let instance = Profile::builder()
         .name("forge-test".into())

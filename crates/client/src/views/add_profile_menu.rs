@@ -101,7 +101,16 @@ impl View for AddProfileMenu<'_> {
 
         egui::ComboBox::from_label("Select instance to create profile for").show_ui(ui, |ui| {
             for instance in &self.profiles_state.instances.instances {
-                if ui.button(instance.read().name()).clicked() {
+                if ui
+                    .selectable_label(
+                        self.menu_state
+                            .parent_instance
+                            .as_ref()
+                            .is_some_and(|i| i.read().id() == instance.read().id()),
+                        instance.read().name(),
+                    )
+                    .clicked()
+                {
                     self.menu_state.parent_instance = Some(instance.clone());
                 }
             }
@@ -256,7 +265,7 @@ impl View for AddProfileMenu<'_> {
                         },
                     };
 
-                    let path = GamePaths::from_instance_path(instance.path(), &version).profile_config();
+                    let path = GamePaths::from_instance_path(instance.path(), profile.id.profile()).profile_config();
 
                     let payload = ProfilePayload::from_version_profile(&profile, &path);
                     let profile = ModdedProfile::new(profile);
@@ -267,9 +276,12 @@ impl View for AddProfileMenu<'_> {
                 };
 
                 {
-                    let mut instance = instance.write();
-                    instance.add_profile(payload);
-                    self.profiles_state.instances.update_instance_config(instance.id()).report_error();
+                    let id = {
+                        let mut instance = instance.write();
+                        instance.add_profile(payload);
+                        instance.id()
+                    };
+                    self.profiles_state.instances.update_instance_config(id).report_error();
                 }
             }
         }
