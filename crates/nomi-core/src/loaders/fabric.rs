@@ -31,6 +31,8 @@ use crate::{
     PinnedFutureWithBounds,
 };
 
+use super::ToLoaderProfile;
+
 #[derive(Debug)]
 pub struct Fabric {
     pub game_version: String,
@@ -91,8 +93,10 @@ impl Fabric {
             libraries_downloader,
         })
     }
+}
 
-    pub fn to_profile(&self) -> LoaderProfile {
+impl ToLoaderProfile for Fabric {
+    fn to_profile(&self) -> LoaderProfile {
         LoaderProfile {
             loader: Loader::Fabric {
                 version: Some(self.fabric_version.clone()),
@@ -149,11 +153,5 @@ impl Downloader for Fabric {
         };
 
         Box::pin(fut)
-    }
-}
-
-impl LaunchInstanceBuilderExt for Fabric {
-    fn insert(&self, builder: LaunchInstanceBuilder<LaunchSettings>) -> LaunchInstanceBuilder<LaunchSettings> {
-        builder.profile(self.to_profile())
     }
 }

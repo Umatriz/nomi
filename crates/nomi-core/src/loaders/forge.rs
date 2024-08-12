@@ -38,6 +38,8 @@ use crate::{
     PinnedFutureWithBounds, DOT_NOMI_TEMP_DIR,
 };
 
+use super::ToLoaderProfile;
+
 const FORGE_REPO_URL: &str = "https://maven.minecraftforge.net";
 
 const _NEO_FORGE_REPO_URL: &str = "https://maven.neoforged.net/releases/";
@@ -69,15 +71,6 @@ pub struct Forge {
 }
 
 impl Forge {
-    pub fn to_profile(&self) -> LoaderProfile {
-        LoaderProfile {
-            loader: Loader::Forge,
-            main_class: self.profile.main_class().to_string(),
-            args: self.profile.simple_args(),
-            libraries: self.profile.simple_libraries(),
-        }
-    }
-
     #[tracing::instrument(skip_all, err)]
     pub async fn get_versions(game_version: impl Into<String>) -> anyhow::Result<Vec<String>> {
         let game_version = game_version.into();
@@ -291,6 +284,17 @@ impl Forge {
     }
 }
 
+impl ToLoaderProfile for Forge {
+    fn to_profile(&self) -> LoaderProfile {
+        LoaderProfile {
+            loader: Loader::Forge,
+            main_class: self.profile.main_class().to_string(),
+            args: self.profile.simple_args(),
+            libraries: self.profile.simple_libraries(),
+        }
+    }
+}
+
 fn forge_installer_path(game_version: &str, forge_version: &str) -> PathBuf {
     Path::new(DOT_NOMI_TEMP_DIR).join(format!("{game_version}-{forge_version}.jar"))
 }
@@ -386,12 +390,6 @@ impl Downloader for Forge {
             self.processors_data.clone(),
             self.library_data.clone(),
         ))
-    }
-}
-
-impl LaunchInstanceBuilderExt for Forge {
-    fn insert(&self, builder: LaunchInstanceBuilder<LaunchSettings>) -> LaunchInstanceBuilder<LaunchSettings> {
-        builder.profile(self.to_profile())
     }
 }
 

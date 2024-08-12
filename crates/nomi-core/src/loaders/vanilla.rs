@@ -141,9 +141,3 @@ impl Downloader for Vanilla {
         Box::pin(fut)
     }
 }
-
-impl LaunchInstanceBuilderExt for Vanilla {
-    fn insert(&self, builder: LaunchInstanceBuilder<LaunchSettings>) -> LaunchInstanceBuilder<LaunchSettings> {
-        builder
-    }
-}

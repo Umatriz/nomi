@@ -12,6 +12,7 @@ use nomi_core::{
     game_paths::GamePaths,
     instance::{launch::LaunchSettings, Profile},
     loaders::{
+        combined::VanillaCombinedDownloader,
         fabric::Fabric,
         forge::{Forge, ForgeVersion},
         vanilla::Vanilla,
@@ -49,14 +50,21 @@ async fn try_download_version(profile: Arc<RwLock<ModdedProfile>>, progress_shar
             .version(version_profile.version().to_string())
             .game_paths(game_paths.clone());
 
+        let combined_downloader = VanillaCombinedDownloader::new(version_profile.version(), game_paths.clone()).await?;
         let instance = match loader {
-            Loader::Vanilla => builder.downloader(Box::new(Vanilla::new(version_profile.version(), game_paths.clone()).await?)),
-            Loader::Fabric { version } => builder.downloader(Box::new(
-                Fabric::new(version_profile.version(), version.as_ref(), game_paths.clone()).await?,
-            )),
-            Loader::Forge => builder.downloader(Box::new(
-                Forge::new(version_profile.version(), ForgeVersion::Recommended, game_paths.clone()).await?,
-            )),
+            Loader::Vanilla => builder.downloader(Box::new(combined_downloader)),
+            Loader::Fabric { version } => {
+                let combined = combined_downloader
+                    .with_loader(|game_version, game_paths| Fabric::new(game_version, version.as_ref(), game_paths))
+                    .await?;
+                builder.downloader(Box::new(combined))
+            }
+            Loader::Forge => {
+                let combined = combined_downloader
+                    .with_loader(|game_version, game_paths| Forge::new(game_version, ForgeVersion::Recommended, game_paths))
+                    .await?;
+                builder.downloader(Box::new(combined))
+            }
         }
         .build();
 
@@ -70,7 +78,7 @@ async fn try_download_version(profile: Arc<RwLock<ModdedProfile>>, progress_shar
 
         let instance = instance.downloader();
         let io = instance.io();
-        let downloader: Box<dyn Downloader<Data = DownloadResult>> = instance.into_downloader();
+        let downloader = instance.into_downloader();
         io.await?;
 
         let downloader = DownloadQueue::new().with_downloader_dyn(downloader);

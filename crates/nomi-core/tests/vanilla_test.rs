@@ -1,4 +1,4 @@
-use nomi_core::{instance::launch::LaunchSettings, repository::java_runner::JavaRunner};
+use nomi_core::instance::launch::LaunchSettings;
 
 #[tokio::test]
 async fn vanilla_test() {
