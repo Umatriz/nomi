@@ -1354,7 +1354,7 @@ dependencies = [
 [[package]]
 name = "egui_task_manager"
 version = "0.1.1"
-source = "git+https://github.com/Umatriz/egui-task-manager#19b25af2e22e8ef77ffacb012a4057215663ef7a"
+source = "git+https://github.com/Umatriz/egui-task-manager#fee4f0449da1f8a60849e18d384f1d39b9fc576c"
 dependencies = [
  "egui",
  "tokio",

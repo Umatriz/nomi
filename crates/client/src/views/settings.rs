@@ -147,7 +147,7 @@ impl View for SettingsPage<'_> {
                     .on_hover_text("Pressing this button will start the Java downloading process and add the downloaded binary as selected")
                     .clicked()
                 {
-                    self.java_state.download_java(self.manager);
+                    self.java_state.download_java(self.manager, ui.ctx().clone());
                     self.settings_state.java = JavaRunner::path(PathBuf::from(DOT_NOMI_JAVA_EXECUTABLE));
                     self.settings_state.update_config();
                 }

@@ -1,21 +1,17 @@
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::anyhow;
+use eframe::egui::Context;
 use egui_task_manager::TaskProgressShared;
 use nomi_core::{
     configs::profile::{Loader, ProfileState},
-    downloads::{
-        progress::MappedSender,
-        traits::{DownloadResult, Downloader},
-        AssetsDownloader, DownloadQueue,
-    },
+    downloads::{progress::MappedSender, traits::Downloader, AssetsDownloader, DownloadQueue},
     game_paths::GamePaths,
     instance::{launch::LaunchSettings, Profile},
     loaders::{
         combined::VanillaCombinedDownloader,
         fabric::Fabric,
         forge::{Forge, ForgeVersion},
-        vanilla::Vanilla,
     },
     state::get_launcher_manifest,
 };
@@ -23,11 +19,11 @@ use parking_lot::RwLock;
 
 use crate::{errors_pool::ErrorPoolExt, views::ModdedProfile};
 
-pub async fn task_download_version(profile: Arc<RwLock<ModdedProfile>>, progress_shared: TaskProgressShared) -> Option<()> {
-    try_download_version(profile, progress_shared).await.report_error()
+pub async fn task_download_version(progress_shared: TaskProgressShared, ctx: Context, profile: Arc<RwLock<ModdedProfile>>) -> Option<()> {
+    try_download_version(progress_shared, ctx, profile).await.report_error()
 }
 
-async fn try_download_version(profile: Arc<RwLock<ModdedProfile>>, progress_shared: TaskProgressShared) -> anyhow::Result<()> {
+async fn try_download_version(progress_shared: TaskProgressShared, ctx: Context, profile: Arc<RwLock<ModdedProfile>>) -> anyhow::Result<()> {
     let launch_instance = {
         let version_profile = {
             let version_profile = &profile.read().profile;
@@ -85,7 +81,7 @@ async fn try_download_version(profile: Arc<RwLock<ModdedProfile>>, progress_shar
 
         let _ = progress_shared.set_total(downloader.total());
 
-        let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress_shared.sender()));
+        let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress_shared.sender())).with_side_effect(move || ctx.request_repaint());
 
         Box::new(downloader).download(&mapped_sender).await;
 
@@ -97,11 +93,11 @@ async fn try_download_version(profile: Arc<RwLock<ModdedProfile>>, progress_shar
     Ok(())
 }
 
-pub async fn task_assets(version: String, assets_dir: PathBuf, progress_shared: TaskProgressShared) -> Option<()> {
-    try_assets(version, assets_dir, progress_shared).await.report_error()
+pub async fn task_assets(progress_shared: TaskProgressShared, ctx: Context, version: String, assets_dir: PathBuf) -> Option<()> {
+    try_assets(progress_shared, ctx, version, assets_dir).await.report_error()
 }
 
-async fn try_assets(version: String, assets_dir: PathBuf, progress_shared: TaskProgressShared) -> anyhow::Result<()> {
+async fn try_assets(progress_shared: TaskProgressShared, ctx: Context, version: String, assets_dir: PathBuf) -> anyhow::Result<()> {
     let manifest = get_launcher_manifest().await?;
     let version_manifest = manifest.get_version_manifest(version).await?;
 
@@ -117,7 +113,7 @@ async fn try_assets(version: String, assets_dir: PathBuf, progress_shared: TaskP
 
     let _ = progress_shared.set_total(downloader.total());
 
-    let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress_shared.sender()));
+    let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress_shared.sender())).with_side_effect(move || ctx.request_repaint());
 
     Box::new(downloader).download(&mapped_sender).await;
 

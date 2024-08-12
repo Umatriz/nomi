@@ -22,11 +22,7 @@ use crate::{
         DownloadQueue, FileDownloader, LibrariesDownloader, LibrariesMapper,
     },
     game_paths::GamePaths,
-    instance::{
-        builder_ext::LaunchInstanceBuilderExt,
-        launch::{LaunchInstanceBuilder, LaunchSettings, CLASSPATH_SEPARATOR},
-        loader::LoaderProfile,
-    },
+    instance::{launch::CLASSPATH_SEPARATOR, loader::LoaderProfile},
     loaders::vanilla::VanillaLibrariesMapper,
     maven_data::{MavenArtifact, MavenData},
     repository::{

@@ -1,14 +1,8 @@
 use std::fmt::Debug;
 
-use crate::{
-    downloads::traits::{DownloadResult, Downloader},
-    loaders::vanilla::Vanilla,
-};
+use crate::downloads::traits::{DownloadResult, Downloader};
 
-use super::{
-    builder_ext::LaunchInstanceBuilderExt,
-    launch::{LaunchInstanceBuilder, LaunchSettings},
-};
+use super::builder_ext::LaunchInstanceBuilderExt;
 
 pub trait ProfileDownloader: LaunchInstanceBuilderExt + Downloader<Data = DownloadResult> + Debug + Send + Sync {
     fn into_downloader(self: Box<Self>) -> Box<dyn Downloader<Data = DownloadResult>>;

@@ -4,6 +4,7 @@ use std::{
     sync::{mpsc::Sender, Arc},
 };
 
+use eframe::egui::Context;
 use egui_task_manager::{Progress, TaskProgressShared};
 use itertools::Itertools;
 use nomi_core::{
@@ -56,7 +57,7 @@ pub struct SimpleDependency {
     pub is_required: bool,
 }
 
-pub async fn download_added_mod(progress: TaskProgressShared, target_path: PathBuf, files: Vec<ModFile>) {
+pub async fn download_added_mod(progress: TaskProgressShared, ctx: Context, target_path: PathBuf, files: Vec<ModFile>) {
     let _ = progress.set_total(files.len() as u32);
 
     let mut set = DownloadSet::new();
@@ -68,7 +69,7 @@ pub async fn download_added_mod(progress: TaskProgressShared, target_path: PathB
         set.add(Box::new(downloader));
     }
 
-    let sender = MappedSender::new_progress_mapper(Box::new(progress.sender()));
+    let sender = MappedSender::new_progress_mapper(Box::new(progress.sender())).with_side_effect(move || ctx.request_repaint());
 
     Box::new(set).download(&sender).await;
 }
@@ -106,7 +107,7 @@ pub async fn proceed_deps(dist: &mut Vec<SimpleDependency>, version: Arc<Version
     Ok(())
 }
 
-pub async fn download_mods(progress: TaskProgressShared, versions: Vec<(Arc<Version>, PathBuf, String)>) -> anyhow::Result<Vec<Mod>> {
+pub async fn download_mods(progress: TaskProgressShared, ctx: Context, versions: Vec<(Arc<Version>, PathBuf, String)>) -> anyhow::Result<Vec<Mod>> {
     let _ = progress.set_total(
         versions
             .iter()
@@ -116,14 +117,14 @@ pub async fn download_mods(progress: TaskProgressShared, versions: Vec<(Arc<Vers
 
     let mut mods = Vec::new();
     for (version, path, name) in versions {
-        let mod_value = download_mod(progress.sender(), path, name, version).await?;
+        let mod_value = download_mod(progress.sender(), ctx.clone(), path, name, version).await?;
         mods.push(mod_value);
     }
 
     Ok(mods)
 }
 
-pub async fn download_mod(sender: Sender<Box<dyn Progress>>, dir: PathBuf, name: String, version: Arc<Version>) -> anyhow::Result<Mod> {
+pub async fn download_mod(sender: Sender<Box<dyn Progress>>, ctx: Context, dir: PathBuf, name: String, version: Arc<Version>) -> anyhow::Result<Mod> {
     let mut set = DownloadSet::new();
 
     let mut downloaded_files = Vec::new();
@@ -150,7 +151,7 @@ pub async fn download_mod(sender: Sender<Box<dyn Progress>>, dir: PathBuf, name:
         set.add(Box::new(downloader));
     }
 
-    let sender = MappedSender::new_progress_mapper(Box::new(sender));
+    let sender = MappedSender::new_progress_mapper(Box::new(sender)).with_side_effect(move || ctx.request_repaint());
 
     Box::new(set).download(&sender).await;
 

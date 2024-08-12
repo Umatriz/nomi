@@ -595,6 +595,7 @@ impl View for ModManager<'_> {
                                     let lock = profile.read();
                                     lock.profile.id
                                 };
+                                let ctx = ui.ctx().clone();
                                 let download_mod = Task::new(
                                     "Download mods",
                                     Caller::progressing(move |progress| async move {
@@ -625,7 +626,7 @@ impl View for ModManager<'_> {
                                             versions_with_paths.push(data);
                                         }
 
-                                        let mods = download_mods(progress, versions_with_paths).await.report_error();
+                                        let mods = download_mods(progress, ctx, versions_with_paths).await.report_error();
 
                                         if let Some((mut profile, mods)) = mods.map(|mods| (profile.write(), mods)) {
                                             if matches!(project_type, ProjectType::Mod) {

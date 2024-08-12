@@ -1,6 +1,7 @@
 // Remove console window in release builds
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use cache::ui_for_loaded_profiles;
 use collections::{AssetsCollection, GameDownloadingCollection, GameRunnerCollection, JavaCollection};
 use context::MyContext;
 use eframe::{
@@ -160,7 +161,7 @@ impl eframe::App for MyTabs {
         ctx.set_pixels_per_point(self.context.states.client_settings.pixels_per_point);
 
         if !self.context.states.java.is_downloaded {
-            self.context.states.java.download_java(&mut self.context.manager);
+            self.context.states.java.download_java(&mut self.context.manager, ctx.clone());
         }
 
         egui::TopBottomPanel::top("top_panel_id").show(ctx, |ui| {

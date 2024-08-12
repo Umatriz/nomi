@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use eframe::egui::Context;
 use egui_task_manager::{Caller, Task, TaskManager};
 use nomi_core::{
     downloads::{java::JavaDownloader, progress::MappedSender, traits::Downloader},
@@ -71,7 +72,7 @@ impl JavaState {
         }
     }
 
-    pub fn download_java(&mut self, manager: &mut TaskManager) {
+    pub fn download_java(&mut self, manager: &mut TaskManager, ctx: Context) {
         info!("Downloading Java");
 
         self.is_downloaded = true;
@@ -83,7 +84,7 @@ impl JavaState {
 
             let io = downloader.io();
 
-            let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress.sender()));
+            let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress.sender())).with_side_effect(move || ctx.request_repaint());
 
             Box::new(downloader).download(&mapped_sender).await;
 

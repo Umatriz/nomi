@@ -1,3 +1,5 @@
+use eframe::egui::Ui;
+use itertools::Itertools;
 use std::{
     collections::HashMap,
     path::PathBuf,
@@ -14,6 +16,12 @@ pub static GLOBAL_CACHE: LazyLock<Arc<RwLock<GlobalCache>>> = LazyLock::new(|| A
 
 pub struct GlobalCache {
     profiles: HashMap<InstanceProfileId, Arc<RwLock<ModdedProfile>>>,
+}
+
+impl Default for GlobalCache {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl GlobalCache {
@@ -33,4 +41,21 @@ impl GlobalCache {
                 }),
         }
     }
+
+    fn loaded_profiles(&self) -> Vec<Arc<RwLock<ModdedProfile>>> {
+        self.profiles.values().cloned().collect_vec()
+    }
+}
+
+pub fn ui_for_loaded_profiles(ui: &mut Ui) {
+    ui.vertical(|ui| {
+        for profile in GLOBAL_CACHE.read().loaded_profiles() {
+            let profile = profile.read();
+            ui.horizontal(|ui| {
+                ui.label(&profile.profile.name);
+                ui.label(profile.profile.version());
+            });
+            ui.separator();
+        }
+    });
 }

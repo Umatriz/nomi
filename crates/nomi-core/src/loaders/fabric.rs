@@ -15,11 +15,7 @@ use crate::{
     },
     fs::write_to_file,
     game_paths::GamePaths,
-    instance::{
-        builder_ext::LaunchInstanceBuilderExt,
-        launch::{LaunchInstanceBuilder, LaunchSettings},
-        loader::LoaderProfile,
-    },
+    instance::loader::LoaderProfile,
     maven_data::{MavenArtifact, MavenData},
     repository::{
         fabric_meta::FabricVersions,

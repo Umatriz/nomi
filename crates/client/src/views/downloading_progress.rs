@@ -13,7 +13,7 @@ impl View for DownloadingProgress<'_> {
         ui.with_layout(Layout::top_down_justified(egui::Align::Min), |ui| {
             for collection in self.manager.iter_collections() {
                 for task in collection.iter_tasks() {
-                    task.ui(ui)
+                    ui.group(|ui| task.ui(ui));
                 }
             }
         });

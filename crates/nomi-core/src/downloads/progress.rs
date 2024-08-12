@@ -22,6 +22,7 @@ impl<P: Send> ProgressSender<P> for std::sync::mpsc::Sender<P> {
 pub struct MappedSender<I, T> {
     inner: Box<dyn ProgressSender<T>>,
     mapper: Box<dyn Fn(I) -> T + Sync + Send>,
+    side_effect: Option<Box<dyn Fn() + Sync + Send>>,
 }
 
 #[async_trait::async_trait]
@@ -29,6 +30,10 @@ impl<I: Send, T: Send> ProgressSender<I> for MappedSender<I, T> {
     async fn update(&self, data: I) {
         let mapped = (self.mapper)(data);
         self.inner.update(mapped).await;
+
+        if let Some(side_effect) = self.side_effect.as_ref() {
+            (side_effect)()
+        }
     }
 }
 
@@ -40,7 +45,14 @@ impl<I, T> MappedSender<I, T> {
         Self {
             inner: sender,
             mapper: Box::new(mapper),
+            side_effect: None,
         }
+    }
+
+    #[must_use]
+    pub fn with_side_effect(mut self, side_effect: impl Fn() + Send + Sync + 'static) -> Self {
+        self.side_effect = Some(Box::new(side_effect));
+        self
     }
 }
 
@@ -49,6 +61,18 @@ impl<I: Progress + 'static> MappedSender<I, Box<dyn Progress>> {
         Self {
             inner: sender,
             mapper: Box::new(|value| Box::new(value) as Box<dyn Progress>),
+            side_effect: None,
+        }
+    }
+
+    pub fn new_progress_mapper_with_side_effect(
+        sender: Box<dyn ProgressSender<Box<dyn Progress>>>,
+        side_effect: impl Fn() + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            inner: sender,
+            mapper: Box::new(|value| Box::new(value) as Box<dyn Progress>),
+            side_effect: Some(Box::new(side_effect)),
         }
     }
 }

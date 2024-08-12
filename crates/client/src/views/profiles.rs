@@ -52,6 +52,12 @@ pub struct ProfilesState {
     pub instances: InstancesConfig,
 }
 
+impl Default for ProfilesState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProfilesState {
     pub fn new() -> Self {
         Self {
@@ -155,6 +161,7 @@ impl InstancesConfig {
 }
 
 impl Instances<'_> {
+    // TODO: It requires profile to be loaded
     fn profile_action_ui(&mut self, ui: &mut Ui, profile_lock: Arc<RwLock<ModdedProfile>>) {
         let profile = profile_lock.read();
         match &profile.profile.state {
@@ -204,18 +211,20 @@ impl Instances<'_> {
                     let game_version = profile.profile.version().to_owned();
 
                     let game_paths = GamePaths::from_id(profile.profile.id);
+                    let ctx = ui.ctx().clone();
                     let assets_task = Task::new(
                         format!("Assets ({})", profile.profile.version()),
-                        Caller::progressing(|progress| task_assets(game_version, game_paths.assets, progress)),
+                        Caller::progressing(|progress| task_assets(progress, ctx, game_version, game_paths.assets)),
                     );
                     self.manager.push_task::<AssetsCollection>(assets_task);
 
                     let profile_clone = profile_lock.clone();
 
                     let id = profile.profile.id;
+                    let ctx = ui.ctx().clone();
                     let game_task = Task::new(
                         format!("Downloading version {}", profile.profile.version()),
-                        Caller::progressing(move |progress| async move { task_download_version(profile_clone, progress).await.map(|()| id) }),
+                        Caller::progressing(move |progress| async move { task_download_version(progress, ctx, profile_clone).await.map(|()| id) }),
                     );
                     self.manager.push_task::<GameDownloadingCollection>(game_task);
                 }

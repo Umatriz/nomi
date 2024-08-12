@@ -1,7 +1,4 @@
-use std::{
-    collections::HashSet,
-    sync::Arc,
-};
+use std::{collections::HashSet, sync::Arc};
 
 use eframe::egui::{self, Color32, Id, RichText, TextEdit};
 use egui_task_manager::{Caller, Task, TaskManager};
@@ -462,10 +459,11 @@ impl View for ProfileInfo<'_> {
                         let profile_id = self.profile.read().profile.id;
                         let files = m.files.clone();
                         let project_id = m.project_id.clone();
+                        let ctx = ui.ctx().clone();
                         let download_task = Task::new(
                             "Download mod",
                             Caller::progressing(move |progress| async move {
-                                download_added_mod(progress, mods_stash_path_for_profile(profile_id), files).await;
+                                download_added_mod(progress, ctx, mods_stash_path_for_profile(profile_id), files).await;
                                 (profile_id, project_id)
                             }),
                         );
