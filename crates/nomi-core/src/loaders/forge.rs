@@ -423,7 +423,7 @@ impl ProcessorsData {
                 client = "client",
                 server = ""
             "MINECRAFT_JAR" :
-                client = game_paths.manifest_file(game_version).to_string_lossy(),
+                client = game_paths.version_jar_file(game_version).to_string_lossy(),
                 server = ""
             "MINECRAFT_VERSION":
                 client = game_version,
