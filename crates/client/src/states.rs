@@ -11,7 +11,7 @@ use tracing::info;
 
 use crate::{
     collections::JavaCollection,
-    errors_pool::{ErrorPoolExt, ErrorsPoolState},
+    errors_pool::ErrorPoolExt,
     views::{
         add_tab_menu::TabsState,
         profiles::ProfilesState,
@@ -22,7 +22,6 @@ use crate::{
 
 pub struct States {
     pub tabs: TabsState,
-    pub errors_pool: ErrorsPoolState,
 
     pub logs_state: LogsState,
     pub java: JavaState,
@@ -40,7 +39,6 @@ impl Default for States {
 
         Self {
             tabs: TabsState::new(),
-            errors_pool: ErrorsPoolState::default(),
             logs_state: LogsState::new(),
             java: JavaState::new(),
             profiles: ProfilesState::new(),

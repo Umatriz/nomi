@@ -26,7 +26,9 @@ async fn forge_test() {
         .version("1.7.10".into())
         .game_paths(game_paths.clone())
         .downloader(Box::new(
-            Forge::new("1.7.10", ForgeVersion::Recommended, game_paths.clone()).await.unwrap(),
+            Forge::new("1.7.10", ForgeVersion::Recommended, game_paths.clone(), JavaRunner::from_environment())
+                .await
+                .unwrap(),
         ))
         // .instance(Box::new(Vanilla::new("1.7.10", game_paths.clone()).await.unwrap()))
         .build();

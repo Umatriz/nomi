@@ -1,10 +1,10 @@
 use std::{
     fmt::{Debug, Display},
-    sync::{Arc, RwLock},
+    sync::Arc,
 };
 
 use once_cell::sync::Lazy;
-use tracing::error;
+use parking_lot::RwLock;
 
 pub static ERRORS_POOL: Lazy<Arc<RwLock<ErrorsPool>>> = Lazy::new(|| Arc::new(RwLock::new(ErrorsPool::default())));
 
@@ -46,12 +46,6 @@ impl ErrorsPool {
     }
 }
 
-#[derive(Default)]
-pub struct ErrorsPoolState {
-    pub is_window_open: bool,
-    pub number_of_errors: usize,
-}
-
 pub trait ErrorPoolExt<T> {
     fn report_error(self) -> Option<T>;
     fn report_error_with_context<C>(self, context: C) -> Option<T>
@@ -67,13 +61,8 @@ where
         match self {
             Ok(value) => Some(value),
             Err(error) => {
-                if let Ok(mut pool) = ERRORS_POOL
-                    .clone()
-                    .write()
-                    .inspect_err(|err| error!("Unable to write into the `ERRORS_POOL`\n{}", err))
-                {
-                    pool.push_error(error);
-                }
+                let mut pool = ERRORS_POOL.write();
+                pool.push_error(error);
                 None
             }
         }
@@ -86,13 +75,8 @@ where
         match self {
             Ok(value) => Some(value),
             Err(error) => {
-                if let Ok(mut pool) = ERRORS_POOL
-                    .clone()
-                    .write()
-                    .inspect_err(|err| error!("Unable to write into the `ERRORS_POOL`\n{}", err))
-                {
-                    pool.push_error(anyhow::Error::msg(error).context(context));
-                }
+                let mut pool = ERRORS_POOL.write();
+                pool.push_error(anyhow::Error::msg(error).context(context));
                 None
             }
         }

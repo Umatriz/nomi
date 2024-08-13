@@ -58,4 +58,14 @@ impl GamePaths {
     pub fn version_jar_file(&self, game_version: &str) -> PathBuf {
         self.profile.join(format!("{game_version}.jar"))
     }
+
+    pub fn minecraft(game_version: &str) -> Self {
+        const MINECRAFT_DIR: &str = "./minecraft";
+        Self {
+            game: MINECRAFT_DIR.into(),
+            assets: PathBuf::from(MINECRAFT_DIR).join("assets"),
+            profile: PathBuf::from(MINECRAFT_DIR).join("versions").join(game_version),
+            libraries: PathBuf::from(MINECRAFT_DIR).join("libraries"),
+        }
+    }
 }

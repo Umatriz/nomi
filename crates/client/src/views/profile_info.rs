@@ -376,8 +376,17 @@ impl View for ProfileInfo<'_> {
                     if let ProfileState::Downloaded(instance) = &mut profile.profile.state {
                         instance.jvm_arguments_mut().clone_from(&self.profile_info_state.profile_jvm_args);
                     }
+
+                    if let Some(instance) = self.profiles.find_instance(profile.profile.id.instance()) {
+                        if let Some(profile) = instance.write().find_profile_mut(profile.profile.id) {
+                            profile.name.clone_from(&self.profile_info_state.profile_name);
+                        }
+                    }
                 }
 
+                self.profiles
+                    .update_instance_config(self.profile.read().profile.id.instance())
+                    .report_error();
                 self.profiles.update_profile_config(self.profile.read().profile.id).report_error();
             }
 

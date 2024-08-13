@@ -13,17 +13,28 @@ use nomi_core::{
         fabric::Fabric,
         forge::{Forge, ForgeVersion},
     },
+    repository::java_runner::JavaRunner,
     state::get_launcher_manifest,
 };
 use parking_lot::RwLock;
 
 use crate::{errors_pool::ErrorPoolExt, views::ModdedProfile};
 
-pub async fn task_download_version(progress_shared: TaskProgressShared, ctx: Context, profile: Arc<RwLock<ModdedProfile>>) -> Option<()> {
-    try_download_version(progress_shared, ctx, profile).await.report_error()
+pub async fn task_download_version(
+    progress_shared: TaskProgressShared,
+    ctx: Context,
+    profile: Arc<RwLock<ModdedProfile>>,
+    java_runner: JavaRunner,
+) -> Option<()> {
+    try_download_version(progress_shared, ctx, profile, java_runner).await.report_error()
 }
 
-async fn try_download_version(progress_shared: TaskProgressShared, ctx: Context, profile: Arc<RwLock<ModdedProfile>>) -> anyhow::Result<()> {
+async fn try_download_version(
+    progress_shared: TaskProgressShared,
+    ctx: Context,
+    profile: Arc<RwLock<ModdedProfile>>,
+    java_runner: JavaRunner,
+) -> anyhow::Result<()> {
     let launch_instance = {
         let version_profile = {
             let version_profile = &profile.read().profile;
@@ -57,7 +68,7 @@ async fn try_download_version(progress_shared: TaskProgressShared, ctx: Context,
             }
             Loader::Forge => {
                 let combined = combined_downloader
-                    .with_loader(|game_version, game_paths| Forge::new(game_version, ForgeVersion::Recommended, game_paths))
+                    .with_loader(|game_version, game_paths| Forge::new(game_version, ForgeVersion::Recommended, game_paths, java_runner))
                     .await?;
                 builder.downloader(Box::new(combined))
             }
@@ -75,15 +86,13 @@ async fn try_download_version(progress_shared: TaskProgressShared, ctx: Context,
         let instance = instance.downloader();
         let io = instance.io();
         let downloader = instance.into_downloader();
-        io.await?;
-
-        let downloader = DownloadQueue::new().with_downloader_dyn(downloader);
 
         let _ = progress_shared.set_total(downloader.total());
 
         let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress_shared.sender())).with_side_effect(move || ctx.request_repaint());
+        downloader.download(&mapped_sender).await;
 
-        Box::new(downloader).download(&mapped_sender).await;
+        io.await?;
 
         launch_instance
     };

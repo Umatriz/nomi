@@ -99,22 +99,29 @@ impl View for AddProfileMenu<'_> {
             ui.separator()
         });
 
-        egui::ComboBox::from_label("Select instance to create profile for").show_ui(ui, |ui| {
-            for instance in &self.profiles_state.instances.instances {
-                if ui
-                    .selectable_label(
-                        self.menu_state
-                            .parent_instance
-                            .as_ref()
-                            .is_some_and(|i| i.read().id() == instance.read().id()),
-                        instance.read().name(),
-                    )
-                    .clicked()
-                {
-                    self.menu_state.parent_instance = Some(instance.clone());
+        egui::ComboBox::from_label("Select instance to create profile for")
+            .selected_text(
+                self.menu_state
+                    .parent_instance
+                    .as_ref()
+                    .map_or(String::from("No instance selected"), |i| i.read().name().to_owned()),
+            )
+            .show_ui(ui, |ui| {
+                for instance in &self.profiles_state.instances.instances {
+                    if ui
+                        .selectable_label(
+                            self.menu_state
+                                .parent_instance
+                                .as_ref()
+                                .is_some_and(|i| i.read().id() == instance.read().id()),
+                            instance.read().name(),
+                        )
+                        .clicked()
+                    {
+                        self.menu_state.parent_instance = Some(instance.clone());
+                    }
                 }
-            }
-        });
+            });
 
         {
             ui.label("Profile name:");
@@ -152,6 +159,7 @@ impl View for AddProfileMenu<'_> {
                     .selected_text(format!("{}", self.menu_state.selected_loader_buf))
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut self.menu_state.selected_loader_buf, Loader::Vanilla, "Vanilla");
+                        ui.selectable_value(&mut self.menu_state.selected_loader_buf, Loader::Forge, "Forge");
                         let fabric = ui.selectable_value(&mut self.menu_state.selected_loader_buf, Loader::Fabric { version: None }, "Fabric");
 
                         if fabric.clicked() {
@@ -243,7 +251,8 @@ impl View for AddProfileMenu<'_> {
             .add_enabled(
                 self.menu_state.parent_instance.is_some()
                     && some_version_buf()
-                    && ((matches!(self.menu_state.selected_loader_buf, Loader::Vanilla))
+                    && (matches!(self.menu_state.selected_loader_buf, Loader::Vanilla)
+                        || matches!(self.menu_state.selected_loader_buf, Loader::Forge)
                         || (fabric_version_is_some() && fabric_versions_non_empty())),
                 egui::Button::new("Create"),
             )

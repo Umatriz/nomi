@@ -68,6 +68,14 @@ impl Instance {
         self.profiles.push(payload);
     }
 
+    pub fn find_profile(&self, id: InstanceProfileId) -> Option<&ProfilePayload> {
+        self.profiles().iter().find(|p| p.id == id)
+    }
+
+    pub fn find_profile_mut(&mut self, id: InstanceProfileId) -> Option<&mut ProfilePayload> {
+        self.profiles_mut().iter_mut().find(|p| p.id == id)
+    }
+
     /// Generate id for the next profile in this instance
     pub fn next_id(&self) -> InstanceProfileId {
         match &self.profiles.iter().max_by_key(|profile| profile.id.1) {

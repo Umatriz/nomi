@@ -2,13 +2,17 @@ use std::path::PathBuf;
 
 use nomi_core::{
     configs::profile::{ProfileState, VersionProfile},
+    downloads::traits::Downloader,
     game_paths::GamePaths,
     instance::{
         launch::{arguments::UserData, LaunchSettings},
         logs::PrintLogs,
         InstanceProfileId, Profile,
     },
-    loaders::forge::{Forge, ForgeVersion},
+    loaders::{
+        forge::{Forge, ForgeVersion},
+        vanilla::Vanilla,
+    },
     repository::java_runner::JavaRunner,
     DOT_NOMI_JAVA_EXECUTABLE,
 };
@@ -19,19 +23,21 @@ async fn forge_test() {
 
     let (tx, _) = tokio::sync::mpsc::channel(100);
 
-    let game_paths = GamePaths::from_id(InstanceProfileId::ZERO);
+    let game_paths = GamePaths::minecraft("1.19.2");
 
     let instance = Profile::builder()
         .name("forge-test".into())
-        .version("1.20.1".into())
+        .version("1.19.2".into())
         .game_paths(game_paths.clone())
         .downloader(Box::new(
-            Forge::new("1.20.1", ForgeVersion::Recommended, game_paths.clone()).await.unwrap(),
+            Forge::new("1.19.2", ForgeVersion::Recommended, game_paths.clone(), JavaRunner::from_environment())
+                .await
+                .unwrap(),
         ))
-        // .downloader(Box::new(Vanilla::new("1.20.1", game_paths.clone()).await.unwrap()))
+        // .downloader(Box::new(Vanilla::new("1.19.2", game_paths.clone()).await.unwrap()))
         .build();
 
-    // let vanilla = Box::new(Vanilla::new("1.20.1", game_paths.clone()).await.unwrap());
+    // let vanilla = Box::new(Vanilla::new("1.19.2", game_paths.clone()).await.unwrap());
     // let io = vanilla.io();
 
     // vanilla.download(&tx).await;
@@ -41,7 +47,7 @@ async fn forge_test() {
     let settings = LaunchSettings {
         java_runner: None,
 
-        version: "1.20.1".to_string(),
+        version: "1.19.2".to_string(),
         version_type: nomi_core::repository::manifest::VersionType::Release,
     };
 
@@ -66,12 +72,7 @@ async fn forge_test() {
         .build();
 
     dbg!(profile)
-        .launch(
-            game_paths,
-            UserData::default(),
-            &JavaRunner::path(PathBuf::from(DOT_NOMI_JAVA_EXECUTABLE)),
-            &PrintLogs,
-        )
+        .launch(game_paths, UserData::default(), &JavaRunner::from_environment(), &PrintLogs)
         .await
         .unwrap();
 }

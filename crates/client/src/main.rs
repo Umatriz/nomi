@@ -164,6 +164,8 @@ impl eframe::App for MyTabs {
             self.context.states.java.download_java(&mut self.context.manager, ctx.clone());
         }
 
+        // egui::Window::new("Loaded profiles").show(ctx, |ui| ui_for_loaded_profiles(ui));
+
         egui::TopBottomPanel::top("top_panel_id").show(ctx, |ui| {
             ui.with_layout(Layout::left_to_right(Align::Center).with_cross_align(Align::Center), |ui| {
                 // The way to calculate the target size is captured from the
@@ -205,43 +207,32 @@ impl eframe::App for MyTabs {
             });
         });
 
-        if let Ok(len) = ERRORS_POOL.try_read().map(|pool| pool.len()) {
-            if self.context.states.errors_pool.number_of_errors != len {
-                self.context.states.errors_pool.number_of_errors = len;
-                self.context.states.errors_pool.is_window_open = true;
-            }
-        }
-
+        let mut is_open = { !ERRORS_POOL.read().is_empty() };
         egui::Window::new("Errors")
             .id("error_window".into())
-            .open(&mut self.context.states.errors_pool.is_window_open)
+            .open(&mut is_open)
             .resizable(false)
             .movable(false)
             .anchor(Align2::RIGHT_BOTTOM, [0.0, 0.0])
             .show(ctx, |ui| {
                 {
-                    match ERRORS_POOL.try_read() {
-                        Ok(pool) => {
-                            if pool.is_empty() {
-                                ui.label("No errors");
-                            }
-                            ScrollArea::vertical().show(ui, |ui| {
-                                ui.vertical(|ui| {
-                                    for error in pool.iter_errors() {
-                                        ui.label(format!("{:#?}", error));
-                                        ui.separator();
-                                    }
-                                });
-                            });
-                        }
-                        Err(_) => {
-                            ui.spinner();
-                        }
+                    let pool = ERRORS_POOL.read();
+
+                    if pool.is_empty() {
+                        ui.label("No errors");
                     }
+                    ScrollArea::vertical().show(ui, |ui| {
+                        ui.vertical(|ui| {
+                            for error in pool.iter_errors() {
+                                ui.label(format!("{:#?}", error));
+                                ui.separator();
+                            }
+                        });
+                    });
                 }
 
                 if ui.button("Clear").clicked() {
-                    ERRORS_POOL.write().unwrap().clear()
+                    ERRORS_POOL.write().clear()
                 }
             });
 

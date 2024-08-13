@@ -194,7 +194,7 @@ impl View for ModManager<'_> {
             ui.horizontal(|ui| {
                 for project_type in ProjectType::iter().filter(|t| !matches!(t, ProjectType::Plugin)) {
                     let enabled = {
-                        (self.profile.read().profile.loader().is_fabric() || matches!(project_type, ProjectType::DataPack))
+                        (self.profile.read().profile.loader().support_mods() || matches!(project_type, ProjectType::DataPack))
                             && !matches!(project_type, ProjectType::Modpack)
                     };
 

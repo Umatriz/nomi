@@ -87,6 +87,13 @@ impl<'c> TasksCollection<'c> for GameDownloadingCollection {
         Handler::new(|id| {
             if let Some(id) = id {
                 context.update_profile_config(id).report_error();
+                if let Some(instance) = context.find_instance(id.instance()) {
+                    if let Some(profile) = instance.write().find_profile_mut(id) {
+                        profile.is_downloaded = true
+                    };
+
+                    instance.read().write_blocking().report_error();
+                }
             }
         })
     }

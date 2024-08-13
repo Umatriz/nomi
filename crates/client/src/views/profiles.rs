@@ -22,6 +22,7 @@ use crate::{
     download::{task_assets, task_download_version},
     errors_pool::ErrorPoolExt,
     ui_ext::UiExt,
+    TabKind,
 };
 
 use super::{
@@ -162,72 +163,84 @@ impl InstancesConfig {
 
 impl Instances<'_> {
     // TODO: It requires profile to be loaded
-    fn profile_action_ui(&mut self, ui: &mut Ui, profile_lock: Arc<RwLock<ModdedProfile>>) {
+    fn profile_action_ui(&mut self, ui: &mut Ui, profile_payload: &ProfilePayload) {
+        let button = if profile_payload.is_downloaded {
+            ui.add_enabled(self.is_allowed_to_take_action, egui::Button::new("Launch"))
+        } else {
+            ui.add_enabled(
+                !self.profiles_state.currently_downloading_profiles.contains(&profile_payload.id),
+                egui::Button::new("Download"),
+            )
+        };
+
+        if button.clicked() {
+            self.profile_action(ui, profile_payload)
+        }
+    }
+
+    fn profile_action(&mut self, ui: &mut Ui, profile_payload: &ProfilePayload) {
+        let Some(profile_lock) = self.profiles_state.instances.find_profile(profile_payload.id) else {
+            error!(id = ?profile_payload.id, "Cannot find the profile");
+            return;
+        };
         let profile = profile_lock.read();
         match &profile.profile.state {
             ProfileState::Downloaded(instance) => {
-                if ui.add_enabled(self.is_allowed_to_take_action, egui::Button::new("Launch")).clicked() {
-                    let user_data = UserData {
-                        username: Username::new(self.settings_state.username.clone()).unwrap(),
-                        uuid: Some(self.settings_state.uuid.clone()),
-                        access_token: None,
-                    };
+                let user_data = UserData {
+                    username: Username::new(self.settings_state.username.clone()).unwrap(),
+                    uuid: Some(self.settings_state.uuid.clone()),
+                    access_token: None,
+                };
 
-                    let instance = instance.clone();
-                    let java_runner = self.settings_state.java.clone();
+                let instance = instance.clone();
+                let java_runner = self.settings_state.java.clone();
 
-                    let should_load_mods = profile.profile.loader().support_mods();
-                    let profile_id = profile.profile.id;
+                let should_load_mods = profile.profile.loader().support_mods();
+                let profile_id = profile.profile.id;
 
-                    let game_logs = self.logs_state.game_logs.clone();
-                    game_logs.clear();
-                    let run_game = Task::new(
-                        "Running the game",
-                        Caller::standard(async move {
-                            if should_load_mods {
-                                load_mods(profile_id).await.report_error();
-                            }
+                let game_logs = self.logs_state.game_logs.clone();
+                game_logs.clear();
+                let run_game = Task::new(
+                    "Running the game",
+                    Caller::standard(async move {
+                        if should_load_mods {
+                            load_mods(profile_id).await.report_error();
+                        }
 
-                            instance
-                                .launch(GamePaths::from_id(profile_id), user_data, &java_runner, &*game_logs)
-                                .await
-                                .report_error()
-                        }),
-                    );
+                        instance
+                            .launch(GamePaths::from_id(profile_id), user_data, &java_runner, &*game_logs)
+                            .await
+                            .report_error()
+                    }),
+                );
 
-                    self.manager.push_task::<GameRunnerCollection>(run_game)
-                }
+                self.manager.push_task::<GameRunnerCollection>(run_game)
             }
             ProfileState::NotDownloaded { .. } => {
-                if ui
-                    .add_enabled(
-                        !self.profiles_state.currently_downloading_profiles.contains(&profile.profile.id),
-                        egui::Button::new("Download"),
-                    )
-                    .clicked()
-                {
-                    self.profiles_state.currently_downloading_profiles.insert(profile.profile.id);
+                self.profiles_state.currently_downloading_profiles.insert(profile.profile.id);
 
-                    let game_version = profile.profile.version().to_owned();
+                let game_version = profile.profile.version().to_owned();
 
-                    let game_paths = GamePaths::from_id(profile.profile.id);
-                    let ctx = ui.ctx().clone();
-                    let assets_task = Task::new(
-                        format!("Assets ({})", profile.profile.version()),
-                        Caller::progressing(|progress| task_assets(progress, ctx, game_version, game_paths.assets)),
-                    );
-                    self.manager.push_task::<AssetsCollection>(assets_task);
+                let game_paths = GamePaths::from_id(profile.profile.id);
+                let ctx = ui.ctx().clone();
+                let assets_task = Task::new(
+                    format!("Assets ({})", profile.profile.version()),
+                    Caller::progressing(|progress| task_assets(progress, ctx, game_version, game_paths.assets)),
+                );
+                self.manager.push_task::<AssetsCollection>(assets_task);
 
-                    let profile_clone = profile_lock.clone();
+                let profile_clone = profile_lock.clone();
 
-                    let id = profile.profile.id;
-                    let ctx = ui.ctx().clone();
-                    let game_task = Task::new(
-                        format!("Downloading version {}", profile.profile.version()),
-                        Caller::progressing(move |progress| async move { task_download_version(progress, ctx, profile_clone).await.map(|()| id) }),
-                    );
-                    self.manager.push_task::<GameDownloadingCollection>(game_task);
-                }
+                let id = profile.profile.id;
+                let ctx = ui.ctx().clone();
+                let java_runner = self.settings_state.java.clone();
+                let game_task = Task::new(
+                    format!("Downloading version {}", profile.profile.version()),
+                    Caller::progressing(move |progress| async move {
+                        task_download_version(progress, ctx, profile_clone, java_runner).await.map(|()| id)
+                    }),
+                );
+                self.manager.push_task::<GameDownloadingCollection>(game_task);
             }
         }
     }
@@ -261,22 +274,18 @@ impl Instances<'_> {
                         row.col(|ui| {
                             ui.label(profile.loader.name());
                         });
-                        row.col(|ui| {
-                            if let Some(profile) = self.profiles_state.instances.find_profile(profile.id) {
-                                self.profile_action_ui(ui, profile)
-                            } else {
-                                ui.error_label("Cannot find the profile");
-                            }
-                        });
+                        row.col(|ui| self.profile_action_ui(ui, profile));
 
                         row.col(|ui| {
-                            if ui.button("TODO: Details").clicked() {
-                                // self.profile_info_state.set_profile_to_edit(&profile_lock.read());
+                            if ui.button("Details").clicked() {
+                                if let Some(profile_lock) = self.profiles_state.instances.find_profile(profile.id) {
+                                    self.profile_info_state.set_profile_to_edit(&profile_lock.read());
 
-                                // let kind = TabKind::ProfileInfo {
-                                //     profile: profile_lock.clone(),
-                                // };
-                                // self.tabs_state.0.insert(kind.id(), kind);
+                                    let kind = TabKind::ProfileInfo {
+                                        profile: profile_lock.clone(),
+                                    };
+                                    self.tabs_state.0.insert(kind.id(), kind);
+                                };
                             }
                         });
 
