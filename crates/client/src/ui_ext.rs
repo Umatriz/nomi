@@ -69,18 +69,6 @@ pub trait UiExt {
 
         button
     }
-
-    fn toasts(&mut self, writer: impl FnOnce(&mut Toasts) -> &mut Toast) {
-        use parking_lot::Mutex;
-        use std::sync::Arc;
-
-        let ui = self.ui_mut();
-        let toasts = ui.data_mut(|data| data.get_temp_mut_or_default::<Arc<Mutex<Toasts>>>(egui::Id::new(TOASTS_ID)).clone());
-
-        let mut locked = toasts.lock();
-
-        writer(&mut locked);
-    }
 }
 
 impl UiExt for Ui {

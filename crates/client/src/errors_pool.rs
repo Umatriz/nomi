@@ -6,6 +6,8 @@ use std::{
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 
+use crate::toasts;
+
 pub static ERRORS_POOL: Lazy<Arc<RwLock<ErrorsPool>>> = Lazy::new(|| Arc::new(RwLock::new(ErrorsPool::default())));
 
 pub trait Error: Display + Debug {}
@@ -48,9 +50,6 @@ impl ErrorsPool {
 
 pub trait ErrorPoolExt<T> {
     fn report_error(self) -> Option<T>;
-    fn report_error_with_context<C>(self, context: C) -> Option<T>
-    where
-        C: Display + Send + Sync + 'static;
 }
 
 impl<T, E> ErrorPoolExt<T> for Result<T, E>
@@ -61,22 +60,9 @@ where
         match self {
             Ok(value) => Some(value),
             Err(error) => {
+                toasts::add(|toasts| toasts.error(error.to_string()));
                 let mut pool = ERRORS_POOL.write();
                 pool.push_error(error);
-                None
-            }
-        }
-    }
-
-    fn report_error_with_context<C>(self, context: C) -> Option<T>
-    where
-        C: Display + Send + Sync + 'static,
-    {
-        match self {
-            Ok(value) => Some(value),
-            Err(error) => {
-                let mut pool = ERRORS_POOL.write();
-                pool.push_error(anyhow::Error::msg(error).context(context));
                 None
             }
         }

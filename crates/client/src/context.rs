@@ -25,6 +25,7 @@ pub struct MyContext {
     pub is_allowed_to_take_action: bool,
     pub is_profile_window_open: bool,
     pub is_instance_window_open: bool,
+    pub is_errors_window_open: bool,
 
     pub images_clean_requested: bool,
 }
@@ -45,14 +46,15 @@ impl MyContext {
             egui_layer,
             launcher_manifest: launcher_manifest_ref,
             file_dialog: FileDialog::new(),
-
-            is_profile_window_open: false,
-            is_instance_window_open: false,
-            is_allowed_to_take_action: true,
-            images_clean_requested: false,
-
             states: States::new(),
             manager: TaskManager::new(),
+
+            is_allowed_to_take_action: true,
+            is_profile_window_open: false,
+            is_instance_window_open: false,
+            is_errors_window_open: false,
+
+            images_clean_requested: false,
         }
     }
 

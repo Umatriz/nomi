@@ -1,11 +1,12 @@
 // Remove console window in release builds
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use anyhow::anyhow;
 use cache::ui_for_loaded_profiles;
 use collections::{AssetsCollection, GameDownloadingCollection, GameRunnerCollection, JavaCollection};
 use context::MyContext;
 use eframe::{
-    egui::{self, Align, Align2, Button, Frame, Id, Layout, RichText, ScrollArea, ViewportBuilder},
+    egui::{self, Align, Align2, Button, Color32, Frame, Id, Layout, RichText, ScrollArea, ViewportBuilder},
     epaint::Vec2,
 };
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
@@ -33,6 +34,7 @@ pub mod utils;
 pub mod views;
 
 pub mod cache;
+pub mod toasts;
 
 pub mod mods;
 pub mod open_directory;
@@ -127,16 +129,7 @@ impl MyTabs {
 
 impl eframe::App for MyTabs {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        {
-            use parking_lot::Mutex;
-            use std::sync::Arc;
-
-            let toasts = ctx.data_mut(|data| data.get_temp_mut_or_default::<Arc<Mutex<Toasts>>>(egui::Id::new(TOASTS_ID)).clone());
-
-            let mut locked = toasts.lock();
-
-            locked.show(ctx);
-        }
+        toasts::show(ctx);
 
         self.context
             .manager
@@ -199,14 +192,27 @@ impl eframe::App for MyTabs {
                 .ui(ui);
 
                 ui.add_space(this_target_width);
-                ui.horizontal(|ui| {
-                    egui::warn_if_debug_build(ui);
-                    ui.hyperlink_to(
-                        RichText::new(format!("{} Nomi on GitHub", egui::special_emojis::GITHUB)).small(),
-                        "https://github.com/Umatriz/nomi",
-                    );
-                    ui.hyperlink_to(RichText::new("Nomi's Discord server").small(), "https://discord.gg/qRD5XEJKc4");
-                });
+
+                egui::warn_if_debug_build(ui);
+
+                if ui.button("Cause an error").clicked() {
+                    Err::<(), _>(anyhow!("Error!")).report_error();
+                }
+
+                let is_errors = { !ERRORS_POOL.read().is_empty() };
+                if is_errors {
+                    let button = egui::Button::new(RichText::new("Errors").color(ui.visuals().error_fg_color));
+                    let button = ui.add(button);
+                    if button.clicked() {
+                        self.context.is_errors_window_open = true;
+                    }
+                }
+
+                ui.hyperlink_to(
+                    RichText::new(format!("{} Nomi on GitHub", egui::special_emojis::GITHUB)).small(),
+                    "https://github.com/Umatriz/nomi",
+                );
+                ui.hyperlink_to(RichText::new("Nomi's Discord server").small(), "https://discord.gg/qRD5XEJKc4");
 
                 ui.data_mut(|data| data.insert_temp(id_cal_target_size, ui.min_rect().width() - this_target_width));
             });
@@ -240,33 +246,36 @@ impl eframe::App for MyTabs {
                 });
         }
 
-        let mut is_open = { !ERRORS_POOL.read().is_empty() };
         egui::Window::new("Errors")
             .id("error_window".into())
-            .open(&mut is_open)
-            .resizable(false)
-            .movable(false)
-            .anchor(Align2::RIGHT_BOTTOM, [0.0, 0.0])
+            .open(&mut self.context.is_errors_window_open)
             .show(ctx, |ui| {
-                {
-                    let pool = ERRORS_POOL.read();
+                ScrollArea::vertical().show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        if ui.button("Clear").clicked() {
+                            ERRORS_POOL.write().clear()
+                        }
 
-                    if pool.is_empty() {
-                        ui.label("No errors");
-                    }
-                    ScrollArea::vertical().show(ui, |ui| {
-                        ui.vertical(|ui| {
-                            for error in pool.iter_errors() {
-                                ui.label(format!("{:#?}", error));
-                                ui.separator();
-                            }
-                        });
+                        ui.label("See the Logs tab for detailed information");
                     });
-                }
 
-                if ui.button("Clear").clicked() {
-                    ERRORS_POOL.write().clear()
-                }
+                    {
+                        let pool = ERRORS_POOL.read();
+
+                        if pool.is_empty() {
+                            ui.label("No errors");
+                        }
+
+                        egui::Frame::dark_canvas(ui.style()).show(ui, |ui| {
+                            ui.vertical(|ui| {
+                                for error in pool.iter_errors() {
+                                    ui.label(format!("{:#?}", error));
+                                    ui.separator();
+                                }
+                            });
+                        });
+                    }
+                });
             });
 
         egui::CentralPanel::default()

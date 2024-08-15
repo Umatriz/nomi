@@ -1,7 +1,7 @@
 use eframe::egui;
 use nomi_core::instance::Instance;
 
-use crate::{errors_pool::ErrorPoolExt, ui_ext::UiExt};
+use crate::{errors_pool::ErrorPoolExt, toasts, ui_ext::UiExt};
 
 use super::{InstancesState, View};
 
@@ -35,7 +35,7 @@ impl View for CreateInstanceMenu<'_> {
             let instance = Instance::new(self.create_instance_menu_state.name.trim_end().to_owned(), id);
             self.instances_state.instances.add_instance(instance);
             self.instances_state.instances.update_instance_config(id).report_error();
-            ui.toasts(|toasts| toasts.success("New instance created"));
+            toasts::add(|toasts| toasts.success("New instance created"));
         }
     }
 }

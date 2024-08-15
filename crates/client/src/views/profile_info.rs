@@ -7,7 +7,7 @@ use nomi_modding::modrinth::project::ProjectId;
 use parking_lot::RwLock;
 
 use crate::{
-    collections::DownloadAddedModsCollection, errors_pool::ErrorPoolExt, open_directory::open_directory_native, ui_ext::UiExt,
+    collections::DownloadAddedModsCollection, errors_pool::ErrorPoolExt, open_directory::open_directory_native, toasts, ui_ext::UiExt,
     views::InstancesConfig, TabKind,
 };
 
@@ -330,7 +330,7 @@ impl View for ProfileInfo<'_> {
                         ui.ctx().copy_text(export_code);
                     }
 
-                    ui.toasts(|toasts| toasts.success("Copied the export code to the clipboard"));
+                    toasts::add(|toasts| toasts.success("Copied the export code to the clipboard"));
                 }
             });
 
