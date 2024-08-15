@@ -397,7 +397,7 @@ impl View for ProfileInfo<'_> {
 
         ui.heading("Mods");
 
-        ui.add_enabled_ui(self.profile.read().profile.loader().is_fabric(), |ui| {
+        ui.add_enabled_ui(self.profile.read().profile.loader().support_mods(), |ui| {
             ui.toggle_button(&mut self.profile_info_state.is_import_window_open, "Import mods");
             if ui
                 .toggle_button(&mut self.profile_info_state.is_export_window_open, "Export mods")

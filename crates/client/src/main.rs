@@ -13,8 +13,8 @@ use egui_notify::Toasts;
 use open_directory::open_directory_native;
 use std::path::Path;
 use subscriber::EguiLayer;
-use ui_ext::TOASTS_ID;
-use views::{add_tab_menu::AddTab, View};
+use ui_ext::{UiExt, TOASTS_ID};
+use views::{add_tab_menu::AddTab, AddProfileMenu, CreateInstanceMenu, View};
 
 use errors_pool::{ErrorPoolExt, ERRORS_POOL};
 use nomi_core::{DOT_NOMI_DATA_PACKS_DIR, DOT_NOMI_LOGS_DIR};
@@ -141,9 +141,9 @@ impl eframe::App for MyTabs {
         self.context
             .manager
             .add_collection::<collections::AssetsCollection>(())
-            .add_collection::<collections::FabricDataCollection>(&mut self.context.states.add_profile_menu_state.fabric_versions)
+            .add_collection::<collections::FabricDataCollection>(&mut self.context.states.add_profile_menu.fabric_versions)
             .add_collection::<collections::GameDeletionCollection>(())
-            .add_collection::<collections::GameDownloadingCollection>(&self.context.states.profiles.instances)
+            .add_collection::<collections::GameDownloadingCollection>(&self.context.states.instances.instances)
             .add_collection::<collections::JavaCollection>(())
             .add_collection::<collections::ProjectCollection>(&mut self.context.states.mod_manager.current_project)
             .add_collection::<collections::ProjectVersionsCollection>(&mut self.context.states.mod_manager.current_versions)
@@ -151,11 +151,11 @@ impl eframe::App for MyTabs {
                 &mut self.context.states.mod_manager.current_dependencies,
                 self.context.states.mod_manager.current_project.as_ref().map(|p| &p.id),
             ))
-            .add_collection::<collections::ModsDownloadingCollection>(&self.context.states.profiles.instances)
+            .add_collection::<collections::ModsDownloadingCollection>(&self.context.states.instances.instances)
             .add_collection::<collections::GameRunnerCollection>(())
             .add_collection::<collections::DownloadAddedModsCollection>((
                 &mut self.context.states.profile_info.currently_downloading_mods,
-                &self.context.states.profiles.instances,
+                &self.context.states.instances.instances,
             ));
 
         ctx.set_pixels_per_point(self.context.states.client_settings.pixels_per_point);
@@ -175,11 +175,10 @@ impl eframe::App for MyTabs {
                 let last_others_width = ui.data(|data| data.get_temp(id_cal_target_size).unwrap_or(this_init_max_width));
                 let this_target_width = this_init_max_width - last_others_width;
 
-                AddTab {
-                    dock_state: &self.dock_state,
-                    tabs_state: &mut self.context.states.tabs,
-                }
-                .ui(ui);
+                ui.menu_button("New", |ui| {
+                    ui.toggle_button(&mut self.context.is_instance_window_open, "Create new instance");
+                    ui.toggle_button(&mut self.context.is_profile_window_open, "Add new profile");
+                });
 
                 ui.menu_button("Open", |ui| {
                     if ui
@@ -192,6 +191,12 @@ impl eframe::App for MyTabs {
                         }
                     }
                 });
+
+                AddTab {
+                    dock_state: &self.dock_state,
+                    tabs_state: &mut self.context.states.tabs,
+                }
+                .ui(ui);
 
                 ui.add_space(this_target_width);
                 ui.horizontal(|ui| {
@@ -206,6 +211,34 @@ impl eframe::App for MyTabs {
                 ui.data_mut(|data| data.insert_temp(id_cal_target_size, ui.min_rect().width() - this_target_width));
             });
         });
+
+        {
+            egui::Window::new("Add new profile")
+                .collapsible(true)
+                .resizable(true)
+                .open(&mut self.context.is_profile_window_open)
+                .show(ctx, |ui| {
+                    AddProfileMenu {
+                        menu_state: &mut self.context.states.add_profile_menu,
+                        profiles_state: &mut self.context.states.instances,
+                        launcher_manifest: self.context.launcher_manifest,
+                        manager: &mut self.context.manager,
+                    }
+                    .ui(ui);
+                });
+
+            egui::Window::new("Create new instance")
+                .collapsible(true)
+                .resizable(true)
+                .open(&mut self.context.is_instance_window_open)
+                .show(ctx, |ui| {
+                    CreateInstanceMenu {
+                        instances_state: &mut self.context.states.instances,
+                        create_instance_menu_state: &mut self.context.states.create_instance_menu,
+                    }
+                    .ui(ui);
+                });
+        }
 
         let mut is_open = { !ERRORS_POOL.read().is_empty() };
         egui::Window::new("Errors")

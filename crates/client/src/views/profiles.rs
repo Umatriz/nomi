@@ -21,16 +21,10 @@ use crate::{
     collections::{AssetsCollection, GameDownloadingCollection, GameRunnerCollection},
     download::{task_assets, task_download_version},
     errors_pool::ErrorPoolExt,
-    ui_ext::UiExt,
     TabKind,
 };
 
-use super::{
-    add_profile_menu::{AddProfileMenu, AddProfileMenuState},
-    load_mods,
-    settings::SettingsState,
-    LogsState, ModsConfig, ProfileInfoState, TabsState, View,
-};
+use super::{add_profile_menu::AddProfileMenuState, load_mods, settings::SettingsState, LogsState, ModsConfig, ProfileInfoState, TabsState, View};
 
 pub struct Instances<'a> {
     pub is_allowed_to_take_action: bool,
@@ -38,28 +32,26 @@ pub struct Instances<'a> {
     pub settings_state: &'a SettingsState,
     pub profile_info_state: &'a mut ProfileInfoState,
 
-    pub is_profile_window_open: &'a mut bool,
-
     pub logs_state: &'a LogsState,
     pub tabs_state: &'a mut TabsState,
-    pub profiles_state: &'a mut ProfilesState,
+    pub profiles_state: &'a mut InstancesState,
     pub menu_state: &'a mut AddProfileMenuState,
 
     pub launcher_manifest: &'static LauncherManifest,
 }
 
-pub struct ProfilesState {
+pub struct InstancesState {
     pub currently_downloading_profiles: HashSet<InstanceProfileId>,
     pub instances: InstancesConfig,
 }
 
-impl Default for ProfilesState {
+impl Default for InstancesState {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl ProfilesState {
+impl InstancesState {
     pub fn new() -> Self {
         Self {
             currently_downloading_profiles: HashSet::new(),
@@ -305,27 +297,6 @@ impl Instances<'_> {
 
 impl View for Instances<'_> {
     fn ui(mut self, ui: &mut Ui) {
-        {
-            ui.toggle_value(self.is_profile_window_open, "Add new profile");
-
-            egui::Window::new("Create new profile")
-                .title_bar(true)
-                .collapsible(false)
-                .resizable(false)
-                .anchor(Align2::CENTER_CENTER, [0.0, 0.0])
-                .movable(false)
-                .open(self.is_profile_window_open)
-                .show(ui.ctx(), |ui| {
-                    AddProfileMenu {
-                        menu_state: self.menu_state,
-                        profiles_state: self.profiles_state,
-                        launcher_manifest: self.launcher_manifest,
-                        manager: self.manager, // is_profile_window_open: self.is_profile_window_open,
-                    }
-                    .ui(ui);
-                });
-        }
-
         ui.style_mut().wrap_mode = Some(TextWrapMode::Extend);
 
         let iter = self.profiles_state.instances.instances.iter().cloned().collect_vec().into_iter();

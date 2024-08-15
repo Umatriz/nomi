@@ -23,7 +23,7 @@ async fn forge_test() {
 
     let (tx, _) = tokio::sync::mpsc::channel(100);
 
-    let game_paths = GamePaths::minecraft("1.19.2");
+    let game_paths = GamePaths::from_id(InstanceProfileId::ZERO);
 
     let instance = Profile::builder()
         .name("forge-test".into())
@@ -53,10 +53,10 @@ async fn forge_test() {
 
     let launch = instance.launch_instance(settings, None);
 
-    // let assets = instance.assets().await.unwrap();
-    // let assets_io = assets.io();
-    // Box::new(assets).download(&tx).await;
-    // assets_io.await.unwrap();
+    let assets = instance.assets().await.unwrap();
+    let assets_io = assets.io();
+    Box::new(assets).download(&tx).await;
+    assets_io.await.unwrap();
 
     let instance = instance.downloader();
     let io_fut = instance.io();

@@ -24,6 +24,7 @@ pub struct MyContext {
 
     pub is_allowed_to_take_action: bool,
     pub is_profile_window_open: bool,
+    pub is_instance_window_open: bool,
 
     pub images_clean_requested: bool,
 }
@@ -44,12 +45,14 @@ impl MyContext {
             egui_layer,
             launcher_manifest: launcher_manifest_ref,
             file_dialog: FileDialog::new(),
+
             is_profile_window_open: false,
+            is_instance_window_open: false,
+            is_allowed_to_take_action: true,
+            images_clean_requested: false,
 
             states: States::new(),
             manager: TaskManager::new(),
-            is_allowed_to_take_action: true,
-            images_clean_requested: false,
         }
     }
 
@@ -69,11 +72,11 @@ impl TabViewer for MyContext {
         match &tab.kind {
             TabKind::Mods { profile } => {
                 let profile = profile.read();
-                self.states.profiles.instances.find_profile(profile.profile.id).is_none()
+                self.states.instances.instances.find_profile(profile.profile.id).is_none()
             }
             TabKind::ProfileInfo { profile } => {
                 let profile = profile.read();
-                self.states.profiles.instances.find_profile(profile.profile.id).is_none()
+                self.states.instances.instances.find_profile(profile.profile.id).is_none()
             }
             _ => false,
         }
@@ -86,13 +89,12 @@ impl TabViewer for MyContext {
                 profile_info_state: &mut self.states.profile_info,
                 manager: &mut self.manager,
                 settings_state: &self.states.settings,
-                profiles_state: &mut self.states.profiles,
-                menu_state: &mut self.states.add_profile_menu_state,
+                profiles_state: &mut self.states.instances,
+                menu_state: &mut self.states.add_profile_menu,
                 tabs_state: &mut self.states.tabs,
                 logs_state: &self.states.logs_state,
 
                 launcher_manifest: self.launcher_manifest,
-                is_profile_window_open: &mut self.is_profile_window_open,
             }
             .ui(ui),
             TabKind::Settings => SettingsPage {
@@ -111,19 +113,19 @@ impl TabViewer for MyContext {
             TabKind::DownloadProgress => {
                 views::DownloadingProgress {
                     manager: &self.manager,
-                    profiles_state: &mut self.states.profiles,
+                    profiles_state: &mut self.states.instances,
                 }
                 .ui(ui);
             }
             TabKind::Mods { profile } => ModManager {
                 task_manager: &mut self.manager,
-                profiles_config: &mut self.states.profiles.instances,
+                profiles_config: &mut self.states.instances.instances,
                 mod_manager_state: &mut self.states.mod_manager,
                 profile: profile.clone(),
             }
             .ui(ui),
             TabKind::ProfileInfo { profile } => ProfileInfo {
-                profiles: &self.states.profiles.instances,
+                profiles: &self.states.instances.instances,
                 task_manager: &mut self.manager,
                 profile: profile.clone(),
                 tabs_state: &mut self.states.tabs,

@@ -17,13 +17,13 @@ use parking_lot::RwLock;
 
 use crate::{collections::FabricDataCollection, errors_pool::ErrorPoolExt, ui_ext::UiExt, views::ModdedProfile};
 
-use super::{profiles::ProfilesState, View};
+use super::{profiles::InstancesState, View};
 
 pub struct AddProfileMenu<'a> {
     pub manager: &'a mut TaskManager,
     pub launcher_manifest: &'a LauncherManifest,
     pub menu_state: &'a mut AddProfileMenuState,
-    pub profiles_state: &'a mut ProfilesState,
+    pub profiles_state: &'a mut InstancesState,
 }
 
 pub struct AddProfileMenuState {
@@ -86,18 +86,6 @@ impl View for AddProfileMenu<'_> {
                     Loader::Forge => unreachable!(),
                 }
         }
-
-        ui.vertical(|ui| {
-            ui.text_edit_singleline(&mut self.menu_state.instance_name);
-
-            if ui.button("Create").clicked() {
-                let id = self.profiles_state.instances.next_id();
-                let instance = Instance::new(self.menu_state.instance_name.clone(), id);
-                self.profiles_state.instances.add_instance(instance);
-                self.profiles_state.instances.update_instance_config(id).report_error();
-            }
-            ui.separator()
-        });
 
         egui::ComboBox::from_label("Select instance to create profile for")
             .selected_text(

@@ -1,11 +1,11 @@
 use eframe::egui::{self, Layout};
 use egui_task_manager::TaskManager;
 
-use super::{profiles::ProfilesState, View};
+use super::{profiles::InstancesState, View};
 
 pub struct DownloadingProgress<'a> {
     pub manager: &'a TaskManager,
-    pub profiles_state: &'a mut ProfilesState,
+    pub profiles_state: &'a mut InstancesState,
 }
 
 impl View for DownloadingProgress<'_> {
