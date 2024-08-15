@@ -32,7 +32,7 @@ impl View for CreateInstanceMenu<'_> {
             .clicked()
         {
             let id = self.instances_state.instances.next_id();
-            let instance = Instance::new(self.create_instance_menu_state.name.clone(), id);
+            let instance = Instance::new(self.create_instance_menu_state.name.trim_end().to_owned(), id);
             self.instances_state.instances.add_instance(instance);
             self.instances_state.instances.update_instance_config(id).report_error();
             ui.toasts(|toasts| toasts.success("New instance created"));
