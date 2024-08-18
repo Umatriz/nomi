@@ -14,7 +14,7 @@ use egui_notify::Toasts;
 use open_directory::open_directory_native;
 use std::path::Path;
 use subscriber::EguiLayer;
-use ui_ext::{UiExt, TOASTS_ID};
+use ui_ext::UiExt;
 use views::{add_tab_menu::AddTab, AddProfileMenu, CreateInstanceMenu, View};
 
 use errors_pool::{ErrorPoolExt, ERRORS_POOL};
@@ -135,7 +135,8 @@ impl eframe::App for MyTabs {
             .manager
             .add_collection::<collections::AssetsCollection>(())
             .add_collection::<collections::FabricDataCollection>(&mut self.context.states.add_profile_menu.fabric_versions)
-            .add_collection::<collections::GameDeletionCollection>(())
+            .add_collection::<collections::GameDeletionCollection>(&self.context.states.instances.instances)
+            .add_collection::<collections::InstanceDeletionCollection>(&mut self.context.states.instances.instances)
             .add_collection::<collections::GameDownloadingCollection>(&self.context.states.instances.instances)
             .add_collection::<collections::JavaCollection>(())
             .add_collection::<collections::ProjectCollection>(&mut self.context.states.mod_manager.current_project)

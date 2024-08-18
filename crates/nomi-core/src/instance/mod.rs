@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 pub use profile::*;
 use serde::{Deserialize, Serialize};
-use tracing::error;
+use tracing::{error, warn};
 
 use crate::{
     configs::profile::{Loader, VersionProfile},
@@ -74,6 +74,16 @@ impl Instance {
 
     pub fn find_profile_mut(&mut self, id: InstanceProfileId) -> Option<&mut ProfilePayload> {
         self.profiles_mut().iter_mut().find(|p| p.id == id)
+    }
+
+    pub fn remove_profile(&mut self, id: InstanceProfileId) -> Option<ProfilePayload> {
+        let opt = self.profiles.iter().position(|p| p.id == id).map(|idx| self.profiles.remove(idx));
+
+        if opt.is_none() {
+            warn!(?id, "Cannot find a profile to remove");
+        }
+
+        opt
     }
 
     /// Generate id for the next profile in this instance

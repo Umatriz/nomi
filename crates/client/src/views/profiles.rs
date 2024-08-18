@@ -1,7 +1,7 @@
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 
 use anyhow::bail;
-use eframe::egui::{self, Align2, RichText, TextWrapMode, Ui};
+use eframe::egui::{self, Align2, Id, RichText, TextWrapMode, Ui};
 use egui_extras::{Column, TableBuilder};
 use egui_task_manager::{Caller, Task, TaskManager};
 use itertools::Itertools;
@@ -9,7 +9,7 @@ use nomi_core::{
     configs::profile::{ProfileState, VersionProfile},
     fs::write_toml_config_sync,
     game_paths::GamePaths,
-    instance::{launch::arguments::UserData, load_instances, Instance, InstanceProfileId, ProfilePayload},
+    instance::{delete_profile, launch::arguments::UserData, load_instances, Instance, InstanceProfileId, ProfilePayload},
     repository::{launcher_manifest::LauncherManifest, username::Username},
 };
 use parking_lot::RwLock;
@@ -18,9 +18,11 @@ use tracing::error;
 
 use crate::{
     cache::GLOBAL_CACHE,
-    collections::{AssetsCollection, GameDownloadingCollection, GameRunnerCollection},
+    collections::{AssetsCollection, GameDeletionCollection, GameDownloadingCollection, GameRunnerCollection, InstanceDeletionCollection},
     download::{task_assets, task_download_version},
     errors_pool::ErrorPoolExt,
+    toasts,
+    ui_ext::UiExt,
     TabKind,
 };
 
@@ -94,6 +96,13 @@ impl InstancesConfig {
         self.instances.iter().find(|p| p.read().id() == id).cloned()
     }
 
+    pub fn remove_instance(&mut self, id: usize) -> Option<Arc<RwLock<Instance>>> {
+        self.instances
+            .iter()
+            .position(|i| i.read().id() == id)
+            .map(|idx| self.instances.remove(idx))
+    }
+
     pub fn load() -> Self {
         Self {
             instances: load_instances()
@@ -154,7 +163,6 @@ impl InstancesConfig {
 }
 
 impl Instances<'_> {
-    // TODO: It requires profile to be loaded
     fn profile_action_ui(&mut self, ui: &mut Ui, profile_payload: &ProfilePayload) {
         let button = if profile_payload.is_downloaded {
             ui.add_enabled(self.is_allowed_to_take_action, egui::Button::new("Launch"))
@@ -282,15 +290,42 @@ impl Instances<'_> {
                         });
 
                         row.col(|ui| {
-                            ui.button("TODO: Delete");
+                            ui.button_with_confirm_popup(Id::new("confirm_profile_deletion").with(profile.id), "Delete", |ui| {
+                                ui.set_width(200.0);
+                                ui.label("Are you sure you want to delete this profile?");
+                                ui.warn_irreversible_action();
+
+                                ui.horizontal(|ui| {
+                                    let yes_button = ui.button("Yes");
+                                    let no_button = ui.button("No");
+
+                                    if yes_button.clicked() {
+                                        let id = profile.id;
+                                        if let Some(profile) = self.profiles_state.instances.find_profile(id) {
+                                            let profile = profile.read();
+                                            let game_version = profile.profile.version().to_owned();
+                                            let task = Task::new(
+                                                "Deleting profile",
+                                                Caller::standard(async move {
+                                                    delete_profile(GamePaths::from_id(id), &game_version).await;
+                                                    id
+                                                }),
+                                            );
+
+                                            self.manager.push_task::<GameDeletionCollection>(task)
+                                        } else {
+                                            toasts::add(|toasts| toasts.warning("Cannot find profile to delete"));
+                                        }
+                                    }
+
+                                    if yes_button.clicked() || no_button.clicked() {
+                                        ui.memory_mut(|mem| mem.close_popup())
+                                    }
+                                });
+                            });
                         });
                     });
                 }
-
-                // is_deleting.drain(..).for_each(|index| {
-                //     self.profiles_state.instances.instances.remove(index);
-                //     self.profiles_state.instances.update_config_sync().report_error();
-                // });
             });
     }
 }
@@ -303,87 +338,43 @@ impl View for Instances<'_> {
         for instance in iter {
             let instance = instance.read();
             ui.group(|ui| {
-                ui.label(RichText::new(instance.name()).strong());
-                egui::CollapsingHeader::new("Profiles")
-                    .id_source(egui::Id::new(instance.id()).with("__profiles_list"))
-                    .show(ui, |ui| {
+                let id = ui.make_persistent_id("instance_details").with(instance.id());
+                egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false)
+                    .show_header(ui, |ui| {
+                        ui.label(RichText::new(instance.name()).strong());
+                        ui.button("Launch");
+                    })
+                    .body(|ui| {
+                        ui.button_with_confirm_popup(Id::new("confirm_instance_deletion").with(instance.id()), "Delete", |ui| {
+                            ui.set_width(200.0);
+                            ui.label("Are you sure you want to delete this instance?");
+                            ui.warn_irreversible_action();
+
+                            ui.horizontal(|ui| {
+                                let yes_button = ui.button("Yes");
+                                let no_button = ui.button("No");
+
+                                if yes_button.clicked() {
+                                    let path = instance.path();
+                                    let id = instance.id();
+                                    let task = Task::new(
+                                        "Deleting the instance",
+                                        Caller::standard(async move { tokio::fs::remove_dir_all(path).await.report_error().map(|()| id) }),
+                                    );
+                                    self.manager.push_task::<InstanceDeletionCollection>(task);
+                                }
+
+                                if yes_button.clicked() || no_button.clicked() {
+                                    ui.memory_mut(|mem| mem.close_popup())
+                                }
+                            });
+                        });
+
+                        ui.heading("Profiles");
+
                         self.show_profiles_for_instance(ui, instance.profiles(), self.is_allowed_to_take_action)
                     });
             });
         }
     }
-}
-
-fn delete_profile_ui() {
-    // if let ProfileState::Downloaded(instance) = &profile.profile.state {
-    //     let popup_id = ui.make_persistent_id("delete_popup_id");
-    //     let button = ui
-    //         .add_enabled(is_allowed_to_take_action, Button::new("Delete"))
-    //         .on_hover_text("It will delete the profile and it's data");
-
-    //     if button.clicked() {
-    //         ui.memory_mut(|mem| mem.toggle_popup(popup_id));
-    //     }
-
-    //     popup_below_widget(ui, popup_id, &button, PopupCloseBehavior::CloseOnClickOutside, |ui| {
-    //         ui.set_min_width(150.0);
-
-    //         let delete_client_id = Id::new("delete_client");
-    //         let delete_libraries_id = Id::new("delete_libraries");
-    //         let delete_assets_id = Id::new("delete_assets");
-    //         let delete_mods_id = Id::new("delete_mods");
-
-    //         let mut make_checkbox = |text: &str, id, default: bool| {
-    //             let mut state = ui.data_mut(|map| *map.get_temp_mut_or_insert_with(id, move || default));
-    //             ui.checkbox(&mut state, text);
-    //             ui.data_mut(|map| map.insert_temp(id, state));
-    //         };
-
-    //         make_checkbox("Delete profile's client", delete_client_id, true);
-    //         make_checkbox("Delete profile's libraries", delete_libraries_id, false);
-    //         if profile.profile.loader().is_fabric() {
-    //             make_checkbox("Delete profile's mods", delete_mods_id, true);
-    //         }
-    //         make_checkbox("Delete profile's assets", delete_assets_id, false);
-
-    //         ui.label("Are you sure you want to delete this profile and it's data?");
-    //         ui.horizontal(|ui| {
-    //             ui.warn_icon_with_hover_text("Deleting profile's assets and libraries might break other profiles.");
-    //             if ui.button("Yes").clicked() {
-    //                 is_deleting.push(index);
-
-    //                 let version = &instance.settings.version;
-
-    //                 let checkbox_data = |id| ui.data(|data| data.get_temp(id)).unwrap_or_default();
-
-    //                 let delete_client = checkbox_data(delete_client_id);
-    //                 let delete_libraries = checkbox_data(delete_libraries_id);
-    //                 let delete_assets = checkbox_data(delete_assets_id);
-    //                 let delete_mods = checkbox_data(delete_mods_id);
-
-    //                 let profile_id = profile.profile.id;
-
-    //                 let instance = instance.clone();
-    //                 let caller = Caller::standard(async move {
-    //                     let path = Path::new(DOT_NOMI_MODS_STASH_DIR).join(format!("{}", profile_id));
-    //                     if delete_mods && path.exists() {
-    //                         tokio::fs::remove_dir_all(path).await.report_error();
-    //                     }
-    //                     instance.delete(delete_client, delete_libraries, delete_assets).await.report_error();
-    //                 });
-
-    //                 let task = Task::new(format!("Deleting the game's files ({})", version), caller);
-
-    //                 self.manager.push_task::<GameDeletionCollection>(task);
-
-    //                 self.tabs_state.remove_profile_related_tabs(&profile);
-
-    //                 ui.memory_mut(|mem| mem.close_popup());
-    //             }
-    //             if ui.button("No").clicked() {
-    //                 ui.memory_mut(|mem| mem.close_popup());
-    //             }
-    //         });
-    //     });
-    // }
 }

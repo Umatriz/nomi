@@ -7,9 +7,16 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct GamePaths {
+    /// Game root directory. This is usually corresponds to the instance directory.
     pub game: PathBuf,
+
+    /// Assets directory.
     pub assets: PathBuf,
+
+    /// Profile directory.
     pub profile: PathBuf,
+
+    /// Libraries directory.
     pub libraries: PathBuf,
 }
 
@@ -24,7 +31,6 @@ impl GamePaths {
         Self {
             game: path.to_path_buf(),
             assets: ASSETS_DIR.into(),
-            // Is this a good approach?
             profile: path.join("profiles").join(format!("{profile_id}")),
             libraries: LIBRARIES_DIR.into(),
         }

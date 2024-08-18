@@ -9,6 +9,7 @@ use nomi_modding::modrinth::{
 
 use crate::{
     errors_pool::ErrorPoolExt,
+    toasts,
     views::{InstancesConfig, SimpleDependency},
 };
 
@@ -102,9 +103,9 @@ impl<'c> TasksCollection<'c> for GameDownloadingCollection {
 pub struct GameDeletionCollection;
 
 impl<'c> TasksCollection<'c> for GameDeletionCollection {
-    type Context = ();
+    type Context = &'c InstancesConfig;
 
-    type Target = ();
+    type Target = InstanceProfileId;
 
     type Executor = executors::Linear;
 
@@ -112,8 +113,43 @@ impl<'c> TasksCollection<'c> for GameDeletionCollection {
         "Game deletion collection"
     }
 
-    fn handle(_context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|()| ())
+    fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|id: InstanceProfileId| {
+            if let Some(instance) = context.find_instance(id.instance()) {
+                instance.write().remove_profile(id);
+                if context.update_instance_config(id.instance()).report_error().is_some() {
+                    toasts::add(|toasts| toasts.success("Successfully removed the profile"))
+                }
+            }
+        })
+    }
+}
+
+pub struct InstanceDeletionCollection;
+
+impl<'c> TasksCollection<'c> for InstanceDeletionCollection {
+    type Context = &'c mut InstancesConfig;
+
+    type Target = Option<usize>;
+
+    type Executor = executors::Linear;
+
+    fn name() -> &'static str {
+        "Instance deletion collection"
+    }
+
+    fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|id: Option<usize>| {
+            let Some(id) = id else {
+                return;
+            };
+
+            if context.remove_instance(id).is_none() {
+                return;
+            }
+
+            toasts::add(|toasts| toasts.success("Successfully removed the instance"))
+        })
     }
 }
 

@@ -54,47 +54,6 @@ pub struct LaunchInstance {
 }
 
 impl LaunchInstance {
-    #[tracing::instrument(skip(self), err)]
-    pub async fn delete(&self, paths: GamePaths, delete_client: bool, delete_libraries: bool, delete_assets: bool) -> anyhow::Result<()> {
-        let manifest = read_json_config::<Manifest>(paths.manifest_file(&self.settings.version)).await?;
-        let arguments_builder = ArgumentsBuilder::new(&paths, self, &manifest).build_classpath();
-
-        if delete_client {
-            let path = paths.version_jar_file(&self.settings.version);
-            let _ = tokio::fs::remove_file(&path)
-                .await
-                .inspect(|()| {
-                    debug!("Removed client successfully: {}", &path.display());
-                })
-                .inspect_err(|_| {
-                    warn!("Cannot remove client: {}", &path.display());
-                });
-        }
-
-        if delete_libraries {
-            for library in arguments_builder.classpath_as_slice() {
-                let _ = tokio::fs::remove_file(library)
-                    .await
-                    .inspect(|()| trace!("Removed library successfully: {}", library.display()))
-                    .inspect_err(|_| warn!("Cannot remove library: {}", library.display()));
-            }
-        }
-
-        if delete_assets {
-            let assets = read_json_config::<Assets>(dbg!(paths.assets.join("indexes").join(format!("{}.json", manifest.asset_index.id)))).await?;
-            for asset in assets.objects.values() {
-                let path = paths.assets.join("objects").join(&asset.hash[0..2]).join(&asset.hash);
-
-                let _ = tokio::fs::remove_file(&path)
-                    .await
-                    .inspect(|()| trace!("Removed asset successfully: {}", path.display()))
-                    .inspect_err(|e| warn!("Cannot remove asset: {}. Error: {e}", path.display()));
-            }
-        }
-
-        Ok(())
-    }
-
     pub fn loader_profile(&self) -> Option<&LoaderProfile> {
         self.loader_profile.as_ref()
     }

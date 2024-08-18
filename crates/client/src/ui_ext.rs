@@ -1,7 +1,4 @@
 use eframe::egui::{self, popup_below_widget, Id, PopupCloseBehavior, Response, RichText, Ui, WidgetText};
-use egui_notify::{Toast, Toasts};
-
-pub const TOASTS_ID: &str = "global_egui_notify_toasts";
 
 pub trait UiExt {
     fn ui(&self) -> &Ui;
@@ -25,6 +22,10 @@ pub trait UiExt {
     fn warn_label_with_icon_before(&mut self, text: impl Into<String>) -> Response {
         let ui = self.ui_mut();
         ui.label(RichText::new(format!("⚠ {}", text.into())).color(ui.visuals().warn_fg_color))
+    }
+
+    fn warn_irreversible_action(&mut self) -> Response {
+        self.warn_label_with_icon_before("This action is irreversible.")
     }
 
     fn markdown_ui(&mut self, id: egui::Id, markdown: &str) {
