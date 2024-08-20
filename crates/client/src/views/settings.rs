@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use eframe::egui::{self, RichText};
+use eframe::egui::{self};
 use egui_file_dialog::FileDialog;
 use egui_form::{garde::field_path, Form, FormField};
 use egui_task_manager::TaskManager;

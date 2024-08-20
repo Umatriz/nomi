@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 
 use nomi_core::{
     configs::profile::{ProfileState, VersionProfile},
@@ -9,12 +8,8 @@ use nomi_core::{
         logs::PrintLogs,
         InstanceProfileId, Profile,
     },
-    loaders::{
-        forge::{Forge, ForgeVersion},
-        vanilla::Vanilla,
-    },
+    loaders::forge::{Forge, ForgeVersion},
     repository::java_runner::JavaRunner,
-    DOT_NOMI_JAVA_EXECUTABLE,
 };
 
 #[tokio::test]

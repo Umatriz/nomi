@@ -1,7 +1,7 @@
 use eframe::egui;
 use nomi_core::instance::Instance;
 
-use crate::{errors_pool::ErrorPoolExt, toasts, ui_ext::UiExt};
+use crate::{errors_pool::ErrorPoolExt, toasts};
 
 use super::{InstancesState, View};
 

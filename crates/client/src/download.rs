@@ -5,7 +5,7 @@ use eframe::egui::Context;
 use egui_task_manager::TaskProgressShared;
 use nomi_core::{
     configs::profile::{Loader, ProfileState},
-    downloads::{progress::MappedSender, traits::Downloader, AssetsDownloader, DownloadQueue},
+    downloads::{progress::MappedSender, traits::Downloader, AssetsDownloader},
     game_paths::GamePaths,
     instance::{launch::LaunchSettings, Profile},
     loaders::{

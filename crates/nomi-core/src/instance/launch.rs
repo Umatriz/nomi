@@ -10,10 +10,9 @@ use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
-use tracing::{debug, error, info, trace, warn};
+use tracing::{error, info};
 
 use crate::{
-    downloads::Assets,
     fs::read_json_config,
     game_paths::GamePaths,
     markers::Undefined,

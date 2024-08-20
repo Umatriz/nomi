@@ -2,15 +2,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use anyhow::anyhow;
-use cache::ui_for_loaded_profiles;
 use collections::{AssetsCollection, GameDownloadingCollection, GameRunnerCollection, JavaCollection};
 use context::MyContext;
 use eframe::{
-    egui::{self, Align, Align2, Button, Color32, Frame, Id, Layout, RichText, ScrollArea, ViewportBuilder},
+    egui::{self, Align, Button, Frame, Id, Layout, RichText, ScrollArea, ViewportBuilder},
     epaint::Vec2,
 };
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
-use egui_notify::Toasts;
 use open_directory::open_directory_native;
 use std::path::Path;
 use subscriber::EguiLayer;
