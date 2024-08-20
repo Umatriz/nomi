@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use eframe::egui::{self, text::LayoutJob, text_selection::LabelSelectionState, Color32, Id, Sense, TextFormat, Vec2};
+use eframe::egui::{self, text::LayoutJob, text_selection::LabelSelectionState, Color32, Id, Sense, TextFormat};
 use parking_lot::Mutex;
 use time::{format_description, OffsetDateTime};
 use tracing::{
