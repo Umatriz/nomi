@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use eframe::egui::{self, text::LayoutJob, Color32, Sense, TextFormat, Vec2};
+use eframe::egui::{self, text::LayoutJob, Color32, Id, Sense, TextFormat, Vec2};
 use parking_lot::Mutex;
 use time::{format_description, OffsetDateTime};
 use tracing::{
@@ -55,98 +55,98 @@ impl EguiLayer {
     }
 
     pub fn ui(&self, ui: &mut egui::Ui) {
-        egui::Grid::new("egui_logs_ui").show(ui, |ui| {
-            let lock = self.events.lock();
-            for (event, scope) in lock.iter() {
-                let color = Self::level_color(event.level);
-                ui.label(format!(
-                    "{} {} {}",
-                    event.time.date(),
-                    event
-                        .time
-                        .time()
-                        .format(&format_description::parse("[hour]:[minute]:[second]").unwrap())
-                        .unwrap(),
-                    event.time.offset()
-                ));
-                ui.colored_label(color, format!("{}", event.level));
-                ui.horizontal(|ui| {
-                    ui.colored_label(color, format!("{}:", &event.target));
-                    if let Some((_, content)) = event.fields.0.iter().find(|(name, _)| name == "message") {
-                        ui.colored_label(color, content);
-                    }
-                    for (name, content) in &event.fields.0 {
-                        if name == "message" {
-                            continue;
+        let lock = self.events.lock();
+        for (event, scope) in lock.iter() {
+            let color = Self::level_color(event.level);
+
+            egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), Id::new("log_data").with(event.time), false)
+                .show_header(ui, |ui| {
+                    ui.colored_label(color, format!("{}", event.level));
+                    ui.horizontal(|ui| {
+                        ui.colored_label(color, format!("{}:", &event.target));
+                        if let Some((_, content)) = event.fields.0.iter().find(|(name, _)| name == "message") {
+                            ui.colored_label(color, content);
+                        }
+                        for (name, content) in &event.fields.0 {
+                            if name == "message" {
+                                continue;
+                            }
+
+                            ui.colored_label(color, format!("{name}: {content}"));
+                        }
+                    });
+                })
+                .body(|ui| {
+                    ui.vertical(|ui| {
+                        ui.label(format!(
+                            "Time: {} {} {}",
+                            event.time.date(),
+                            event
+                                .time
+                                .time()
+                                .format(&format_description::parse("[hour]:[minute]:[second]").unwrap())
+                                .unwrap(),
+                            event.time.offset()
+                        ));
+
+                        let draw_layout_job = |ui: &mut egui::Ui, job| {
+                            let galley = ui.fonts(|fonts| fonts.layout_job(job));
+                            let response = ui.allocate_response(galley.size(), Sense::hover());
+                            // response.rect = response.rect.translate(Vec2::new(25.0, 0.0));
+
+                            ui.painter().galley(response.rect.left_top(), galley, Color32::WHITE);
+                        };
+
+                        if let Some((file, line)) = event.file.as_ref().and_then(|f| event.line.map(|l| (f, l))) {
+                            let mut job = LayoutJob::default();
+
+                            job.append(
+                                "at",
+                                5.0,
+                                TextFormat {
+                                    italics: true,
+                                    ..Default::default()
+                                },
+                            );
+
+                            job.append(&format!("{}:{}", file, line), 5.0, TextFormat::default());
+
+                            draw_layout_job(ui, job);
                         }
 
-                        ui.colored_label(color, format!("{name}: {content}"));
-                    }
+                        for span in &scope.spans {
+                            let mut job = LayoutJob::default();
+                            job.append(
+                                "in",
+                                5.0,
+                                TextFormat {
+                                    italics: true,
+                                    ..Default::default()
+                                },
+                            );
+
+                            job.append(span.name, 5.0, TextFormat::default());
+
+                            if !span.fields.0.is_empty() {
+                                job.append(
+                                    "with",
+                                    5.0,
+                                    TextFormat {
+                                        italics: true,
+                                        ..Default::default()
+                                    },
+                                );
+                            }
+
+                            for (name, content) in &span.fields.0 {
+                                job.append(&format!("{name}: {content}"), 5.0, TextFormat::default());
+                            }
+
+                            draw_layout_job(ui, job);
+                        }
+                    });
                 });
-                ui.end_row();
-
-                let draw_layout_job = |ui: &mut egui::Ui, job| {
-                    let galley = ui.fonts(|fonts| fonts.layout_job(job));
-                    let mut response = ui.allocate_response(Vec2::new(0.0, ui.available_height()), Sense::hover());
-                    response.rect = response.rect.translate(Vec2::new(25.0, 0.0));
-
-                    ui.painter().galley(response.rect.left_top(), galley, Color32::WHITE);
-                };
-
-                if let Some((file, line)) = event.file.as_ref().and_then(|f| event.line.map(|l| (f, l))) {
-                    let mut job = LayoutJob::default();
-
-                    job.append(
-                        "at",
-                        5.0,
-                        TextFormat {
-                            italics: true,
-                            ..Default::default()
-                        },
-                    );
-
-                    job.append(&format!("{}:{}", file, line), 5.0, TextFormat::default());
-
-                    draw_layout_job(ui, job);
-                    ui.end_row();
-                }
-
-                for span in &scope.spans {
-                    let mut job = LayoutJob::default();
-                    job.append(
-                        "in",
-                        5.0,
-                        TextFormat {
-                            italics: true,
-                            ..Default::default()
-                        },
-                    );
-
-                    job.append(span.name, 5.0, TextFormat::default());
-
-                    if !span.fields.0.is_empty() {
-                        job.append(
-                            "with",
-                            5.0,
-                            TextFormat {
-                                italics: true,
-                                ..Default::default()
-                            },
-                        );
-                    }
-
-                    for (name, content) in &span.fields.0 {
-                        job.append(&format!("{name}: {content}"), 5.0, TextFormat::default());
-                    }
-
-                    draw_layout_job(ui, job);
-                    ui.end_row();
-                }
-
-                ui.allocate_space(Vec2::new(0.0, 5.0));
-                ui.end_row()
-            }
-        });
+        }
     }
 }
 
