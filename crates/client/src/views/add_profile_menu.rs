@@ -27,8 +27,6 @@ pub struct AddProfileMenu<'a> {
 }
 
 pub struct AddProfileMenuState {
-    instance_name: String,
-
     parent_instance: Option<Arc<RwLock<Instance>>>,
 
     selected_version_type: VersionType,
@@ -63,7 +61,6 @@ impl Default for AddProfileMenuState {
 impl AddProfileMenuState {
     pub fn new() -> Self {
         Self {
-            instance_name: String::new(),
             parent_instance: None,
 
             selected_version_type: VersionType::Release,

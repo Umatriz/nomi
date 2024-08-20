@@ -32,7 +32,7 @@ impl<I: Send, T: Send> ProgressSender<I> for MappedSender<I, T> {
         self.inner.update(mapped).await;
 
         if let Some(side_effect) = self.side_effect.as_ref() {
-            (side_effect)()
+            (side_effect)();
         }
     }
 }
