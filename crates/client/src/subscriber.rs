@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use eframe::egui::{self, text::LayoutJob, Color32, Id, Sense, TextFormat, Vec2};
+use eframe::egui::{self, text::LayoutJob, text_selection::LabelSelectionState, Color32, Id, Sense, TextFormat};
 use parking_lot::Mutex;
 use time::{format_description, OffsetDateTime};
 use tracing::{
@@ -91,18 +91,20 @@ impl EguiLayer {
 
                         let draw_layout_job = |ui: &mut egui::Ui, job| {
                             let galley = ui.fonts(|fonts| fonts.layout_job(job));
-                            let response = ui.allocate_response(galley.size(), Sense::hover());
-                            // response.rect = response.rect.translate(Vec2::new(25.0, 0.0));
+                            let response = ui.allocate_response(galley.size(), Sense::click_and_drag());
 
-                            ui.painter().galley(response.rect.left_top(), galley, Color32::WHITE);
+                            let galley_pos = response.rect.left_top();
+                            ui.painter().galley(galley_pos, galley.clone(), Color32::WHITE);
+
+                            LabelSelectionState::label_text_selection(ui, &response, galley_pos, &galley);
                         };
 
                         if let Some((file, line)) = event.file.as_ref().and_then(|f| event.line.map(|l| (f, l))) {
                             let mut job = LayoutJob::default();
 
                             job.append(
-                                "at",
-                                5.0,
+                                "at ",
+                                0.0,
                                 TextFormat {
                                     italics: true,
                                     ..Default::default()
@@ -117,20 +119,20 @@ impl EguiLayer {
                         for span in &scope.spans {
                             let mut job = LayoutJob::default();
                             job.append(
-                                "in",
-                                5.0,
+                                "in ",
+                                0.0,
                                 TextFormat {
                                     italics: true,
                                     ..Default::default()
                                 },
                             );
 
-                            job.append(span.name, 5.0, TextFormat::default());
+                            job.append(span.name, 0.0, TextFormat::default());
 
                             if !span.fields.0.is_empty() {
                                 job.append(
-                                    "with",
-                                    5.0,
+                                    " with ",
+                                    0.0,
                                     TextFormat {
                                         italics: true,
                                         ..Default::default()
