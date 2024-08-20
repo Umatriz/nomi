@@ -7,7 +7,10 @@ use std::{
 use eframe::egui::{self, Button, Color32, ComboBox, Id, Image, Key, Layout, RichText, ScrollArea, Vec2};
 use egui_infinite_scroll::{InfiniteScroll, LoadingState};
 use egui_task_manager::{Caller, Task, TaskManager};
-use nomi_core::{DOT_NOMI_DATA_PACKS_DIR, MINECRAFT_DIR};
+use nomi_core::{
+    instance::{Instance, InstanceProfileId},
+    DOT_NOMI_DATA_PACKS_DIR,
+};
 use nomi_modding::{
     capitalize_first_letters_whitespace_split,
     modrinth::{
@@ -25,16 +28,15 @@ use crate::{
     collections::{DependenciesCollection, ModsDownloadingCollection, ProjectCollection, ProjectVersionsCollection},
     errors_pool::ErrorPoolExt,
     ui_ext::UiExt,
-    DOT_NOMI_MODS_STASH_DIR,
 };
 
-use super::{ModdedProfile, ProfilesConfig, View};
+use super::{InstancesConfig, ModdedProfile, View};
 
 pub use crate::mods::*;
 
 pub struct ModManager<'a> {
     pub task_manager: &'a mut TaskManager,
-    pub profiles_config: &'a mut ProfilesConfig,
+    pub profiles_config: &'a mut InstancesConfig,
     pub profile: Arc<RwLock<ModdedProfile>>,
     pub mod_manager_state: &'a mut ModManagerState,
 }
@@ -69,9 +71,10 @@ pub enum DataPackDownloadDirectory {
 }
 
 impl DataPackDownloadDirectory {
-    pub fn as_path_buf(&self, profile_id: usize) -> PathBuf {
+    pub fn as_path_buf(&self, profile_id: InstanceProfileId) -> PathBuf {
         match self {
-            DataPackDownloadDirectory::Mods => PathBuf::from(DOT_NOMI_MODS_STASH_DIR).join(format!("{profile_id}")),
+            DataPackDownloadDirectory::Mods => mods_stash_path_for_profile(profile_id),
+            // TODO: Maybe make this local for each instance
             DataPackDownloadDirectory::DataPacks => PathBuf::from(DOT_NOMI_DATA_PACKS_DIR),
         }
     }
@@ -91,11 +94,11 @@ fn fix_svg(text: &str, color: Color32) -> Option<String> {
     Some(format!("<svg xmlns=\"http://www.w3.org/2000/svg\" {s}"))
 }
 
-fn directory_from_project_type(project_type: ProjectType, profile_id: usize) -> PathBuf {
+fn directory_from_project_type(project_type: ProjectType, profile_id: InstanceProfileId) -> PathBuf {
     match project_type {
-        ProjectType::Mod | ProjectType::Modpack => PathBuf::from(DOT_NOMI_MODS_STASH_DIR).join(format!("{}", profile_id)),
-        ProjectType::ResourcePack => PathBuf::from(MINECRAFT_DIR).join("resourcepacks"),
-        ProjectType::Shader => PathBuf::from(MINECRAFT_DIR).join("shaderpacks"),
+        ProjectType::Mod | ProjectType::Modpack => mods_stash_path_for_profile(profile_id),
+        ProjectType::ResourcePack => Instance::path_from_id(profile_id.instance()).join("resourcepacks"),
+        ProjectType::Shader => Instance::path_from_id(profile_id.instance()).join("shaderpacks"),
         ProjectType::DataPack => PathBuf::from(DOT_NOMI_DATA_PACKS_DIR),
         _ => unreachable!("You cannot download plugins"),
     }
@@ -191,7 +194,7 @@ impl View for ModManager<'_> {
             ui.horizontal(|ui| {
                 for project_type in ProjectType::iter().filter(|t| !matches!(t, ProjectType::Plugin)) {
                     let enabled = {
-                        (self.profile.read().profile.loader().is_fabric() || matches!(project_type, ProjectType::DataPack))
+                        (self.profile.read().profile.loader().support_mods() || matches!(project_type, ProjectType::DataPack))
                             && !matches!(project_type, ProjectType::Modpack)
                     };
 
@@ -586,12 +589,13 @@ impl View for ModManager<'_> {
 
                                 let project_type = project.project_type;
 
-                                let _ = self.profiles_config.update_config().report_error();
+                                let _ = self.profiles_config.update_profile_config(self.profile.read().profile.id).report_error();
                                 let is_data_pack = self.mod_manager_state.is_datapack;
                                 let profile_id = {
                                     let lock = profile.read();
                                     lock.profile.id
                                 };
+                                let ctx = ui.ctx().clone();
                                 let download_mod = Task::new(
                                     "Download mods",
                                     Caller::progressing(move |progress| async move {
@@ -622,18 +626,18 @@ impl View for ModManager<'_> {
                                             versions_with_paths.push(data);
                                         }
 
-                                        let mods = download_mods(progress, versions_with_paths).await.report_error();
+                                        let mods = download_mods(progress, ctx, versions_with_paths).await.report_error();
 
                                         if let Some((mut profile, mods)) = mods.map(|mods| (profile.write(), mods)) {
                                             if matches!(project_type, ProjectType::Mod) {
                                                 profile.mods.mods.extend(mods);
                                                 profile.mods.mods.sort();
                                                 profile.mods.mods.dedup();
-                                                debug!("Added mods to profile {} successfully", profile.profile.id);
+                                                debug!(id = ?profile.profile.id, "Added mods to profile successfully");
                                             }
                                         }
 
-                                        Some(())
+                                        Some(profile_id)
                                     }),
                                 );
 

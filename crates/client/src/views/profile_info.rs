@@ -1,4 +1,4 @@
-use std::{collections::HashSet, path::Path, sync::Arc};
+use std::{collections::HashSet, sync::Arc};
 
 use eframe::egui::{self, Color32, Id, RichText, TextEdit};
 use egui_task_manager::{Caller, Task, TaskManager};
@@ -7,14 +7,14 @@ use nomi_modding::modrinth::project::ProjectId;
 use parking_lot::RwLock;
 
 use crate::{
-    collections::DownloadAddedModsCollection, errors_pool::ErrorPoolExt, open_directory::open_directory_native, ui_ext::UiExt, views::ProfilesConfig,
-    TabKind, DOT_NOMI_MODS_STASH_DIR,
+    collections::DownloadAddedModsCollection, errors_pool::ErrorPoolExt, open_directory::open_directory_native, toasts, ui_ext::UiExt,
+    views::InstancesConfig, TabKind,
 };
 
-use super::{download_added_mod, Mod, ModdedProfile, TabsState, View};
+use super::{download_added_mod, mods_stash_path_for_profile, Mod, ModdedProfile, TabsState, View};
 
 pub struct ProfileInfo<'a> {
-    pub profiles: &'a ProfilesConfig,
+    pub profiles: &'a InstancesConfig,
     pub task_manager: &'a mut TaskManager,
     pub profile: Arc<RwLock<ModdedProfile>>,
     pub tabs_state: &'a mut TabsState,
@@ -273,7 +273,8 @@ impl View for ProfileInfo<'_> {
                         }
 
                         {
-                            self.profiles.update_config().report_error();
+                            let id = self.profile.read().profile.id;
+                            self.profiles.update_profile_config(id).report_error();
                         }
 
                         self.profile_info_state.mods_to_import.clear();
@@ -329,7 +330,7 @@ impl View for ProfileInfo<'_> {
                         ui.ctx().copy_text(export_code);
                     }
 
-                    ui.toasts(|toasts| toasts.success("Copied the export code to the clipboard"));
+                    toasts::add(|toasts| toasts.success("Copied the export code to the clipboard"));
                 }
             });
 
@@ -375,9 +376,18 @@ impl View for ProfileInfo<'_> {
                     if let ProfileState::Downloaded(instance) = &mut profile.profile.state {
                         instance.jvm_arguments_mut().clone_from(&self.profile_info_state.profile_jvm_args);
                     }
+
+                    if let Some(instance) = self.profiles.find_instance(profile.profile.id.instance()) {
+                        if let Some(profile) = instance.write().find_profile_mut(profile.profile.id) {
+                            profile.name.clone_from(&self.profile_info_state.profile_name);
+                        }
+                    }
                 }
 
-                self.profiles.update_config().report_error();
+                self.profiles
+                    .update_instance_config(self.profile.read().profile.id.instance())
+                    .report_error();
+                self.profiles.update_profile_config(self.profile.read().profile.id).report_error();
             }
 
             if ui.button("Reset").clicked() {
@@ -387,7 +397,7 @@ impl View for ProfileInfo<'_> {
 
         ui.heading("Mods");
 
-        ui.add_enabled_ui(self.profile.read().profile.loader().is_fabric(), |ui| {
+        ui.add_enabled_ui(self.profile.read().profile.loader().support_mods(), |ui| {
             ui.toggle_button(&mut self.profile_info_state.is_import_window_open, "Import mods");
             if ui
                 .toggle_button(&mut self.profile_info_state.is_export_window_open, "Export mods")
@@ -401,7 +411,9 @@ impl View for ProfileInfo<'_> {
                 .on_hover_text("Open a folder where mods for this profile are located.")
                 .clicked()
             {
-                let path = Path::new(DOT_NOMI_MODS_STASH_DIR).join(format!("{}", self.profile.read().profile.id));
+                let profile_id = self.profile.read().profile.id;
+                let path = mods_stash_path_for_profile(profile_id);
+
                 if !path.exists() {
                     std::fs::create_dir_all(&path).report_error();
                 }
@@ -441,7 +453,7 @@ impl View for ProfileInfo<'_> {
 
                                 if yes.clicked() {
                                     mods_to_remove.push(m.project_id.clone());
-                                    let path = Path::new(DOT_NOMI_MODS_STASH_DIR).join(format!("{profile_id}"));
+                                    let path = mods_stash_path_for_profile(profile_id);
                                     for file in &m.files {
                                         std::fs::remove_file(path.join(&file.filename)).report_error();
                                     }
@@ -456,11 +468,12 @@ impl View for ProfileInfo<'_> {
                         let profile_id = self.profile.read().profile.id;
                         let files = m.files.clone();
                         let project_id = m.project_id.clone();
+                        let ctx = ui.ctx().clone();
                         let download_task = Task::new(
                             "Download mod",
                             Caller::progressing(move |progress| async move {
-                                download_added_mod(progress, profile_id, files).await;
-                                project_id
+                                download_added_mod(progress, ctx, mods_stash_path_for_profile(profile_id), files).await;
+                                (profile_id, project_id)
                             }),
                         );
 
@@ -476,7 +489,7 @@ impl View for ProfileInfo<'_> {
 
             vec.retain(|m| !mods_to_remove.contains(&m.project_id));
             if !mods_to_remove.is_empty() {
-                self.profiles.update_config().report_error();
+                self.profiles.update_profile_config(self.profile.read().profile.id).report_error();
             }
 
             let _ = std::mem::replace(&mut self.profile.write().mods.mods, vec);

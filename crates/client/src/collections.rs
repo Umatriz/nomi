@@ -1,7 +1,7 @@
 use std::{collections::HashSet, sync::Arc};
 
 use egui_task_manager::*;
-use nomi_core::repository::fabric_meta::FabricVersions;
+use nomi_core::{instance::InstanceProfileId, repository::fabric_meta::FabricVersions};
 use nomi_modding::modrinth::{
     project::{Project, ProjectId},
     version::Version,
@@ -9,7 +9,8 @@ use nomi_modding::modrinth::{
 
 use crate::{
     errors_pool::ErrorPoolExt,
-    views::{ProfilesConfig, SimpleDependency},
+    toasts,
+    views::{InstancesConfig, SimpleDependency},
 };
 
 pub struct FabricDataCollection;
@@ -73,9 +74,9 @@ impl<'c> TasksCollection<'c> for JavaCollection {
 pub struct GameDownloadingCollection;
 
 impl<'c> TasksCollection<'c> for GameDownloadingCollection {
-    type Context = &'c ProfilesConfig;
+    type Context = &'c InstancesConfig;
 
-    type Target = Option<()>;
+    type Target = Option<InstanceProfileId>;
 
     type Executor = executors::Linear;
 
@@ -84,8 +85,17 @@ impl<'c> TasksCollection<'c> for GameDownloadingCollection {
     }
 
     fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|_| {
-            context.update_config().report_error();
+        Handler::new(|id| {
+            if let Some(id) = id {
+                context.update_profile_config(id).report_error();
+                if let Some(instance) = context.find_instance(id.instance()) {
+                    if let Some(profile) = instance.write().find_profile_mut(id) {
+                        profile.is_downloaded = true
+                    };
+
+                    instance.read().write_blocking().report_error();
+                }
+            }
         })
     }
 }
@@ -93,9 +103,9 @@ impl<'c> TasksCollection<'c> for GameDownloadingCollection {
 pub struct GameDeletionCollection;
 
 impl<'c> TasksCollection<'c> for GameDeletionCollection {
-    type Context = ();
+    type Context = &'c InstancesConfig;
 
-    type Target = ();
+    type Target = InstanceProfileId;
 
     type Executor = executors::Linear;
 
@@ -103,8 +113,43 @@ impl<'c> TasksCollection<'c> for GameDeletionCollection {
         "Game deletion collection"
     }
 
-    fn handle(_context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|()| ())
+    fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|id: InstanceProfileId| {
+            if let Some(instance) = context.find_instance(id.instance()) {
+                instance.write().remove_profile(id);
+                if context.update_instance_config(id.instance()).report_error().is_some() {
+                    toasts::add(|toasts| toasts.success("Successfully removed the profile"))
+                }
+            }
+        })
+    }
+}
+
+pub struct InstanceDeletionCollection;
+
+impl<'c> TasksCollection<'c> for InstanceDeletionCollection {
+    type Context = &'c mut InstancesConfig;
+
+    type Target = Option<usize>;
+
+    type Executor = executors::Linear;
+
+    fn name() -> &'static str {
+        "Instance deletion collection"
+    }
+
+    fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
+        Handler::new(|id: Option<usize>| {
+            let Some(id) = id else {
+                return;
+            };
+
+            if context.remove_instance(id).is_none() {
+                return;
+            }
+
+            toasts::add(|toasts| toasts.success("Successfully removed the instance"))
+        })
     }
 }
 
@@ -182,9 +227,9 @@ impl<'c> TasksCollection<'c> for DependenciesCollection {
 pub struct ModsDownloadingCollection;
 
 impl<'c> TasksCollection<'c> for ModsDownloadingCollection {
-    type Context = &'c ProfilesConfig;
+    type Context = &'c InstancesConfig;
 
-    type Target = Option<()>;
+    type Target = Option<InstanceProfileId>;
 
     type Executor = executors::Linear;
 
@@ -193,8 +238,10 @@ impl<'c> TasksCollection<'c> for ModsDownloadingCollection {
     }
 
     fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|_| {
-            context.update_config().report_error();
+        Handler::new(|id| {
+            if let Some(id) = id {
+                context.update_profile_config(id).report_error();
+            }
         })
     }
 }
@@ -220,9 +267,9 @@ impl<'c> TasksCollection<'c> for GameRunnerCollection {
 pub struct DownloadAddedModsCollection;
 
 impl<'c> TasksCollection<'c> for DownloadAddedModsCollection {
-    type Context = (&'c mut HashSet<ProjectId>, &'c ProfilesConfig);
+    type Context = (&'c mut HashSet<ProjectId>, &'c InstancesConfig);
 
-    type Target = ProjectId;
+    type Target = (InstanceProfileId, ProjectId);
 
     type Executor = executors::Parallel;
 
@@ -231,9 +278,9 @@ impl<'c> TasksCollection<'c> for DownloadAddedModsCollection {
     }
 
     fn handle(context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|id| {
-            context.0.remove(&id);
-            context.1.update_config().report_error();
+        Handler::new(|(profile_id, project_id)| {
+            context.0.remove(&project_id);
+            context.1.update_profile_config(profile_id).report_error();
         })
     }
 }

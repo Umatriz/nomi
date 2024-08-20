@@ -5,9 +5,11 @@ use serde::{Deserialize, Serialize};
 use typed_builder::TypedBuilder;
 
 use crate::{
+    game_paths::GamePaths,
     instance::{
         launch::{arguments::UserData, LaunchInstance},
         logs::GameLogsWriter,
+        InstanceProfileId,
     },
     repository::{java_runner::JavaRunner, manifest::VersionType},
 };
@@ -33,6 +35,10 @@ impl Display for Loader {
 }
 
 impl Loader {
+    pub fn support_mods(&self) -> bool {
+        !self.is_vanilla()
+    }
+
     pub fn is_fabric(&self) -> bool {
         matches!(*self, Self::Fabric { .. })
     }
@@ -43,6 +49,10 @@ impl Loader {
 
     pub fn is_vanilla(&self) -> bool {
         matches!(*self, Self::Vanilla)
+    }
+
+    pub fn name(&self) -> String {
+        format!("{self}")
     }
 }
 
@@ -73,16 +83,22 @@ impl ProfileState {
 
 #[derive(Serialize, Deserialize, Debug, TypedBuilder, Clone, PartialEq, Eq, Hash)]
 pub struct VersionProfile {
-    pub id: usize,
+    pub id: InstanceProfileId,
     pub name: String,
 
     pub state: ProfileState,
 }
 
 impl VersionProfile {
-    pub async fn launch(&self, user_data: UserData, java_runner: &JavaRunner, logs_writer: &dyn GameLogsWriter) -> anyhow::Result<()> {
+    pub async fn launch(
+        &self,
+        paths: GamePaths,
+        user_data: UserData,
+        java_runner: &JavaRunner,
+        logs_writer: &dyn GameLogsWriter,
+    ) -> anyhow::Result<()> {
         match &self.state {
-            ProfileState::Downloaded(instance) => instance.launch(user_data, java_runner, logs_writer).await,
+            ProfileState::Downloaded(instance) => instance.launch(paths, user_data, java_runner, logs_writer).await,
             ProfileState::NotDownloaded { .. } => Err(anyhow!("This profile is not downloaded!")),
         }
     }
@@ -108,5 +124,9 @@ impl VersionProfile {
             ProfileState::Downloaded(instance) => &instance.settings.version,
             ProfileState::NotDownloaded { version, .. } => version,
         }
+    }
+
+    pub fn is_downloaded(&self) -> bool {
+        matches!(self.state, ProfileState::Downloaded(_))
     }
 }

@@ -1,19 +1,19 @@
 // Remove console window in release builds
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use anyhow::anyhow;
 use collections::{AssetsCollection, GameDownloadingCollection, GameRunnerCollection, JavaCollection};
 use context::MyContext;
 use eframe::{
-    egui::{self, Align, Align2, Button, Frame, Id, Layout, RichText, ScrollArea, ViewportBuilder},
+    egui::{self, Align, Button, Frame, Id, Layout, RichText, ScrollArea, ViewportBuilder},
     epaint::Vec2,
 };
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
-use egui_notify::Toasts;
 use open_directory::open_directory_native;
 use std::path::Path;
 use subscriber::EguiLayer;
-use ui_ext::TOASTS_ID;
-use views::{add_tab_menu::AddTab, View};
+use ui_ext::UiExt;
+use views::{add_tab_menu::AddTab, AddProfileMenu, CreateInstanceMenu, View};
 
 use errors_pool::{ErrorPoolExt, ERRORS_POOL};
 use nomi_core::{DOT_NOMI_DATA_PACKS_DIR, DOT_NOMI_LOGS_DIR};
@@ -30,6 +30,9 @@ pub mod errors_pool;
 pub mod ui_ext;
 pub mod utils;
 pub mod views;
+
+pub mod cache;
+pub mod toasts;
 
 pub mod mods;
 pub mod open_directory;
@@ -124,23 +127,15 @@ impl MyTabs {
 
 impl eframe::App for MyTabs {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        {
-            use parking_lot::Mutex;
-            use std::sync::Arc;
-
-            let toasts = ctx.data_mut(|data| data.get_temp_mut_or_default::<Arc<Mutex<Toasts>>>(egui::Id::new(TOASTS_ID)).clone());
-
-            let mut locked = toasts.lock();
-
-            locked.show(ctx);
-        }
+        toasts::show(ctx);
 
         self.context
             .manager
             .add_collection::<collections::AssetsCollection>(())
-            .add_collection::<collections::FabricDataCollection>(&mut self.context.states.add_profile_menu_state.fabric_versions)
-            .add_collection::<collections::GameDeletionCollection>(())
-            .add_collection::<collections::GameDownloadingCollection>(&self.context.states.profiles.profiles)
+            .add_collection::<collections::FabricDataCollection>(&mut self.context.states.add_profile_menu.fabric_versions)
+            .add_collection::<collections::GameDeletionCollection>(&self.context.states.instances.instances)
+            .add_collection::<collections::InstanceDeletionCollection>(&mut self.context.states.instances.instances)
+            .add_collection::<collections::GameDownloadingCollection>(&self.context.states.instances.instances)
             .add_collection::<collections::JavaCollection>(())
             .add_collection::<collections::ProjectCollection>(&mut self.context.states.mod_manager.current_project)
             .add_collection::<collections::ProjectVersionsCollection>(&mut self.context.states.mod_manager.current_versions)
@@ -148,18 +143,20 @@ impl eframe::App for MyTabs {
                 &mut self.context.states.mod_manager.current_dependencies,
                 self.context.states.mod_manager.current_project.as_ref().map(|p| &p.id),
             ))
-            .add_collection::<collections::ModsDownloadingCollection>(&self.context.states.profiles.profiles)
+            .add_collection::<collections::ModsDownloadingCollection>(&self.context.states.instances.instances)
             .add_collection::<collections::GameRunnerCollection>(())
             .add_collection::<collections::DownloadAddedModsCollection>((
                 &mut self.context.states.profile_info.currently_downloading_mods,
-                &self.context.states.profiles.profiles,
+                &self.context.states.instances.instances,
             ));
 
         ctx.set_pixels_per_point(self.context.states.client_settings.pixels_per_point);
 
         if !self.context.states.java.is_downloaded {
-            self.context.states.java.download_java(&mut self.context.manager);
+            self.context.states.java.download_java(&mut self.context.manager, ctx.clone());
         }
+
+        // egui::Window::new("Loaded profiles").show(ctx, |ui| ui_for_loaded_profiles(ui));
 
         egui::TopBottomPanel::top("top_panel_id").show(ctx, |ui| {
             ui.with_layout(Layout::left_to_right(Align::Center).with_cross_align(Align::Center), |ui| {
@@ -170,11 +167,10 @@ impl eframe::App for MyTabs {
                 let last_others_width = ui.data(|data| data.get_temp(id_cal_target_size).unwrap_or(this_init_max_width));
                 let this_target_width = this_init_max_width - last_others_width;
 
-                AddTab {
-                    dock_state: &self.dock_state,
-                    tabs_state: &mut self.context.states.tabs,
-                }
-                .ui(ui);
+                ui.menu_button("New", |ui| {
+                    ui.toggle_button(&mut self.context.is_instance_window_open, "Create new instance");
+                    ui.toggle_button(&mut self.context.is_profile_window_open, "Add new profile");
+                });
 
                 ui.menu_button("Open", |ui| {
                     if ui
@@ -188,58 +184,97 @@ impl eframe::App for MyTabs {
                     }
                 });
 
+                AddTab {
+                    dock_state: &self.dock_state,
+                    tabs_state: &mut self.context.states.tabs,
+                }
+                .ui(ui);
+
                 ui.add_space(this_target_width);
-                ui.horizontal(|ui| {
-                    egui::warn_if_debug_build(ui);
-                    ui.hyperlink_to(
-                        RichText::new(format!("{} Nomi on GitHub", egui::special_emojis::GITHUB)).small(),
-                        "https://github.com/Umatriz/nomi",
-                    );
-                    ui.hyperlink_to(RichText::new("Nomi's Discord server").small(), "https://discord.gg/qRD5XEJKc4");
-                });
+
+                egui::warn_if_debug_build(ui);
+
+                if ui.button("Cause an error").clicked() {
+                    Err::<(), _>(anyhow!("Error!")).report_error();
+                }
+
+                let is_errors = { !ERRORS_POOL.read().is_empty() };
+                if is_errors {
+                    let button = egui::Button::new(RichText::new("Errors").color(ui.visuals().error_fg_color));
+                    let button = ui.add(button);
+                    if button.clicked() {
+                        self.context.is_errors_window_open = true;
+                    }
+                }
+
+                ui.hyperlink_to(
+                    RichText::new(format!("{} Nomi on GitHub", egui::special_emojis::GITHUB)).small(),
+                    "https://github.com/Umatriz/nomi",
+                );
+                ui.hyperlink_to(RichText::new("Nomi's Discord server").small(), "https://discord.gg/qRD5XEJKc4");
 
                 ui.data_mut(|data| data.insert_temp(id_cal_target_size, ui.min_rect().width() - this_target_width));
             });
         });
 
-        if let Ok(len) = ERRORS_POOL.try_read().map(|pool| pool.len()) {
-            if self.context.states.errors_pool.number_of_errors != len {
-                self.context.states.errors_pool.number_of_errors = len;
-                self.context.states.errors_pool.is_window_open = true;
-            }
+        {
+            egui::Window::new("Add new profile")
+                .collapsible(true)
+                .resizable(true)
+                .open(&mut self.context.is_profile_window_open)
+                .show(ctx, |ui| {
+                    AddProfileMenu {
+                        menu_state: &mut self.context.states.add_profile_menu,
+                        profiles_state: &mut self.context.states.instances,
+                        launcher_manifest: self.context.launcher_manifest,
+                        manager: &mut self.context.manager,
+                    }
+                    .ui(ui);
+                });
+
+            egui::Window::new("Create new instance")
+                .collapsible(true)
+                .resizable(true)
+                .open(&mut self.context.is_instance_window_open)
+                .show(ctx, |ui| {
+                    CreateInstanceMenu {
+                        instances_state: &mut self.context.states.instances,
+                        create_instance_menu_state: &mut self.context.states.create_instance_menu,
+                    }
+                    .ui(ui);
+                });
         }
 
         egui::Window::new("Errors")
             .id("error_window".into())
-            .open(&mut self.context.states.errors_pool.is_window_open)
-            .resizable(false)
-            .movable(false)
-            .anchor(Align2::RIGHT_BOTTOM, [0.0, 0.0])
+            .open(&mut self.context.is_errors_window_open)
             .show(ctx, |ui| {
-                {
-                    match ERRORS_POOL.try_read() {
-                        Ok(pool) => {
-                            if pool.is_empty() {
-                                ui.label("No errors");
-                            }
-                            ScrollArea::vertical().show(ui, |ui| {
-                                ui.vertical(|ui| {
-                                    for error in pool.iter_errors() {
-                                        ui.label(format!("{:#?}", error));
-                                        ui.separator();
-                                    }
-                                });
-                            });
+                ScrollArea::vertical().show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        if ui.button("Clear").clicked() {
+                            ERRORS_POOL.write().clear()
                         }
-                        Err(_) => {
-                            ui.spinner();
-                        }
-                    }
-                }
 
-                if ui.button("Clear").clicked() {
-                    ERRORS_POOL.write().unwrap().clear()
-                }
+                        ui.label("See the Logs tab for detailed information");
+                    });
+
+                    {
+                        let pool = ERRORS_POOL.read();
+
+                        if pool.is_empty() {
+                            ui.label("No errors");
+                        }
+
+                        egui::Frame::dark_canvas(ui.style()).show(ui, |ui| {
+                            ui.vertical(|ui| {
+                                for error in pool.iter_errors() {
+                                    ui.label(format!("{:#?}", error));
+                                    ui.separator();
+                                }
+                            });
+                        });
+                    }
+                });
             });
 
         egui::CentralPanel::default()

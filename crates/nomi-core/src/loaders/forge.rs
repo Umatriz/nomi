@@ -22,7 +22,7 @@ use crate::{
         DownloadQueue, FileDownloader, LibrariesDownloader, LibrariesMapper,
     },
     game_paths::GamePaths,
-    instance::{launch::CLASSPATH_SEPARATOR, profile::LoaderProfile},
+    instance::{launch::CLASSPATH_SEPARATOR, loader::LoaderProfile},
     loaders::vanilla::VanillaLibrariesMapper,
     maven_data::{MavenArtifact, MavenData},
     repository::{
@@ -33,6 +33,8 @@ use crate::{
     },
     PinnedFutureWithBounds, DOT_NOMI_TEMP_DIR,
 };
+
+use super::ToLoaderProfile;
 
 const FORGE_REPO_URL: &str = "https://maven.minecraftforge.net";
 
@@ -59,21 +61,13 @@ pub struct Forge {
     game_version: String,
     forge_version: String,
     game_paths: GamePaths,
+    java_runner: JavaRunner,
 
     library_data: Option<ForgeLibraryExtractionData>,
     processors_data: Option<ProcessorsData>,
 }
 
 impl Forge {
-    pub fn to_profile(&self) -> LoaderProfile {
-        LoaderProfile {
-            loader: Loader::Forge,
-            main_class: self.profile.main_class().to_string(),
-            args: self.profile.simple_args(),
-            libraries: self.profile.simple_libraries(),
-        }
-    }
-
     #[tracing::instrument(skip_all, err)]
     pub async fn get_versions(game_version: impl Into<String>) -> anyhow::Result<Vec<String>> {
         let game_version = game_version.into();
@@ -186,7 +180,12 @@ impl Forge {
     }
 
     #[tracing::instrument(skip(version), fields(game_version) err)]
-    pub async fn new(version: impl Into<String>, forge_version: ForgeVersion, game_paths: GamePaths) -> anyhow::Result<Self> {
+    pub async fn new(
+        version: impl Into<String>,
+        forge_version: ForgeVersion,
+        game_paths: GamePaths,
+        java_runner: JavaRunner,
+    ) -> anyhow::Result<Self> {
         let game_version: String = version.into();
 
         tracing::Span::current().record("game_version", &game_version);
@@ -281,9 +280,21 @@ impl Forge {
             game_version,
             forge_version,
             game_paths,
+            java_runner,
             library_data,
             processors_data,
         })
+    }
+}
+
+impl ToLoaderProfile for Forge {
+    fn to_profile(&self) -> LoaderProfile {
+        LoaderProfile {
+            loader: Loader::Forge,
+            main_class: self.profile.main_class().to_string(),
+            args: self.profile.simple_args(),
+            libraries: self.profile.simple_libraries(),
+        }
     }
 }
 
@@ -358,7 +369,7 @@ impl Downloader for Forge {
 
             if let Some(processors_data) = processors_data {
                 processors_data
-                    .run_processors(&java_runner, &game_version, &forge_version, &game_paths)
+                    .run_processors(&java_runner, &game_version, &forge_version, game_paths)
                     .await?;
             }
 
@@ -377,7 +388,7 @@ impl Downloader for Forge {
             self.game_version.clone(),
             self.forge_version.clone(),
             self.installer_path(),
-            JavaRunner::nomi_default(),
+            self.java_runner.clone(),
             self.game_paths.clone(),
             self.processors_data.clone(),
             self.library_data.clone(),
@@ -412,7 +423,7 @@ impl ProcessorsData {
                 client = "client",
                 server = ""
             "MINECRAFT_JAR" :
-                client = game_paths.version.join(format!("{game_version}.jar")).to_string_lossy(),
+                client = game_paths.version_jar_file(game_version).to_string_lossy(),
                 server = ""
             "MINECRAFT_VERSION":
                 client = game_version,
@@ -438,7 +449,7 @@ impl ProcessorsData {
             .join(CLASSPATH_SEPARATOR)
     }
 
-    #[tracing::instrument]
+    #[tracing::instrument(err)]
     async fn get_processor_main_class(processor_jar: PathBuf) -> anyhow::Result<String> {
         tokio::task::spawn_blocking(|| {
             let file = std::fs::File::open(processor_jar)?;
@@ -501,17 +512,15 @@ impl ProcessorsData {
         java_runner: &JavaRunner,
         game_version: &str,
         forge_version: &str,
-        game_paths: &GamePaths,
+        game_paths: GamePaths,
     ) -> anyhow::Result<()> {
-        self.apply_data_rules(game_version, forge_version, game_paths);
+        // let game_paths = game_paths
+        //     .make_absolute()
+        //     .inspect_err(|error| error!(%error, "Failed to make `game_paths` absolute"))?;
 
-        let total = self
-            .processors
-            .iter()
-            .filter(|p| p.sides.as_ref().is_some_and(|sides| sides.iter().any(|s| s == "client")))
-            .count();
+        self.apply_data_rules(game_version, forge_version, &game_paths);
+
         let mut ok = 0;
-        let mut err = 0;
 
         for mut processor in self.processors {
             if processor.sides.as_ref().is_some_and(|sides| !sides.iter().any(|s| s == "client")) {
@@ -528,19 +537,19 @@ impl ProcessorsData {
 
             let output = dbg!(Command::new(java_runner.get()).arg("-cp").arg(classpath).arg(main_class).args(arguments))
                 .output()
-                .await?;
+                .await
+                .inspect_err(|error| error!(%error, "Cannot run the command"))?;
 
             if output.status.success() {
                 ok += 1;
                 info!("Processor finished successfully");
             } else {
-                err += 1;
                 let error = String::from_utf8_lossy(&output.stderr);
-                error!(error = %error, "Processor failed");
+                bail!("Processor failed, error: {error}")
             }
         }
 
-        info!(total, ok, err, "Finished processors execution");
+        info!(ok, "Finished processors execution");
 
         Ok(())
     }
@@ -770,6 +779,8 @@ pub struct ForgeOldLibrary {
 mod tests {
     use tracing::{debug, Level};
 
+    use crate::instance::InstanceProfileId;
+
     use super::*;
 
     #[tokio::test]
@@ -780,10 +791,24 @@ mod tests {
 
     #[tokio::test]
     async fn create_forge_test() {
-        let recommended = Forge::new("1.7.10", ForgeVersion::Recommended, GamePaths::default()).await.unwrap();
+        let recommended = Forge::new(
+            "1.7.10",
+            ForgeVersion::Recommended,
+            GamePaths::from_id(InstanceProfileId::ZERO),
+            JavaRunner::from_environment(),
+        )
+        .await
+        .unwrap();
         println!("{recommended:#?}");
 
-        let latest = Forge::new("1.19.2", ForgeVersion::Latest, GamePaths::default()).await.unwrap();
+        let latest = Forge::new(
+            "1.19.2",
+            ForgeVersion::Latest,
+            GamePaths::from_id(InstanceProfileId::ZERO),
+            JavaRunner::from_environment(),
+        )
+        .await
+        .unwrap();
         println!("{latest:#?}");
     }
 
@@ -793,7 +818,14 @@ mod tests {
 
         debug!("Test");
 
-        let recommended = Forge::new("1.7.10", ForgeVersion::Recommended, GamePaths::default()).await.unwrap();
+        let recommended = Forge::new(
+            "1.7.10",
+            ForgeVersion::Recommended,
+            GamePaths::from_id(InstanceProfileId::ZERO),
+            JavaRunner::from_environment(),
+        )
+        .await
+        .unwrap();
         println!("{recommended:#?}");
 
         let io = recommended.io();

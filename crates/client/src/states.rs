@@ -1,34 +1,35 @@
-use std::{collections::HashSet, path::PathBuf};
+use std::path::PathBuf;
 
+use eframe::egui::Context;
 use egui_task_manager::{Caller, Task, TaskManager};
 use nomi_core::{
     downloads::{java::JavaDownloader, progress::MappedSender, traits::Downloader},
     fs::read_toml_config_sync,
-    DOT_NOMI_JAVA_DIR, DOT_NOMI_JAVA_EXECUTABLE, DOT_NOMI_PROFILES_CONFIG, DOT_NOMI_SETTINGS_CONFIG,
+    DOT_NOMI_JAVA_DIR, DOT_NOMI_JAVA_EXECUTABLE, DOT_NOMI_SETTINGS_CONFIG,
 };
 use tracing::info;
 
 use crate::{
     collections::JavaCollection,
-    errors_pool::{ErrorPoolExt, ErrorsPoolState},
+    errors_pool::ErrorPoolExt,
     views::{
         add_tab_menu::TabsState,
-        profiles::ProfilesState,
+        profiles::InstancesState,
         settings::{ClientSettingsState, SettingsState},
-        AddProfileMenuState, LogsState, ModManagerState, ProfileInfoState, ProfilesConfig,
+        AddProfileMenuState, CreateInstanceMenuState, LogsState, ModManagerState, ProfileInfoState,
     },
 };
 
 pub struct States {
     pub tabs: TabsState,
-    pub errors_pool: ErrorsPoolState,
 
     pub logs_state: LogsState,
     pub java: JavaState,
-    pub profiles: ProfilesState,
+    pub instances: InstancesState,
     pub settings: SettingsState,
     pub client_settings: ClientSettingsState,
-    pub add_profile_menu_state: AddProfileMenuState,
+    pub add_profile_menu: AddProfileMenuState,
+    pub create_instance_menu: CreateInstanceMenuState,
     pub mod_manager: ModManagerState,
     pub profile_info: ProfileInfoState,
 }
@@ -39,16 +40,13 @@ impl Default for States {
 
         Self {
             tabs: TabsState::new(),
-            errors_pool: ErrorsPoolState::default(),
             logs_state: LogsState::new(),
             java: JavaState::new(),
-            profiles: ProfilesState {
-                currently_downloading_profiles: HashSet::new(),
-                profiles: read_toml_config_sync::<ProfilesConfig>(DOT_NOMI_PROFILES_CONFIG).unwrap_or_default(),
-            },
+            instances: InstancesState::new(),
             client_settings: settings.client_settings.clone(),
             settings,
-            add_profile_menu_state: AddProfileMenuState::default(),
+            add_profile_menu: AddProfileMenuState::new(),
+            create_instance_menu: CreateInstanceMenuState::new(),
             mod_manager: ModManagerState::new(),
             profile_info: ProfileInfoState::new(),
         }
@@ -74,7 +72,7 @@ impl JavaState {
         }
     }
 
-    pub fn download_java(&mut self, manager: &mut TaskManager) {
+    pub fn download_java(&mut self, manager: &mut TaskManager, ctx: Context) {
         info!("Downloading Java");
 
         self.is_downloaded = true;
@@ -86,7 +84,7 @@ impl JavaState {
 
             let io = downloader.io();
 
-            let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress.sender()));
+            let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress.sender())).with_side_effect(move || ctx.request_repaint());
 
             Box::new(downloader).download(&mapped_sender).await;
 

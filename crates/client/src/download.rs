@@ -1,20 +1,17 @@
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::anyhow;
+use eframe::egui::Context;
 use egui_task_manager::TaskProgressShared;
 use nomi_core::{
     configs::profile::{Loader, ProfileState},
-    downloads::{
-        progress::MappedSender,
-        traits::{DownloadResult, Downloader},
-        AssetsDownloader, DownloadQueue,
-    },
+    downloads::{progress::MappedSender, traits::Downloader, AssetsDownloader},
     game_paths::GamePaths,
-    instance::{launch::LaunchSettings, Instance},
+    instance::{launch::LaunchSettings, Profile},
     loaders::{
+        combined::VanillaCombinedDownloader,
         fabric::Fabric,
         forge::{Forge, ForgeVersion},
-        vanilla::Vanilla,
     },
     repository::java_runner::JavaRunner,
     state::get_launcher_manifest,
@@ -23,14 +20,22 @@ use parking_lot::RwLock;
 
 use crate::{errors_pool::ErrorPoolExt, views::ModdedProfile};
 
-pub async fn task_download_version(profile: Arc<RwLock<ModdedProfile>>, progress_shared: TaskProgressShared) -> Option<()> {
-    try_download_version(profile, progress_shared).await.report_error()
+pub async fn task_download_version(
+    progress_shared: TaskProgressShared,
+    ctx: Context,
+    profile: Arc<RwLock<ModdedProfile>>,
+    java_runner: JavaRunner,
+) -> Option<()> {
+    try_download_version(progress_shared, ctx, profile, java_runner).await.report_error()
 }
 
-async fn try_download_version(profile: Arc<RwLock<ModdedProfile>>, progress_shared: TaskProgressShared) -> anyhow::Result<()> {
+async fn try_download_version(
+    progress_shared: TaskProgressShared,
+    ctx: Context,
+    profile: Arc<RwLock<ModdedProfile>>,
+    java_runner: JavaRunner,
+) -> anyhow::Result<()> {
     let launch_instance = {
-        let mc_dir = PathBuf::from("./minecraft");
-
         let version_profile = {
             let version_profile = &profile.read().profile;
             version_profile.clone()
@@ -45,58 +50,49 @@ async fn try_download_version(profile: Arc<RwLock<ModdedProfile>>, progress_shar
             return Err(anyhow!("This profile is already downloaded"));
         };
 
-        let game_paths = GamePaths {
-            game: mc_dir.clone(),
-            assets: mc_dir.join("assets"),
-            version: mc_dir.join("versions").join(version),
-            libraries: mc_dir.join("libraries"),
-        };
+        let game_paths = GamePaths::from_id(version_profile.id);
 
-        let builder = Instance::builder()
+        let builder = Profile::builder()
             .name(version_profile.name.clone())
             .version(version_profile.version().to_string())
             .game_paths(game_paths.clone());
 
+        let combined_downloader = VanillaCombinedDownloader::new(version_profile.version(), game_paths.clone()).await?;
         let instance = match loader {
-            Loader::Vanilla => builder.instance(Box::new(Vanilla::new(version_profile.version(), game_paths.clone()).await?)),
-            Loader::Fabric { version } => builder.instance(Box::new(
-                Fabric::new(version_profile.version(), version.as_ref(), game_paths.clone()).await?,
-            )),
-            Loader::Forge => builder.instance(Box::new(
-                Forge::new(version_profile.version(), ForgeVersion::Recommended, game_paths.clone()).await?,
-            )),
+            Loader::Vanilla => builder.downloader(Box::new(combined_downloader)),
+            Loader::Fabric { version } => {
+                let combined = combined_downloader
+                    .with_loader(|game_version, game_paths| Fabric::new(game_version, version.as_ref(), game_paths))
+                    .await?;
+                builder.downloader(Box::new(combined))
+            }
+            Loader::Forge => {
+                let combined = combined_downloader
+                    .with_loader(|game_version, game_paths| Forge::new(game_version, ForgeVersion::Recommended, game_paths, java_runner))
+                    .await?;
+                builder.downloader(Box::new(combined))
+            }
         }
         .build();
 
         let settings = LaunchSettings {
-            assets: instance.game_paths.assets.clone(),
-            game_dir: instance.game_paths.game.clone(),
-            java_bin: JavaRunner::default(),
-            libraries_dir: instance.game_paths.libraries.clone(),
-            manifest_file: instance.game_paths.version.join(format!("{}.json", &version)),
-            natives_dir: instance.game_paths.version.join("natives"),
-            version_jar_file: instance.game_paths.version.join(format!("{}.jar", &version)),
+            java_runner: None,
             version: version.to_string(),
             version_type: version_type.clone(),
         };
 
         let launch_instance = instance.launch_instance(settings, Some(vec!["-Xms2G".to_string(), "-Xmx4G".to_string()]));
 
-        let instance = instance.instance();
-
+        let instance = instance.downloader();
         let io = instance.io();
-
-        let downloader: Box<dyn Downloader<Data = DownloadResult>> = instance.into_downloader();
-
-        io.await?;
-
-        let downloader = DownloadQueue::new().with_downloader_dyn(downloader);
+        let downloader = instance.into_downloader();
 
         let _ = progress_shared.set_total(downloader.total());
 
-        let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress_shared.sender()));
+        let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress_shared.sender())).with_side_effect(move || ctx.request_repaint());
+        downloader.download(&mapped_sender).await;
 
-        Box::new(downloader).download(&mapped_sender).await;
+        io.await?;
 
         launch_instance
     };
@@ -106,11 +102,11 @@ async fn try_download_version(profile: Arc<RwLock<ModdedProfile>>, progress_shar
     Ok(())
 }
 
-pub async fn task_assets(version: String, assets_dir: PathBuf, progress_shared: TaskProgressShared) -> Option<()> {
-    try_assets(version, assets_dir, progress_shared).await.report_error()
+pub async fn task_assets(progress_shared: TaskProgressShared, ctx: Context, version: String, assets_dir: PathBuf) -> Option<()> {
+    try_assets(progress_shared, ctx, version, assets_dir).await.report_error()
 }
 
-async fn try_assets(version: String, assets_dir: PathBuf, progress_shared: TaskProgressShared) -> anyhow::Result<()> {
+async fn try_assets(progress_shared: TaskProgressShared, ctx: Context, version: String, assets_dir: PathBuf) -> anyhow::Result<()> {
     let manifest = get_launcher_manifest().await?;
     let version_manifest = manifest.get_version_manifest(version).await?;
 
@@ -126,7 +122,7 @@ async fn try_assets(version: String, assets_dir: PathBuf, progress_shared: TaskP
 
     let _ = progress_shared.set_total(downloader.total());
 
-    let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress_shared.sender()));
+    let mapped_sender = MappedSender::new_progress_mapper(Box::new(progress_shared.sender())).with_side_effect(move || ctx.request_repaint());
 
     Box::new(downloader).download(&mapped_sender).await;
 

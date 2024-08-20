@@ -15,7 +15,7 @@ use crate::{
     },
     fs::write_to_file,
     game_paths::GamePaths,
-    instance::profile::LoaderProfile,
+    instance::loader::LoaderProfile,
     maven_data::{MavenArtifact, MavenData},
     repository::{
         fabric_meta::FabricVersions,
@@ -26,6 +26,8 @@ use crate::{
     state::get_launcher_manifest,
     PinnedFutureWithBounds,
 };
+
+use super::ToLoaderProfile;
 
 #[derive(Debug)]
 pub struct Fabric {
@@ -87,8 +89,10 @@ impl Fabric {
             libraries_downloader,
         })
     }
+}
 
-    pub fn to_profile(&self) -> LoaderProfile {
+impl ToLoaderProfile for Fabric {
+    fn to_profile(&self) -> LoaderProfile {
         LoaderProfile {
             loader: Loader::Fabric {
                 version: Some(self.fabric_version.clone()),
@@ -132,7 +136,7 @@ impl Downloader for Fabric {
     }
 
     fn io(&self) -> PinnedFutureWithBounds<anyhow::Result<()>> {
-        let version_path = self.game_paths.version.clone();
+        let version_path = self.game_paths.profile.clone();
         let profile = self.profile.clone();
         let id = self.profile.id.clone();
 

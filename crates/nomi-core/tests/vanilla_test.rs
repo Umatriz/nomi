@@ -1,4 +1,4 @@
-use nomi_core::{instance::launch::LaunchSettings, repository::java_runner::JavaRunner};
+use nomi_core::instance::launch::LaunchSettings;
 
 #[tokio::test]
 async fn vanilla_test() {
@@ -27,16 +27,8 @@ async fn vanilla_test() {
     // // assets.download().await.unwrap();
     // // builder.download().await.unwrap();
 
-    let mc_dir = std::env::current_dir().unwrap().join("minecraft");
-
     let _settings = LaunchSettings {
-        assets: mc_dir.join("assets"),
-        game_dir: mc_dir.clone(),
-        java_bin: JavaRunner::default(),
-        libraries_dir: mc_dir.clone().join("libraries"),
-        manifest_file: mc_dir.clone().join("versions/1.20/1.19.4.json"),
-        natives_dir: mc_dir.clone().join("versions/1.20/natives"),
-        version_jar_file: mc_dir.join("versions/1.20/1.20.jar"),
+        java_runner: None,
         version: "1.20".to_string(),
         version_type: nomi_core::repository::manifest::VersionType::Release,
     };
