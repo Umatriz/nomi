@@ -106,6 +106,10 @@ impl Instance {
         self.main_profile
     }
 
+    pub fn main_profile_mut(&mut self) -> &mut Option<InstanceProfileId> {
+        &mut self.main_profile
+    }
+
     pub fn profiles(&self) -> &[ProfilePayload] {
         &self.profiles
     }

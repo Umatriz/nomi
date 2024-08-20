@@ -1,7 +1,7 @@
-use std::{collections::HashSet, path::PathBuf, sync::Arc};
+use std::{collections::HashSet, mem, path::PathBuf, sync::Arc};
 
 use anyhow::bail;
-use eframe::egui::{self, Align2, Id, RichText, TextWrapMode, Ui};
+use eframe::egui::{self, Id, RichText, TextWrapMode, Ui};
 use egui_extras::{Column, TableBuilder};
 use egui_task_manager::{Caller, Task, TaskManager};
 use itertools::Itertools;
@@ -84,7 +84,10 @@ impl ModdedProfile {
 
 impl InstancesConfig {
     pub fn find_profile(&self, id: InstanceProfileId) -> Option<Arc<RwLock<ModdedProfile>>> {
-        self.get_profile_path(id).and_then(|path| GLOBAL_CACHE.write().request_profile(id, path))
+        let mut cache = GLOBAL_CACHE.write();
+        cache
+            .get_profile(id)
+            .or_else(|| self.get_profile_path(id).and_then(|path| cache.load_profile(id, path)))
     }
 
     pub fn get_profile_path(&self, id: InstanceProfileId) -> Option<PathBuf> {
@@ -174,15 +177,16 @@ impl Instances<'_> {
         };
 
         if button.clicked() {
-            self.profile_action(ui, profile_payload)
+            let Some(profile_lock) = self.profiles_state.instances.find_profile(profile_payload.id) else {
+                error!(id = ?profile_payload.id, "Cannot find the profile");
+                return;
+            };
+
+            self.profile_action(ui, profile_lock)
         }
     }
 
-    fn profile_action(&mut self, ui: &mut Ui, profile_payload: &ProfilePayload) {
-        let Some(profile_lock) = self.profiles_state.instances.find_profile(profile_payload.id) else {
-            error!(id = ?profile_payload.id, "Cannot find the profile");
-            return;
-        };
+    fn profile_action(&mut self, ui: &mut Ui, profile_lock: Arc<RwLock<ModdedProfile>>) {
         let profile = profile_lock.read();
         match &profile.profile.state {
             ProfileState::Downloaded(instance) => {
@@ -245,7 +249,7 @@ impl Instances<'_> {
         }
     }
 
-    fn show_profiles_for_instance(&mut self, ui: &mut Ui, profiles: &[ProfilePayload], is_allowed_to_take_action: bool) {
+    fn show_profiles_for_instance(&mut self, ui: &mut Ui, profiles: &[ProfilePayload]) {
         TableBuilder::new(ui)
             .column(Column::auto().at_least(120.0).at_most(240.0))
             .columns(Column::auto(), 5)
@@ -263,7 +267,7 @@ impl Instances<'_> {
             .body(|mut body| {
                 // let mut is_deleting = vec![];
 
-                for (_index, profile) in profiles.iter().enumerate() {
+                for profile in profiles.iter() {
                     body.row(30.0, |mut row| {
                         row.col(|ui| {
                             ui.add(egui::Label::new(&profile.name).truncate());
@@ -336,15 +340,55 @@ impl View for Instances<'_> {
 
         let iter = self.profiles_state.instances.instances.iter().cloned().collect_vec().into_iter();
         for instance in iter {
-            let instance = instance.read();
             ui.group(|ui| {
-                let id = ui.make_persistent_id("instance_details").with(instance.id());
+                let id = ui.make_persistent_id("instance_details").with(instance.read().id());
                 egui::collapsing_header::CollapsingState::load_with_default_open(ui.ctx(), id, false)
                     .show_header(ui, |ui| {
+                        let instance = instance.read();
                         ui.label(RichText::new(instance.name()).strong());
-                        ui.button("Launch");
+
+                        if let Some(profile_lock) = instance.main_profile().and_then(|id| self.profiles_state.instances.find_profile(id)) {
+                            let response = if profile_lock.read().profile.is_downloaded() {
+                                ui.add_enabled(self.is_allowed_to_take_action, egui::Button::new("Launch"))
+                            } else {
+                                ui.add_enabled(self.is_allowed_to_take_action, egui::Button::new("Download"))
+                            };
+
+                            if response.clicked() {
+                                self.profile_action(ui, profile_lock)
+                            }
+                        }
                     })
                     .body(|ui| {
+                        {
+                            let id = {
+                                let instance_id = instance.read().id();
+                                Id::new("select_instance_main_profile").with(instance_id)
+                            };
+
+                            let selected_text = {
+                                let instance = instance.read();
+                                instance
+                                    .main_profile()
+                                    .and_then(|id| self.profiles_state.instances.find_profile(id))
+                                    .map_or(String::from("No profile selected"), |profile| profile.read().profile.name.clone())
+                            };
+
+                            egui::ComboBox::new(id, "Main profile").selected_text(selected_text).show_ui(ui, |ui| {
+                                let mut instance = instance.write();
+
+                                let profiles = mem::take(instance.profiles_mut());
+
+                                for profile in &profiles {
+                                    ui.selectable_value(instance.main_profile_mut(), Some(profile.id), &profile.name);
+                                }
+
+                                let _ = mem::replace(instance.profiles_mut(), profiles);
+                            });
+                        }
+
+                        let instance = instance.read();
+
                         ui.button_with_confirm_popup(Id::new("confirm_instance_deletion").with(instance.id()), "Delete", |ui| {
                             ui.set_width(200.0);
                             ui.label("Are you sure you want to delete this instance?");
@@ -372,7 +416,7 @@ impl View for Instances<'_> {
 
                         ui.heading("Profiles");
 
-                        self.show_profiles_for_instance(ui, instance.profiles(), self.is_allowed_to_take_action)
+                        self.show_profiles_for_instance(ui, instance.profiles())
                     });
             });
         }

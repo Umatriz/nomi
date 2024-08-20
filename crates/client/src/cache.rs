@@ -29,17 +29,18 @@ impl GlobalCache {
         Self { profiles: HashMap::new() }
     }
 
-    pub fn request_profile(&mut self, id: InstanceProfileId, path: PathBuf) -> Option<Arc<RwLock<ModdedProfile>>> {
-        match self.profiles.get(&id) {
-            Some(some) => Some(some.clone()),
-            None => read_toml_config_sync(path)
-                .inspect_err(|error| error!(%error, "Cannot read profile config"))
-                .report_error()
-                .and_then(|profile| {
-                    self.profiles.insert(id, profile);
-                    self.profiles.get(&id).cloned()
-                }),
-        }
+    pub fn get_profile(&self, id: InstanceProfileId) -> Option<Arc<RwLock<ModdedProfile>>> {
+        self.profiles.get(&id).cloned()
+    }
+
+    pub fn load_profile(&mut self, id: InstanceProfileId, path: PathBuf) -> Option<Arc<RwLock<ModdedProfile>>> {
+        read_toml_config_sync(path)
+            .inspect_err(|error| error!(%error, "Cannot read profile config"))
+            .report_error()
+            .and_then(|profile| {
+                self.profiles.insert(id, profile);
+                self.profiles.get(&id).cloned()
+            })
     }
 
     fn loaded_profiles(&self) -> Vec<Arc<RwLock<ModdedProfile>>> {
