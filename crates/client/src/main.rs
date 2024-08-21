@@ -1,7 +1,7 @@
 // Remove console window in release builds
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use collections::{AssetsCollection, GameDownloadingCollection, GameRunnerCollection, JavaCollection};
+use collections::{AssetsCollection, GameDownloadingCollection, GameRunnerCollection, JavaDownloadingCollection};
 use context::MyContext;
 use eframe::{
     egui::{self, Align, Button, Frame, Id, Layout, RichText, ScrollArea, ViewportBuilder},
@@ -9,7 +9,8 @@ use eframe::{
 };
 use egui_dock::{DockArea, DockState, NodeIndex, Style};
 use open_directory::open_directory_native;
-use std::path::Path;
+use states::download_java_and_update_config;
+use std::path::{Path, PathBuf};
 use subscriber::EguiLayer;
 use ui_ext::UiExt;
 use views::{add_tab_menu::AddTab, AddProfileMenu, CreateInstanceMenu, View};
@@ -135,7 +136,7 @@ impl eframe::App for MyTabs {
             .add_collection::<collections::GameDeletionCollection>(&self.context.states.instances.instances)
             .add_collection::<collections::InstanceDeletionCollection>(&mut self.context.states.instances.instances)
             .add_collection::<collections::GameDownloadingCollection>(&self.context.states.instances.instances)
-            .add_collection::<collections::JavaCollection>(())
+            .add_collection::<collections::JavaDownloadingCollection>(())
             .add_collection::<collections::ProjectCollection>(&mut self.context.states.mod_manager.current_project)
             .add_collection::<collections::ProjectVersionsCollection>(&mut self.context.states.mod_manager.current_versions)
             .add_collection::<collections::DependenciesCollection>((
@@ -180,6 +181,35 @@ impl eframe::App for MyTabs {
                         if let Ok(path) = std::fs::canonicalize(DOT_NOMI_DATA_PACKS_DIR) {
                             open_directory_native(path).report_error();
                         }
+                    }
+                });
+
+                ui.menu_button("Download", |ui| {
+                    if ui
+                        .add_enabled(
+                            self.context.manager.get_collection::<JavaDownloadingCollection>().tasks().is_empty(),
+                            egui::Button::new("Download Java"),
+                        )
+                        .clicked()
+                    {
+                        download_java_and_update_config(
+                            ui,
+                            &mut self.context.manager,
+                            &mut self.context.states.java,
+                            &mut self.context.states.settings,
+                        );
+                    }
+                });
+
+                ui.menu_button("Utils", |ui| {
+                    let launcher_path = PathBuf::from(DOT_NOMI_LOGS_DIR);
+
+                    if launcher_path.exists() {
+                        if ui.button("Delete launcher's logs").clicked() {
+                            let _ = std::fs::remove_dir_all(launcher_path);
+                        }
+                    } else {
+                        ui.warn_label("The launcher log's directory is already deleted");
                     }
                 });
 
@@ -308,7 +338,7 @@ impl eframe::App for MyTabs {
 
         self.context.is_allowed_to_take_action = [
             manager.get_collection::<AssetsCollection>(),
-            manager.get_collection::<JavaCollection>(),
+            manager.get_collection::<JavaDownloadingCollection>(),
             manager.get_collection::<GameDownloadingCollection>(),
             manager.get_collection::<GameRunnerCollection>(),
         ]
