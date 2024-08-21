@@ -53,9 +53,9 @@ impl<'c> TasksCollection<'c> for AssetsCollection {
     }
 }
 
-pub struct JavaCollection;
+pub struct JavaDownloadingCollection;
 
-impl<'c> TasksCollection<'c> for JavaCollection {
+impl<'c> TasksCollection<'c> for JavaDownloadingCollection {
     type Context = ();
 
     type Target = ();
@@ -67,7 +67,9 @@ impl<'c> TasksCollection<'c> for JavaCollection {
     }
 
     fn handle(_context: Self::Context) -> Handler<'c, Self::Target> {
-        Handler::new(|()| ())
+        Handler::new(|()| {
+            toasts::add(|toasts| toasts.success("Successfully downloaded Java"));
+        })
     }
 }
 

@@ -1,17 +1,18 @@
-use std::path::PathBuf;
+use std::{path::PathBuf, sync::LazyLock};
 
 use eframe::egui::{self};
 use egui_file_dialog::FileDialog;
 use egui_form::{garde::field_path, Form, FormField};
 use egui_task_manager::TaskManager;
 use garde::{Error, Validate};
-use nomi_core::{
-    fs::write_toml_config_sync, regex::Regex, repository::java_runner::JavaRunner, Uuid, DOT_NOMI_JAVA_EXECUTABLE, DOT_NOMI_LOGS_DIR,
-    DOT_NOMI_SETTINGS_CONFIG,
-};
+use nomi_core::{fs::write_toml_config_sync, regex::Regex, repository::java_runner::JavaRunner, Uuid, DOT_NOMI_SETTINGS_CONFIG};
 use serde::{Deserialize, Serialize};
 
-use crate::{collections::JavaCollection, errors_pool::ErrorPoolExt, states::JavaState, ui_ext::UiExt};
+use crate::{
+    collections::JavaDownloadingCollection,
+    errors_pool::ErrorPoolExt,
+    states::{download_java_and_update_config, JavaState},
+};
 
 use super::View;
 
@@ -66,10 +67,9 @@ impl Default for ClientSettingsState {
 }
 
 fn check_username(value: &str, _context: &()) -> garde::Result {
-    let regex =
-        Regex::new(r"^[a-zA-Z0-9_]{3,16}$").map_err(|_| Error::new("Cannot create regex (this is a bug, please create an issue on the github)"))?;
+    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9_]{3,16}$").unwrap());
 
-    regex.captures(value).map_or_else(
+    REGEX.captures(value).map_or_else(
         || {
             Err(Error::new(
                 "
@@ -85,36 +85,12 @@ A-Z characters, a-z characters, 0-9 numbers, `_` (underscore) symbol
 }
 
 fn check_uuid(value: &str, _context: &()) -> garde::Result {
-    let regex = Regex::new(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
-        .map_err(|_| Error::new("Cannot create regex (this is a bug, please create an issue on the github)"))?;
-
-    regex.captures(value).map_or_else(|| Err(Error::new("Invalid UUID")), |_| Ok(()))
+    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$").unwrap());
+    REGEX.captures(value).map_or_else(|| Err(Error::new("Invalid UUID")), |_| Ok(()))
 }
 
 impl View for SettingsPage<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
-        ui.heading("Utils");
-
-        let launcher_path = PathBuf::from(DOT_NOMI_LOGS_DIR);
-
-        if launcher_path.exists() {
-            if ui.button("Delete launcher's logs").clicked() {
-                let _ = std::fs::remove_dir_all(launcher_path);
-            }
-        } else {
-            ui.warn_label("The launcher log's directory is already deleted");
-        }
-
-        let game_path = PathBuf::from("./logs");
-
-        if game_path.exists() {
-            if ui.button("Delete game's logs").clicked() {
-                let _ = std::fs::remove_dir_all(game_path);
-            }
-        } else {
-            ui.warn_label("The games log's directory is already deleted");
-        }
-
         let settings_data = self.settings_state.clone();
 
         let mut form = Form::new().add_report(egui_form::garde::GardeReport::new(settings_data.validate(&())));
@@ -142,15 +118,13 @@ impl View for SettingsPage<'_> {
 
             if ui
                 .add_enabled(
-                    self.manager.get_collection::<JavaCollection>().tasks().is_empty(),
+                    self.manager.get_collection::<JavaDownloadingCollection>().tasks().is_empty(),
                     egui::Button::new("Download Java"),
                 )
                 .on_hover_text("Pressing this button will start the Java downloading process and add the downloaded binary as the selected one")
                 .clicked()
             {
-                self.java_state.download_java(self.manager, ui.ctx().clone());
-                self.settings_state.java = JavaRunner::path(PathBuf::from(DOT_NOMI_JAVA_EXECUTABLE));
-                self.settings_state.update_config();
+                download_java_and_update_config(ui, self.manager, self.java_state, self.settings_state);
             }
 
             FormField::new(&mut form, field_path!("java")).label("Java").ui(ui, |ui: &mut egui::Ui| {

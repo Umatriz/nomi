@@ -1,16 +1,17 @@
 use std::path::PathBuf;
 
-use eframe::egui::Context;
+use eframe::egui::{Context, Ui};
 use egui_task_manager::{Caller, Task, TaskManager};
 use nomi_core::{
     downloads::{java::JavaDownloader, progress::MappedSender, traits::Downloader},
     fs::read_toml_config_sync,
+    repository::java_runner::JavaRunner,
     DOT_NOMI_JAVA_DIR, DOT_NOMI_JAVA_EXECUTABLE, DOT_NOMI_SETTINGS_CONFIG,
 };
 use tracing::info;
 
 use crate::{
-    collections::JavaCollection,
+    collections::JavaDownloadingCollection,
     errors_pool::ErrorPoolExt,
     views::{
         add_tab_menu::TabsState,
@@ -92,6 +93,12 @@ impl JavaState {
         });
 
         let task = Task::new("Java downloading", caller);
-        manager.push_task::<JavaCollection>(task);
+        manager.push_task::<JavaDownloadingCollection>(task);
     }
+}
+
+pub fn download_java_and_update_config(ui: &mut Ui, manager: &mut TaskManager, java_state: &mut JavaState, settings_state: &mut SettingsState) {
+    java_state.download_java(manager, ui.ctx().clone());
+    settings_state.java = JavaRunner::path(PathBuf::from(DOT_NOMI_JAVA_EXECUTABLE));
+    settings_state.update_config();
 }

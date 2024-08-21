@@ -14,7 +14,8 @@ pub enum JavaRunner {
 impl JavaRunner {
     pub fn from_environment() -> Self {
         if std::env::var("PATH").is_ok_and(|path| path.contains("java")) {
-            Self::command("java")
+            let command = if cfg!(windows) { "javaw" } else { "java" };
+            Self::command(command)
         } else {
             Self::path(DOT_NOMI_JAVA_EXECUTABLE.into())
         }

@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use regex::Regex;
 use serde::{de::Visitor, Deserialize, Serialize};
 use thiserror::Error;
@@ -62,9 +64,10 @@ pub enum ValidationError {
 
 impl Username {
     pub fn new(s: impl Into<String>) -> anyhow::Result<Self> {
+        static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^[a-zA-Z0-9_]{3,16}$").unwrap());
+
         let s = s.into();
-        let re = Regex::new(r"^[a-zA-Z0-9_]{3,16}$")?;
-        match re.captures(&s) {
+        match REGEX.captures(&s) {
             Some(_) => Ok(Username(s)),
             None => Err(ValidationError::InvalidUsername.into()),
         }
