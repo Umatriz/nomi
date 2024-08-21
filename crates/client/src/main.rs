@@ -1,7 +1,6 @@
 // Remove console window in release builds
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use anyhow::anyhow;
 use collections::{AssetsCollection, GameDownloadingCollection, GameRunnerCollection, JavaCollection};
 use context::MyContext;
 use eframe::{
@@ -193,10 +192,6 @@ impl eframe::App for MyTabs {
                 ui.add_space(this_target_width);
 
                 egui::warn_if_debug_build(ui);
-
-                if ui.button("Cause an error").clicked() {
-                    Err::<(), _>(anyhow!("Error!")).report_error();
-                }
 
                 let is_errors = { !ERRORS_POOL.read().is_empty() };
                 if is_errors {

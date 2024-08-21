@@ -177,7 +177,7 @@ impl View for ProfileInfo<'_> {
         egui::Window::new("Import mods")
             .open(&mut self.profile_info_state.is_import_window_open)
             .show(ui.ctx(), |ui| {
-                egui::ScrollArea::vertical().show(ui, |ui| {
+                egui::ScrollArea::both().show(ui, |ui| {
                     ui.label("Paste the import code");
                     let response = ui.text_edit_singleline(&mut self.profile_info_state.mods_to_import_string);
                     let button = ui.button("Check for conflicts");
@@ -280,6 +280,8 @@ impl View for ProfileInfo<'_> {
                         self.profile_info_state.mods_to_import.clear();
                         self.profile_info_state.conflicts.clear();
                         self.profile_info_state.mods_to_import_string.clear();
+
+                        toasts::add(|toasts| toasts.success("Successfully imported mods"));
                     }
                 });
             });
@@ -289,148 +291,151 @@ impl View for ProfileInfo<'_> {
             .show(ui.ctx(), |ui| {
                 let mods = &self.profile.read().mods.mods;
 
-                egui::Grid::new("export_mods_selection").show(ui, |ui| {
-                    if ui.button("Add all").clicked() {
-                        self.profile_info_state.included_mods.iter_mut().for_each(|s| *s = true);
-                    };
+                egui::ScrollArea::both().show(ui, |ui| {
+                    egui::Grid::new("export_mods_selection").show(ui, |ui| {
+                        if ui.button("Add all").clicked() {
+                            self.profile_info_state.included_mods.iter_mut().for_each(|s| *s = true);
+                        };
 
-                    if ui.button("Remove all").clicked() {
-                        self.profile_info_state.included_mods.iter_mut().for_each(|s| *s = false);
-                    };
+                        if ui.button("Remove all").clicked() {
+                            self.profile_info_state.included_mods.iter_mut().for_each(|s| *s = false);
+                        };
 
-                    ui.end_row();
-
-                    for (modification, state) in mods.iter().zip(self.profile_info_state.included_mods.iter_mut()) {
-                        ui.checkbox(state, "");
-                        mod_info_ui(ui, modification);
                         ui.end_row();
+
+                        for (modification, state) in mods.iter().zip(self.profile_info_state.included_mods.iter_mut()) {
+                            ui.checkbox(state, "");
+                            mod_info_ui(ui, modification);
+                            ui.end_row();
+                        }
+                    });
+
+                    if ui
+                        .add_enabled(
+                            !self.profile_info_state.included_mods.iter().all(|s| !s),
+                            egui::Button::new("Finish exporting"),
+                        )
+                        .on_hover_text("The export code will include all the mods that have the checkbox checked")
+                        .clicked()
+                    {
+                        let mods = mods
+                            .iter()
+                            .zip(self.profile_info_state.included_mods.iter())
+                            .filter(|(_, s)| **s)
+                            .map(|(m, _)| m.clone())
+                            .map(|mut m| {
+                                m.is_downloaded = false;
+                                m
+                            })
+                            .collect::<Vec<_>>();
+
+                        if let Some(export_code) = serde_json::to_string(&mods).report_error() {
+                            ui.ctx().copy_text(export_code);
+                        }
+
+                        toasts::add(|toasts| toasts.success("Copied the export code to the clipboard"));
                     }
                 });
-
-                if ui
-                    .add_enabled(
-                        !self.profile_info_state.included_mods.iter().all(|s| !s),
-                        egui::Button::new("Finish exporting"),
-                    )
-                    .on_hover_text("The export code will include all the mods that have the checkbox checked")
-                    .clicked()
-                {
-                    let mods = mods
-                        .iter()
-                        .zip(self.profile_info_state.included_mods.iter())
-                        .filter(|(_, s)| **s)
-                        .map(|(m, _)| m.clone())
-                        .map(|mut m| {
-                            m.is_downloaded = false;
-                            m
-                        })
-                        .collect::<Vec<_>>();
-
-                    if let Some(export_code) = serde_json::to_string(&mods).report_error() {
-                        ui.ctx().copy_text(export_code);
-                    }
-
-                    toasts::add(|toasts| toasts.success("Copied the export code to the clipboard"));
-                }
             });
 
-        ui.heading("Profile");
+        egui::ScrollArea::both().auto_shrink([false, true]).show(ui, |ui| {
+            ui.heading("Profile");
 
-        ui.small("Don't forget to save the changes!");
+            ui.small("Don't forget to save the changes!");
 
-        ui.label("Profile name");
-        TextEdit::singleline(&mut self.profile_info_state.profile_name).show(ui);
+            ui.label("Profile name");
+            TextEdit::singleline(&mut self.profile_info_state.profile_name).show(ui);
 
-        ui.label("JVM arguments");
+            ui.label("JVM arguments");
 
-        ui.small("Each element should represent only one argument.");
+            ui.small("Each element should represent only one argument.");
 
-        ui.vertical(|ui| {
-            egui::Grid::new("jvm_arguments_ui").show(ui, |ui| {
-                self.profile_info_state.profile_jvm_args.retain_mut(|i| {
-                    ui.scope(|ui| {
-                        ui.set_min_width(150.0);
-                        ui.text_edit_singleline(i);
+            ui.vertical(|ui| {
+                egui::Grid::new("jvm_arguments_ui").show(ui, |ui| {
+                    self.profile_info_state.profile_jvm_args.retain_mut(|i| {
+                        ui.scope(|ui| {
+                            ui.set_min_width(150.0);
+                            ui.text_edit_singleline(i);
+                        });
+                        let response = ui.button("❌");
+                        ui.end_row();
+                        *i = i.trim().to_string();
+                        !response.clicked()
                     });
-                    let response = ui.button("❌");
-                    ui.end_row();
-                    *i = i.trim().to_string();
-                    !response.clicked()
+                });
+
+                ui.horizontal(|ui| {
+                    ui.text_edit_singleline(&mut self.profile_info_state.jvm_arg_to_add);
+                    if ui.button("Add").clicked() {
+                        let value = std::mem::take(&mut self.profile_info_state.jvm_arg_to_add).trim().to_string();
+                        self.profile_info_state.profile_jvm_args.push(value)
+                    };
                 });
             });
 
             ui.horizontal(|ui| {
-                ui.text_edit_singleline(&mut self.profile_info_state.jvm_arg_to_add);
-                if ui.button("Add").clicked() {
-                    let value = std::mem::take(&mut self.profile_info_state.jvm_arg_to_add).trim().to_string();
-                    self.profile_info_state.profile_jvm_args.push(value)
-                };
-            });
-        });
+                if ui.button("Save").clicked() {
+                    {
+                        let mut profile = self.profile.write();
+                        profile.profile.name.clone_from(&self.profile_info_state.profile_name);
+                        if let ProfileState::Downloaded(instance) = &mut profile.profile.state {
+                            instance.jvm_arguments_mut().clone_from(&self.profile_info_state.profile_jvm_args);
+                        }
 
-        ui.horizontal(|ui| {
-            if ui.button("Save").clicked() {
-                {
-                    let mut profile = self.profile.write();
-                    profile.profile.name.clone_from(&self.profile_info_state.profile_name);
-                    if let ProfileState::Downloaded(instance) = &mut profile.profile.state {
-                        instance.jvm_arguments_mut().clone_from(&self.profile_info_state.profile_jvm_args);
-                    }
-
-                    if let Some(instance) = self.profiles.find_instance(profile.profile.id.instance()) {
-                        if let Some(profile) = instance.write().find_profile_mut(profile.profile.id) {
-                            profile.name.clone_from(&self.profile_info_state.profile_name);
+                        if let Some(instance) = self.profiles.find_instance(profile.profile.id.instance()) {
+                            if let Some(profile) = instance.write().find_profile_mut(profile.profile.id) {
+                                profile.name.clone_from(&self.profile_info_state.profile_name);
+                            }
                         }
                     }
+
+                    self.profiles
+                        .update_instance_config(self.profile.read().profile.id.instance())
+                        .report_error();
+                    self.profiles.update_profile_config(self.profile.read().profile.id).report_error();
                 }
 
-                self.profiles
-                    .update_instance_config(self.profile.read().profile.id.instance())
-                    .report_error();
-                self.profiles.update_profile_config(self.profile.read().profile.id).report_error();
-            }
-
-            if ui.button("Reset").clicked() {
-                self.profile_info_state.set_profile_to_edit(&self.profile.read());
-            }
-        });
-
-        ui.heading("Mods");
-
-        ui.add_enabled_ui(self.profile.read().profile.loader().support_mods(), |ui| {
-            ui.toggle_button(&mut self.profile_info_state.is_import_window_open, "Import mods");
-            if ui
-                .toggle_button(&mut self.profile_info_state.is_export_window_open, "Export mods")
-                .clicked()
-            {
-                self.profile_info_state.included_mods = vec![true; self.profile.read().mods.mods.len()];
-            }
-
-            if ui
-                .button("Open mods folder")
-                .on_hover_text("Open a folder where mods for this profile are located.")
-                .clicked()
-            {
-                let profile_id = self.profile.read().profile.id;
-                let path = mods_stash_path_for_profile(profile_id);
-
-                if !path.exists() {
-                    std::fs::create_dir_all(&path).report_error();
+                if ui.button("Reset").clicked() {
+                    self.profile_info_state.set_profile_to_edit(&self.profile.read());
+                    self.profile_info_state.jvm_arg_to_add.clear();
                 }
-                if let Ok(path) = std::fs::canonicalize(path) {
-                    open_directory_native(path).report_error();
+            });
+
+            ui.heading("Mods");
+
+            ui.add_enabled_ui(self.profile.read().profile.loader().support_mods(), |ui| {
+                ui.toggle_button(&mut self.profile_info_state.is_import_window_open, "Import mods");
+                if ui
+                    .toggle_button(&mut self.profile_info_state.is_export_window_open, "Export mods")
+                    .clicked()
+                {
+                    self.profile_info_state.included_mods = vec![true; self.profile.read().mods.mods.len()];
                 }
+
+                if ui
+                    .button("Open mods folder")
+                    .on_hover_text("Open a folder where mods for this profile are located.")
+                    .clicked()
+                {
+                    let profile_id = self.profile.read().profile.id;
+                    let path = mods_stash_path_for_profile(profile_id);
+
+                    if !path.exists() {
+                        std::fs::create_dir_all(&path).report_error();
+                    }
+                    if let Ok(path) = std::fs::canonicalize(path) {
+                        open_directory_native(path).report_error();
+                    }
+                }
+            });
+
+            if ui.button("Browse mods").clicked() {
+                let kind = TabKind::Mods {
+                    profile: self.profile.clone(),
+                };
+                self.tabs_state.0.insert(kind.id(), kind);
             }
-        });
 
-        if ui.button("Browse mods").clicked() {
-            let kind = TabKind::Mods {
-                profile: self.profile.clone(),
-            };
-            self.tabs_state.0.insert(kind.id(), kind);
-        }
-
-        egui::ScrollArea::vertical().min_scrolled_width(ui.available_width()).show(ui, |ui| {
             let (mut vec, profile_id) = {
                 let profile = &mut self.profile.write();
                 (std::mem::take(&mut profile.mods.mods), profile.profile.id)
