@@ -32,7 +32,6 @@ where
     Ok(body)
 }
 
-#[tracing::instrument(skip_all, fields(path = path.as_ref().to_string_lossy().to_string()), err)]
 pub fn read_toml_config_sync<T>(path: impl AsRef<Path>) -> anyhow::Result<T>
 where
     T: DeserializeOwned + ?Sized,
@@ -41,7 +40,6 @@ where
     runtime.block_on(read_toml_config::<T>(path))
 }
 
-#[tracing::instrument(skip_all, fields(path = path.as_ref().to_string_lossy().to_string()), err)]
 pub fn write_toml_config_sync<T>(data: &T, path: impl AsRef<Path>) -> anyhow::Result<()>
 where
     T: Serialize + ?Sized,

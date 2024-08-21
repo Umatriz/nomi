@@ -1,7 +1,6 @@
 // Remove console window in release builds
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use anyhow::anyhow;
 use collections::{AssetsCollection, GameDownloadingCollection, GameRunnerCollection, JavaCollection};
 use context::MyContext;
 use eframe::{

@@ -1,4 +1,3 @@
-
 use nomi_core::{
     configs::profile::{ProfileState, VersionProfile},
     downloads::traits::Downloader,
