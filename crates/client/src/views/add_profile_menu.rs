@@ -155,11 +155,6 @@ impl View for AddProfileMenu<'_> {
             });
 
             if matches!(self.menu_state.selected_loader_buf, Loader::Fabric { .. }) {
-                ui.label(
-                    RichText::new("Warn: Fabric version will not run if you have not installed Vanilla version previously")
-                        .color(ui.visuals().warn_fg_color),
-                );
-
                 if !self.menu_state.fabric_versions.is_empty() {
                     if let Loader::Fabric { version } = &mut self.menu_state.selected_loader_buf {
                         egui::ComboBox::from_label("Select Fabric version")

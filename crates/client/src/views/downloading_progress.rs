@@ -1,4 +1,3 @@
-use eframe::egui::{self, Layout};
 use egui_task_manager::TaskManager;
 
 use super::{profiles::InstancesState, View};
@@ -10,10 +9,13 @@ pub struct DownloadingProgress<'a> {
 
 impl View for DownloadingProgress<'_> {
     fn ui(self, ui: &mut eframe::egui::Ui) {
-        ui.with_layout(Layout::top_down_justified(egui::Align::Min), |ui| {
+        ui.vertical(|ui| {
             for collection in self.manager.iter_collections() {
                 for task in collection.iter_tasks() {
-                    ui.group(|ui| task.ui(ui));
+                    ui.group(|ui| {
+                        ui.set_width(ui.available_width());
+                        task.ui(ui)
+                    });
                 }
             }
         });

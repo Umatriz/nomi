@@ -194,10 +194,6 @@ impl eframe::App for MyTabs {
 
                 egui::warn_if_debug_build(ui);
 
-                if ui.button("Cause an error").clicked() {
-                    Err::<(), _>(anyhow!("Error!")).report_error();
-                }
-
                 let is_errors = { !ERRORS_POOL.read().is_empty() };
                 if is_errors {
                     let button = egui::Button::new(RichText::new("Errors").color(ui.visuals().error_fg_color));
